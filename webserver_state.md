@@ -1,12 +1,12 @@
-* **Bu Dosyanın Amacı:** Bu dosya benim yaptığım projede şuan hangi aşamada olduğumu hangi projeyi yaptığı proje bilgilerini ve bilip bilmediğim şeyleri anlatıyor. Senin görevin bu dosyayı okuyup ben öğrendikçe ve projeyi geliştirdikçe bu dosyayı güncellemen. pdf dosyayını okumayı unutma main.cyi de oku
+* **Bu Dosyanın Amacı:** Bu dosya benim yaptığım projede şuan hangi aşamada olduğumu hangi projeyi yaptığı proje bilgilerini ve bilip bilmediğim şeyleri anlatıyor. Senin görevin bu dosyayı okuyup ben öğrendikçe ve projeyi geliştirdikçe bu dosyayı güncellemen. pdf dosyayını okumayı unutma main.cyi de oku 
 
 # 🚀 Proje Durumu: 42 Webserv
 
 ## 📌 Genel Bilgiler
 * **Proje Adı:** Webserv 
-* **Amaç:** C++98 kullanarak, HTTP protokolünü anlayan kendi web sunucumuzu (HTTP server) yazmak[cite: 4, 90, 91].
-* **Referans Kaynak:** `PDF/en.subject.pdf` projnin kuralları ve geri kalan bütün bilgiler burda bunu kesin oku
-* **Mevcut Aşama:** Teorik araştırma ve teknik altyapı hazırlığı (Kodlama aşamasına henüz geçilmedi).
+* [cite_start]**Amaç:** C++98 kullanarak, HTTP protokolünü anlayan kendi web sunucumuzu (HTTP server) yazmak[cite: 4, 90, 91].
+* **Referans Kaynak:** `PDF/en.subject.pdf` (Projenin kuralları ve bütün temel bilgileri).
+* **Mevcut Aşama:** İlk çalışan bloklayıcı (blocking) prototip yazıldı ve HTTP iletişimi tarayıcılarla test edildi. Şu an projeyi kurallara uygun hale getirecek olan Non-Blocking (Bloklanmayan) mimariye ve konfigürasyon (config) okuma aşamasına geçiş yapılıyor.
 
 ---
 
@@ -14,15 +14,19 @@
 
 ### 1. Soket Programlama Temelleri
 * **Socket Oluşturma (`socket()`):** İletişim için bir uç nokta (endpoint) veya telefon ahizesi oluştururuz.
-  * `AF_INET`: IPv4 protokolünü kullanacağımızı belirtir.
-  * `SOCK_STREAM`: TCP üzerinden güvenilir ve kayıpsız veri iletimi sağlar.
-  * *Not:* Soketler aslında işletim sistemi gözünde özel yetenekleri olan birer Dosya Tanımlayıcıdır (File Descriptor - fd).
+  * `AF_INET`: IPv4 protokolünü kullanır.
+  * `SOCK_STREAM`: TCP üzerinden güvenilir veri iletimi sağlar.
+* **Adresleme ve Bağlama (`bind()`):** Sokete (fd) spesifik bir IP (`INADDR_ANY` ile hepsi) ve Port numarası (örn: 8080) atar. Portlar için byte sıralaması (`htons()`) kullanılır.
+* **Kapıları Açma (`listen()`):** Soketi pasif/dinleyici moda geçirir. İşletim sistemine, gelen bağlantıları bekletmesi için bir bekleme odası (backlog kuyruğu) ayırmasını söyler.
+* **Müşteriyi İçeri Alma (`accept()`):** Kuyruktaki ilk bağlantı isteğini kabul eder. Orijinal dinleyici soket kapıda beklemeye devam ederken, `accept()` bize sırf o istemciyle konuşmamız için **yepyeni bir dosya tanımlayıcısı (client_socket)** verir.
 
-### 2. Adresleme ve Bağlama (`bind()`)
-* **Bind İşlemi:** Oluşturulan isimsiz sokete (fd) spesifik bir IP adresi ve Port numarası atar. 
-* **Struct Kullanımı:** Ağ üzerinden veri yollarken adresleri `sockaddr_in` yapısı içinde tutarız.
-* **IP Ataması (`INADDR_ANY`):** Bilgisayardaki tüm ağ arayüzlerinden (localhost, Wi-Fi IP'si vb.) gelen istekleri kabul etmek için `INADDR_ANY` (0.0.0.0) makrosunu kullanırız. Özel bir IP vermek için `inet_addr("127.0.0.1")` kullanılır.
-* **Byte Sıralaması (`htons()`):** Port numarası gibi verileri bilgisayarın bellek dizilişinden (Host), Ağ dizilişine (Network) çevirmek zorundayız.
+### 2. HTTP Protokolü İletişimi
+* **İstekler (Request):** Tarayıcıların bize gönderdiği metinler. `GET / HTTP/1.1` ile başlar, başlıklar (headers) içerir ve `\r\n\r\n` (boş satır) ile biter.
+* **Yanıtlar (Response):** Bizim tarayıcıya döndüğümüz yapı. 
+  * Durum satırı (`HTTP/1.1 200 OK`)
+  * Başlıklar (`Content-Type: text/html`, `Content-Length: ...`)
+  * Sihirli boş satır (`\r\n\r\n`)
+  * Gövde (C++ `ifstream` ile okuduğumuz `index.html` dosyası vb.).
 
 ### 3. Port Kavramı ve Yönetimi
 * **Portlar:** 0 ile 65535 arasında 16-bitlik numaralardır.
@@ -35,54 +39,43 @@ Aktif olarak dinlenen portları ve ağ durumunu kontrol etmek için kullandığ�
 * **Ubuntu (Linux) Tarafı:** `ss -tuln` (Dinlenen portları hızlıca listeler) veya `lsof -i -P -n` (Portu hangi uygulamanın tuttuğunu gösterir).
 * **Windows 10 Tarafı:** `netstat -ano` (Aktif portları ve süreç ID'lerini (PID) listeler).
 
+### 5. Multiplexing ve `poll()` Motoru (Teorik Olarak Kavrandı)
+* **Neden İhtiyacımız Var?** Yazdığımız ilk kod `accept` ve `read` işlemlerinde bloklanıyor (kilitleniyor). PDF kuralları gereği sunucu asla kilitlenmemelidir.
+* **Çözüm:** `poll()` fonksiyonu ile işletim sistemine bir `std::vector<struct pollfd>` listesi vererek "Olay Döngüsü (Event Loop)" kurmak.
+* **Kural:** İstemciler ve sunucu arasındaki tüm I/O işlemleri, okuma ve yazmayı aynı anda izleyen tek bir `poll()` (veya eşdeğeri) üzerinden yönetilmelidir. İşletim sistemi `POLLIN` veya `POLLOUT` ile bize haber vermeden asla `read` veya `write` yapamayız.
+
 ---
 
-## ✅ Tamamlananlar
+## ✅ Tamamlananlar (Pratik Kodlama)
 
 * **Temel Soket Kurulumu:** `socket()` ile soket oluşturma ve `bind()` ile bir porta bağlama.
+* **İlk Çalışan Sunucu (main.cpp):** `listen` ve sonsuz döngü içinde `accept` kullanarak temel bir sunucu ayağa kaldırıldı.
+* **Statik Dosya Sunumu:** İstemciden gelen istek karşılanıp, C++ disk işlemleri (`std::ifstream`) kullanılarak yerel bir `index.html` dosyası okundu ve tarayıcıya başarıyla HTTP yanıtı olarak gönderildi.
+* **Testler:** Kod hem `telnet localhost 8080` ile manuel olarak, hem de Google Chrome üzerinden gerçek dünya senaryosuyla test edildi.
 
-## 🚧 Öğrenilecekler / Sıradaki Adımlar (Genişletilmiş To-Do List)
+---
 
-1.  **Bağlantı Kabul Etme:**
-    *   `listen()`: Soketi gelen bağlantıları dinleyecek şekilde pasif moda geçirme.
-    *   `accept()`: Gelen bir bağlantı isteğini kabul ederek istemciyle iletişim için yeni bir soket (file descriptor) oluşturma.
+## 🚧 Öğrenilecekler / Sıradaki Adımlar (To-Do List)
 
-2.  **Non-Blocking I/O ve I/O Multiplexing:**
-    *   **Non-Blocking Soketler:** `fcntl()` kullanarak soketleri non-blocking moda ayarlama. Bu, `accept`, `recv`, `send` gibi fonksiyonların programı kilitlemesini önler.
-    *   **Multiplexing:** `poll()` (veya `epoll`/`kqueue`) kullanarak aynı anda birden çok istemciyi yönetme.
-        *   Ana dinleme soketini ve tüm istemci soketlerini izleme.
-        *   Hangi soketin okumaya veya yazmaya hazır olduğunu verimli bir şekilde tespit etme.
+1.  **Konfigürasyon Dosyası (`.conf`) Ayrıştırma (Parsing):** *(Öncelikli Adım)*
+    * NGINX benzeri bir dosyayı okuyup C++ objelerine (class/struct) çevirmek.
+    * Birden çok sunucu (arayüz:port çifti) dinleme ayarlarını çekmek.
+    * Route (yol) bazlı kuralları (allow_methods, kök dizin, error_pages, directory listing) değişkene aktarmak.
 
-3.  **HTTP Protokolü İşleme:**
-    *   **Request Parsing:** İstemciden gelen HTTP isteklerini (GET, POST, DELETE) ayrıştırma.
-        *   İstek satırını (örn: `GET /index.html HTTP/1.1`), başlıkları (headers) ve varsa gövdeyi (body) okuma.
-    *   **Response Oluşturma:** Geçerli HTTP yanıtları oluşturma.
-        *   Durum kodları (200 OK, 404 Not Found, vb.).
-        *   Gerekli başlıklar (`Content-Type`, `Content-Length`, vb.).
-        *   İstenen kaynağı (dosya içeriği) veya hata sayfasını yanıta ekleme.
+2.  **Bloklanmayan (Non-Blocking) Mimarisine Geçiş:**
+    * Şu anki tekil `while(true)` yapısını yıkıp, `poll()` fonksiyonunu merkeze alan yeni bir Event Loop inşa etmek.
+    * `fcntl()` kullanarak tüm soketleri non-blocking moda geçirmek. (MacOS için özel bayraklar: `F_SETFL, O_NONBLOCK, FD_CLOEXEC`).
+    * `poll()` yapısını hem yeni bağlantıları (`accept`) hem de var olan müşterilerden gelen verileri (`read`/`recv`) aynı anda dinleyecek şekilde kurgulamak.
 
-4.  **Konfigürasyon Dosyası (`.conf`):**
-    *   **Parsing:** Projenin başlangıcında bir konfigürasyon dosyasını okuyup ayrıştırma.
-    *   **Ayarlar:**
-        *   Birden çok sunucu (port) dinleme.
-        *   Varsayılan hata sayfaları.
-        *   İstemci gövde boyutu limiti.
-        *   Route (yol) bazlı kurallar:
-            *   İzin verilen HTTP metodları.
-            *   HTTP yönlendirmeleri (redirection).
-            *   Statik dosyaların sunulacağı kök dizin.
-            *   Dizin listeleme (directory listing) açma/kapama.
+3.  **HTTP Request (İstek) Ayrıştırma (Parsing):**
+    * Müşteriden okunan `buffer` içindeki o devasa HTTP metnini parçalamak.
+    * İlk satırdan metodu (`GET`, `POST`, `DELETE`) ve hedef URL'i ayıklamak.
+    * Gönderilen veri varsa `Content-Length` başlığını bulup, config dosyasındaki istemci gövde boyutu limitiyle (client_max_body_size) karşılaştırmak.
 
-5.  **Statik Site Sunumu:**
-    *   İstek URI'sine göre istenen dosyayı bulma ve içeriğini HTTP yanıtı olarak gönderme.
+4.  **CGI (Common Gateway Interface) Entegrasyonu:**
+    * Eğer istenen dosya bir `.php` veya `.py` ise, programın `fork()` yapıp bu scripti harici olarak çalıştırması.
+    * Tarayıcıdan gelen bilgileri Environment Variables (Ortam Değişkenleri) olarak bu CGI scriptine paslamak.
 
-6.  **CGI (Common Gateway Interface):**
-    *   Belirli isteklere (örn: `.php` uzantılı dosyalara) dayalı olarak harici bir program (CGI script) çalıştırma.
-    *   İstek bilgilerini environment variables aracılığıyla CGI script'ine geçirme.
-    *   CGI script'inin çıktısını yakalayıp istemciye HTTP yanıtı olarak gönderme.
-
-7.  **Diğer Gereksinimler:**
-    *   `Makefile` oluşturma (`all`, `clean`, `fclean`, `re` hedefleriyle).
-    *   `C++98` standardına ve `-Wall -Wextra -Werror` flag'lerine uyum.
-    *   Stres testi yaparak sunucunun çökmediğinden emin olma.
-    *   Dosya yükleme (file upload) işlevselliği (POST metodu ile).
+5.  **Diğer Gereksinimler:**
+    * `Makefile` oluşturma (`NAME`, `all`, `clean`, `fclean`, `re` kuralları ile).
+    * Herhangi bir dış kütüphane kullanmadan tam `C++98` uyumluluğu sağlamak.
