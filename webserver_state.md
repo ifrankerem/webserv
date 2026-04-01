@@ -4,7 +4,7 @@
 
 ## 📌 Genel Bilgiler
 * **Proje Adı:** Webserv 
-* [cite_start]**Amaç:** C++98 kullanarak, HTTP protokolünü anlayan kendi web sunucumuzu (HTTP server) yazmak[cite: 4, 90, 91].
+* **Amaç:** C++98 kullanarak, HTTP protokolünü anlayan kendi web sunucumuzu (HTTP server) yazmak[cite: 4, 90, 91].
 * **Referans Kaynak:** `PDF/en.subject.pdf` (Projenin kuralları ve bütün temel bilgileri).
 * **Mevcut Aşama:** İlk çalışan bloklayıcı (blocking) prototip yazıldı ve HTTP iletişimi tarayıcılarla test edildi. Şu an projeyi kurallara uygun hale getirecek olan Non-Blocking (Bloklanmayan) mimariye ve konfigürasyon (config) okuma aşamasına geçiş yapılıyor.
 
@@ -39,7 +39,21 @@ Aktif olarak dinlenen portları ve ağ durumunu kontrol etmek için kullandığ�
 * **Ubuntu (Linux) Tarafı:** `ss -tuln` (Dinlenen portları hızlıca listeler) veya `lsof -i -P -n` (Portu hangi uygulamanın tuttuğunu gösterir).
 * **Windows 10 Tarafı:** `netstat -ano` (Aktif portları ve süreç ID'lerini (PID) listeler).
 
-### 5. Multiplexing ve `poll()` Motoru (Teorik Olarak Kavrandı)
+### 5. std::vector Kullanımı ve Birden Fazla Port Dinleme
+* Normal C dizileri yerine C++'ın esnek `std::vector` yapısını kullanmak.
+* Config okundukça her bir `server {}` bloğu için ayrı bir `socket()`, `bind()`, `listen()` yapıp, elde edilen file descriptor'ları (FD) bir vektörde (örneğin: `std::vector<int> server_sockets;`) depolamak.
+
+### 7. CGI (Common Gateway Interface) Mekanizması ve Python/PHP Şartı
+* Webserv sadece `.html`, `.css` gibi statik dosyaları okuyup yollamakla kalmaz.
+* PDF'ye göre **"en az bir tane"** dinamik çalıştırılabilir dil (interpreter) desteklemek zorundasın (Python, PHP vb.).
+* Eğer tarayıcıdan `GET /script.py HTTP/1.1` veya `POST /gonder.php HTTP/1.1` diye bir istek gelirse, bunu C++'ın okuyup kendisi döndürmez.
+* **Nasıl Çalışır? (CGI Algoritması)**
+  1. `fork()` ile programı ikiye böl (Child Process oluşur).
+  2. Child Process, `execve()` kullanarak işletim sistemindeki Python'u (veya PHP'yi) çağırır ve ona o `.py` (veya `.php`) dosyasını çalıştır der.
+  3. C++ Webserv'in (Parent Process) Python'un ürettiği çıktıyı okuyabilmesi için `pipe()` kullanılır.
+  4. Script (Python/PHP) işini bitirip çıktıyı (örn: `<h1>Giriş Başarılı</h1>`) pipe içine tükürür.
+  5. Parent process pipe'dan bu çıktıyı okuyup tarayıcıya (istenilen HTTP formatında) gönderir.
+* **Sonuç:** Kodun %99'u C++98 olacak. Ama test edebilmek ve bu (CGI) kuralı yerine getirebilmek için yanına 1-2 tane örnek `.py` (veya `.php`) dosyası yazmamız (veya hazır bulmamız) gerekecek. Python/PHP webe özel arka planda çalışan o küçük scriptlerdir, asıl sunucumuz kesinlikle C++ olacak.
 * **Neden İhtiyacımız Var?** Yazdığımız ilk kod `accept` ve `read` işlemlerinde bloklanıyor (kilitleniyor). PDF kuralları gereği sunucu asla kilitlenmemelidir.
 * **Çözüm:** `poll()` fonksiyonu ile işletim sistemine bir `std::vector<struct pollfd>` listesi vererek "Olay Döngüsü (Event Loop)" kurmak.
 * **Kural:** İstemciler ve sunucu arasındaki tüm I/O işlemleri, okuma ve yazmayı aynı anda izleyen tek bir `poll()` (veya eşdeğeri) üzerinden yönetilmelidir. İşletim sistemi `POLLIN` veya `POLLOUT` ile bize haber vermeden asla `read` veya `write` yapamayız.
@@ -55,27 +69,40 @@ Aktif olarak dinlenen portları ve ağ durumunu kontrol etmek için kullandığ�
 
 ---
 
-## 🚧 Öğrenilecekler / Sıradaki Adımlar (To-Do List)
+## 🚧 Güncel Yol Haritası ve Mimari Algoritma (To-Do List)
 
-1.  **Konfigürasyon Dosyası (`.conf`) Ayrıştırma (Parsing):** *(Öncelikli Adım)*
-    * NGINX benzeri bir dosyayı okuyup C++ objelerine (class/struct) çevirmek.
-    * Birden çok sunucu (arayüz:port çifti) dinleme ayarlarını çekmek.
-    * Route (yol) bazlı kuralları (allow_methods, kök dizin, error_pages, directory listing) değişkene aktarmak.
+### 1- Config ve Hazırlık Aşaması
+* **Config Dosyası Okuma (Parser):** `webserv.conf` dosyasını parse et.
+* **Server Sayısını Belirleme:** Parser'dan kaç tane server (farklı port/IP) açılacağını öğren.
+* **Soket Vektörleri:** Her server için bir TCP Socket oluştur ve File Descriptor'ları (FD) bir `std::vector<int>` içinde tut.
 
-2.  **Bloklanmayan (Non-Blocking) Mimarisine Geçiş:**
-    * Şu anki tekil `while(true)` yapısını yıkıp, `poll()` fonksiyonunu merkeze alan yeni bir Event Loop inşa etmek.
-    * `fcntl()` kullanarak tüm soketleri non-blocking moda geçirmek. (MacOS için özel bayraklar: `F_SETFL, O_NONBLOCK, FD_CLOEXEC`).
-    * `poll()` yapısını hem yeni bağlantıları (`accept`) hem de var olan müşterilerden gelen verileri (`read`/`recv`) aynı anda dinleyecek şekilde kurgulamak.
+### 2- Server Başlatma (Init)
+* Her bir server soketi için:
+  * `bind()` ile IP ve Port ata.
+  * `listen()` ile dinlemeye başla.
+  * **KRİTİK:** `fcntl()` kullanarak tüm server soketlerini `O_NONBLOCK` (bloklanmayan) moda geçir.
 
-3.  **HTTP Request (İstek) Ayrıştırma (Parsing):**
-    * Müşteriden okunan `buffer` içindeki o devasa HTTP metnini parçalamak.
-    * İlk satırdan metodu (`GET`, `POST`, `DELETE`) ve hedef URL'i ayıklamak.
-    * Gönderilen veri varsa `Content-Length` başlığını bulup, config dosyasındaki istemci gövde boyutu limitiyle (client_max_body_size) karşılaştırmak.
+### 3- Event Loop (Olay Döngüsü) ve `poll()` Motoru
+* Tüm server soketlerini ve (daha sonra eklenecek olan) client soketlerini takip etmek için bir `std::vector<struct pollfd>` oluştur.
+* Sonsuz bir `while(true)` döngüsü başlat ve içinde `poll()` çağır. `poll()`, işletim sistemine "Bu soketlerde bir hareket (yeni bağlantı veya yeni mesaj) olana kadar bekle" der.
 
-4.  **CGI (Common Gateway Interface) Entegrasyonu:**
-    * Eğer istenen dosya bir `.php` veya `.py` ise, programın `fork()` yapıp bu scripti harici olarak çalıştırması.
-    * Tarayıcıdan gelen bilgileri Environment Variables (Ortam Değişkenleri) olarak bu CGI scriptine paslamak.
+### 4- Gelen İstekleri Yönetme (Accept & Read)
+* **Yeni Müşteri (Server Soketi Çaldıysa):** `accept()` ile müşteriyi al. Yeni oluşan client soketini de `O_NONBLOCK` yap ve `poll`'un izlediği listeye (`pollfd` vektörüne) ekle.
+* **Tarayıcıdan Mesaj (Client Soketi Çaldıysa):** `read()`/`recv()` ile gelen HTTP parse işlemi için oku ve bir Buffer'a yaz.
 
-5.  **Diğer Gereksinimler:**
-    * `Makefile` oluşturma (`NAME`, `all`, `clean`, `fclean`, `re` kuralları ile).
-    * Herhangi bir dış kütüphane kullanmadan tam `C++98` uyumluluğu sağlamak.
+### 5- HTTP Request Parse ve İşlem (GET, POST, DELETE)
+Okunan veriden Metod (GET/POST/DELETE), Hedef URL ve Body (Gövde) ayrıştırılır:
+* **GET:** İstenen HTML/görsel dosyasını diskten oku, HTTP başlıkları (200 OK) ile `write()`/`send()` kullanarak yolla.
+* **POST:** Tarayıcıdan gelen form verisini veya yüklenen (upload) dosyayı diske kaydet (201 Created).
+* **DELETE:** İstenen dosyanın varlığını kontrol et ve `remove()` ile diskten sil (204 No Content).
+
+### 6- Kapanış
+* İşi biten veya bağlantıyı koparan client'ı `close()` ile kapat ve `poll` vektöründen temizle.
+
+---
+
+## 🎯 Proje Felsefesi ve Mimari Farkındalık: Web Sunucusu vs Backend
+* **Aydınlanma Anı:** "Aslında webserver'dan bağımsız bir backend yazacağım." tespiti %100 doğru bir bakış açısıdır.
+* **C++ Webserv (Web Sunucusu Katmanı - Postacı/Kapıcı):** Senin projenin ana omurgasıdır. TCP ağ protokolünü, soketleri, multiplexing'i (`poll`) işler. HTTP formatını ayrıştırır. Ancak HTTP'nin barındırdığı bilginin "mantığıyla/işiyle" ilgilenmez. Sadece iletimden, dağıtımdan ve çoklu bağlanan müşterilere (client'lara) anında cevap verilmesinden sorumludur. Nginx veya Apache gibi çalışır.
+* **Python/PHP vb. Dosyalar (Backend/CGI Katmanı - Aşçı):** Kullanıcının veritabanına kaydedilmesi, şifre kontrolü veya hesaplama gibi mantıksal işleri yapan *bağımsız* kod parçalarıdır. Python veya PHP scriptleri HTTP raw (çiğ) protokolünü veya TCP soketlerini asla bilmez. Sadece standart girdi (`stdin`) okuyup, standart çıktı (`stdout`) üretir.
+* **Sonuç:** Senin C++ Web Sunucun, dışarıdan gelen müşteriyi (Browser) alacak ve ona ne istediğini soracak. Eğer Müşteri "Bana sadece resim ver" (GET) derse depodan resmi alıp verecek. Eğer Müşteri "Bu form verisini al, şifremi kontrol et" (POST) derse, C++ sunucun bunu o *bağımsız arkadaki backend scriptine (Python)* paslayacak (`execve` ve `pipe` ile), onun cevabını alıp müşteriye (Browser'a) kargo edecektir. Kendi yazdığımız web sunucumuz bir nevi "Trafik Polisi" dir. Müşteri (Browser) asla o arkaplandaki Python (backend) dosyasını doğrudan göremez veya ulaşamaz.
