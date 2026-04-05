@@ -63,7 +63,7 @@ int main() {
 
             // Hazırladığımız paketi tarayıcıya yolluyoruz
             write(client_socket, final_response.c_str(), final_response.length()); 
-
+        
             // --- 3. AŞAMA: Müşteriyle işimiz bitti, soketi kapatıyoruz ---
             close(client_socket); 
         }

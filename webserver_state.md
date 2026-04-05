@@ -1,12 +1,12 @@
-* **Bu Dosyanın Amacı:** Bu dosya benim yaptığım projede şuan hangi aşamada olduğumu hangi projeyi yaptığı proje bilgilerini ve bilip bilmediğim şeyleri anlatıyor. Senin görevin bu dosyayı okuyup ben öğrendikçe ve projeyi geliştirdikçe bu dosyayı güncellemen. pdf dosyayını okumayı unutma main.cyi de oku 
+* **Bu Dosyanın Amacı:** Bu dosya benim yaptığım projede şuan hangi aşamada olduğumu hangi projeyi yaptığı proje bilgilerini ve bilip bilmediğim şeyleri anlatıyor. Senin görevin bu dosyayı okuyup ben öğrendikçe ve projeyi geliştirdikçe bu dosyayı güncellemen. Pdf dosyayını oku dizinini "Referans Kaynak"ta belittim.
 
 # 🚀 Proje Durumu: 42 Webserv
 
 ## 📌 Genel Bilgiler
 * **Proje Adı:** Webserv 
-* **Amaç:** C++98 kullanarak, HTTP protokolünü anlayan kendi web sunucumuzu (HTTP server) yazmak[cite: 4, 90, 91].
+* **Amaç:** C++98 kullanarak, HTTP protokolünü anlayan kendi web sunucumuzu (HTTP server) yazmak
 * **Referans Kaynak:** `PDF/en.subject.pdf` (Projenin kuralları ve bütün temel bilgileri).
-* **Mevcut Aşama:** İlk çalışan bloklayıcı (blocking) prototip yazıldı ve HTTP iletişimi tarayıcılarla test edildi. Şu an projeyi kurallara uygun hale getirecek olan Non-Blocking (Bloklanmayan) mimariye ve konfigürasyon (config) okuma aşamasına geçiş yapılıyor.
+* **Mevcut Aşama:** İlk çalışan bloklayıcı (blocking) prototip yazıldı ve HTTP iletişimi tarayıcılarla test edildi. Şu an projeyi kurallara uygun hale getirecek olan Non-Blocking (Bloklanmayan) mimariye ve konfigürasyon (config) okuma aşamasına geçiş yapılıyor. (PDF `subject.txt` dosyası okunarak gereksinimler teyit edildi).
 
 ---
 
@@ -43,16 +43,16 @@ Aktif olarak dinlenen portları ve ağ durumunu kontrol etmek için kullandığ�
 * Normal C dizileri yerine C++'ın esnek `std::vector` yapısını kullanmak.
 * Config okundukça her bir `server {}` bloğu için ayrı bir `socket()`, `bind()`, `listen()` yapıp, elde edilen file descriptor'ları (FD) bir vektörde (örneğin: `std::vector<int> server_sockets;`) depolamak.
 
-### 7. CGI (Common Gateway Interface) Mekanizması ve Python/PHP Şartı
-* Webserv sadece `.html`, `.css` gibi statik dosyaları okuyup yollamakla kalmaz.
-* PDF'ye göre **"en az bir tane"** dinamik çalıştırılabilir dil (interpreter) desteklemek zorundasın (Python, PHP vb.).
-* Eğer tarayıcıdan `GET /script.py HTTP/1.1` veya `POST /gonder.php HTTP/1.1` diye bir istek gelirse, bunu C++'ın okuyup kendisi döndürmez.
-* **Nasıl Çalışır? (CGI Algoritması)**
-  1. `fork()` ile programı ikiye böl (Child Process oluşur).
-  2. Child Process, `execve()` kullanarak işletim sistemindeki Python'u (veya PHP'yi) çağırır ve ona o `.py` (veya `.php`) dosyasını çalıştır der.
-  3. C++ Webserv'in (Parent Process) Python'un ürettiği çıktıyı okuyabilmesi için `pipe()` kullanılır.
-  4. Script (Python/PHP) işini bitirip çıktıyı (örn: `<h1>Giriş Başarılı</h1>`) pipe içine tükürür.
-  5. Parent process pipe'dan bu çıktıyı okuyup tarayıcıya (istenilen HTTP formatında) gönderir.
+### 6. Gerçek Dünya (Nginx) vs CGI Projemiz Farkı (Teyit Notu)
+* **Gerçek Dünyada Modern Sistemler (FastCGI, uWSGI, Gunicorn):** Nginx ve Python (veya Node.js) her ikisi de 7/24 arkada **ölmeden** ayrı ayrı çalışır. Nginx asıl web portunu (80) dinler. Python ise arka portta (örn. 8000) kendi özel dünyasıyla bekler. Nginx 80'den HTTP alınca, arka plandaki Python'a (8000. porta) onu tcp/socket/unix-socket üzerinden fırlatıp paslaşırlar. Python ASLA KAPANMAZ!
+* **Bizim 42 Webserv (CGI - Common Gateway Interface) Projemizde:** C++ Webserv'imiz 7/24, 80/8080. portta çalışır. Python ise **KAPALIDIR**. Ne zaman ki istek (GET /test.py) gelirse, asıl sunucumuz C++ `fork() + execve()` yapıp Python'u anlık "diriltir" (uyandırır). Python işini yapıp `stdout/pipe` içine tükürür ve anında ölür. Modern siteler saniyede binlerce istek için sürekli uyanık tutarken, tarihsel ama yapması daha "zor/öğretici" CGI modeli sadece çağrılınca çalış-bitir-öl sistemidir.
+* **🚨 Kritik Yanılgı Düzeltmesi (Veriyi Müşteriye Kim Yolluyor?):** Python kullanıcıya (Chrome/Browser'a) ASLA doğrudan veri yollamaz! Python'un internetten, TCP soketinden, ağ bağlantısından haberi bile yoktur. Python sadece `print()` ile ekrana yazı yazar gibi kapalı bir `pipe` (boru) içine metin yazar. C++ (Webserv) o borunun diğer ucundan Python'un ürettiği raw (çiğ) HTML'i okur, önüne `HTTP/1.1 200 OK` gibi resmi HTTP başlıklarını (kargo zarfını) ekler ve işlemi bitmiş, çoktan ölmüş olan Python'un "mirasını" alıp müşteriye (Sokete) **bizzat C++ programı** gönderir. İletişim yüzü daima C++'tır.
+  3. `fork()` ile programı ikiye böl (Child Process oluşur). 
+     *(Neden fork? Çünkü execve programı tamamen değiştirip sonlandırır. Asıl sunucu (Parent) yaşamaya ve port dinlemeye devam etmelidir. Klon (Child) kendini feda eder.)*
+  4. Child Process, `execve()` kullanarak işletim sistemindeki Python'u çağırır ve ona o `.py` dosyasını çalıştır der.
+  5. C++ Webserv'in (Parent Process) Python'un ürettiği çıktıyı okuyabilmesi için `pipe()` kullanılır.
+  6. Script (Python) işini bitirip çıktıyı (örn: `<h1>Giriş Başarılı</h1>`) pipe içine tükürür ve ölür.
+  7. Parent process pipe'dan bu çıktıyı okuyup tarayıcıya (istenilen HTTP formatında) gönderir.
 * **Sonuç:** Kodun %99'u C++98 olacak. Ama test edebilmek ve bu (CGI) kuralı yerine getirebilmek için yanına 1-2 tane örnek `.py` (veya `.php`) dosyası yazmamız (veya hazır bulmamız) gerekecek. Python/PHP webe özel arka planda çalışan o küçük scriptlerdir, asıl sunucumuz kesinlikle C++ olacak.
 * **Neden İhtiyacımız Var?** Yazdığımız ilk kod `accept` ve `read` işlemlerinde bloklanıyor (kilitleniyor). PDF kuralları gereği sunucu asla kilitlenmemelidir.
 * **Çözüm:** `poll()` fonksiyonu ile işletim sistemine bir `std::vector<struct pollfd>` listesi vererek "Olay Döngüsü (Event Loop)" kurmak.
@@ -96,13 +96,80 @@ Okunan veriden Metod (GET/POST/DELETE), Hedef URL ve Body (Gövde) ayrıştırı
 * **POST:** Tarayıcıdan gelen form verisini veya yüklenen (upload) dosyayı diske kaydet (201 Created).
 * **DELETE:** İstenen dosyanın varlığını kontrol et ve `remove()` ile diskten sil (204 No Content).
 
+### 5.5- HTTP Yanıt Kodları (Status Codes) ve Hata Yönetimi
+Projeye entegre edilecek geri dönüş (HTTP Status) kodları ve kullanılacakları yerler (Yanıt/Response oluşturulurken entegre edilir):
+* **2xx Başarılı (Success):** 
+  * `200 OK`: İstek eksiksiz alındı (GET) ve cevap hazır.
+  * `201 Created`: İstemci başarıyla dosya yükledi (POST upload).
+  * `204 No Content`: Dosya başarıyla silindi (DELETE) ve gövde (body) döndürülmeyecek.
+* **3xx Yönlendirme (Redirection):**
+  * `301 / 302 / 307`: `webserv.conf` dosyasında bir yol (route) için HTTP yönlendirme (redirection) kuralı eklenmişse kullanılır.
+* **4xx İstemci Hataları (Client Error):**
+  * `400 Bad Request`: Gelen HTTP isteği hatalı/bozuk format ile parse edilemiyorsa.
+  * `403 Forbidden`: Dosyanın okuma yetkileri kapalıysa veya klasör istenirken `directory listing` (autoindex) erişimi conf'ta kapalıysa.
+  * `404 Not Found`: İstenen HTML, medya dosyası veya CGI scripti dizinde bulunamadıysa.
+  * `405 Method Not Allowed`: İstek yapılan Rota (URL) için Config'de tanımlanan spesifik bir izin (örneğin sadece GET izni var) varsa ve farklı bir method (örn: POST) ile gelindiyse.
+  * `413 Payload Too Large`: İstemcinin yolladığı istek gövdesi (Body), Config'teki limitleri (max_body_size) aşarsa.
+* **5xx Sunucu Hataları (Server Error):**
+  * `500 Internal Server Error`: CGI (Python/PHP vs) çalışması sırasında bir çökme olursa, ya da `fork()/execve()` hatalarında.
+  * `501 Not Implemented`: Sunucunun desteklemediği bir HTTP metodu (PUT, PATCH, OPTIONS vb.) kullanıldıysa.
+
+👉 **Nasıl Entegre Edilecek?** 
+İsteği (Request) ayrıştırırken (Parse ederken) kurallara aykırı durumlarda fonksiyon akışı hemen Response (Yanıt) oluşturma moduna geçer ve ilgili **Hata Kodu** belirlenir. Ardından:
+1. `webserv.conf` dosyasında bu kod için atanmış özel bir dosya (örn: `error_page 404 /ozel_404.html`) var mı diye sorgulanır, varsa o HTML dosyası okunur.
+2. Özel dosya config'de yoksa veya okunamıyorsa, C++ kodumuz içinde string olarak ("Hardcoded") sakladığımız basit ve default **gömülü hata sayfası HTML'i** oluşturulup HTTP Başlıklarıyla (`HTTP/1.1 404 Not Found\r\n...`) birlikte tarayıcıya yollanır.
+
 ### 6- Kapanış
 * İşi biten veya bağlantıyı koparan client'ı `close()` ile kapat ve `poll` vektöründen temizle.
 
 ---
 
-## 🎯 Proje Felsefesi ve Mimari Farkındalık: Web Sunucusu vs Backend
-* **Aydınlanma Anı:** "Aslında webserver'dan bağımsız bir backend yazacağım." tespiti %100 doğru bir bakış açısıdır.
-* **C++ Webserv (Web Sunucusu Katmanı - Postacı/Kapıcı):** Senin projenin ana omurgasıdır. TCP ağ protokolünü, soketleri, multiplexing'i (`poll`) işler. HTTP formatını ayrıştırır. Ancak HTTP'nin barındırdığı bilginin "mantığıyla/işiyle" ilgilenmez. Sadece iletimden, dağıtımdan ve çoklu bağlanan müşterilere (client'lara) anında cevap verilmesinden sorumludur. Nginx veya Apache gibi çalışır.
-* **Python/PHP vb. Dosyalar (Backend/CGI Katmanı - Aşçı):** Kullanıcının veritabanına kaydedilmesi, şifre kontrolü veya hesaplama gibi mantıksal işleri yapan *bağımsız* kod parçalarıdır. Python veya PHP scriptleri HTTP raw (çiğ) protokolünü veya TCP soketlerini asla bilmez. Sadece standart girdi (`stdin`) okuyup, standart çıktı (`stdout`) üretir.
-* **Sonuç:** Senin C++ Web Sunucun, dışarıdan gelen müşteriyi (Browser) alacak ve ona ne istediğini soracak. Eğer Müşteri "Bana sadece resim ver" (GET) derse depodan resmi alıp verecek. Eğer Müşteri "Bu form verisini al, şifremi kontrol et" (POST) derse, C++ sunucun bunu o *bağımsız arkadaki backend scriptine (Python)* paslayacak (`execve` ve `pipe` ile), onun cevabını alıp müşteriye (Browser'a) kargo edecektir. Kendi yazdığımız web sunucumuz bir nevi "Trafik Polisi" dir. Müşteri (Browser) asla o arkaplandaki Python (backend) dosyasını doğrudan göremez veya ulaşamaz.
+## 🎯 Proje Felsefesi ve Mimari Farkındalık: Web Sunucusu vs Backend (CGI)
+* **Aydınlanma Anı:** "C++ ile bağımsız bir webserver (altyapı) yazıyoruz. İşin mantığını (backend) ise ayrı süreçlerde hallediyoruz."
+* **C++ Webserv (Web Sunucu Katmanı):** Projenin omurgasıdır. TCP protokolünü, soketleri, `poll()` ile multiplexing işlemlerini yönetir. HTTP requestlerini ayrıştırır (parse eder), client'ları dinler ve client'lara veri yollar.
+* **CGI Scriptleri (Backend Katmanı - Python/PHP):** TCP veya Ağ soketlerinden tamamen habersizdir. HTTP protokolünü kendisi çözmez (bunu Web Sunucusu yapıp ona çevre değişkenleri olarak iletir). Sadece "standart girdi" (`stdin`) okuyup, veritabanına kayıt gibi mantıksal işlemleri yapar ve "standart çıktı" (`stdout`) üretir.
+
+### Teknik Olarak CGI ve C++ Haberleşme Adımları (Müşteriye Veri Ulaşana Kadar)
+Browser (Google Chrome), sunucuya bir POST veya dinamik bir GET isteği (örneğin `/script.py`) attığında şu olaylar gerçekleşir:
+1. **İsteği Karşılama:** C++, TCP Socket üzerinden request'i `read()`/`recv()` ile alır ve içeriğini parse ederek CGI çalıştırılması gerektiğini (dosya uzantısından) anlar.
+2. **Pipe (Boru) Kurulumu:** C++, Python'un çıktısını okuyabilmek için işletim sisteminden 2 uçlu bir haberleşme kanalı açar: `pipe(fd_array)`.
+3. **Kopya Oluşturma (Fork):** C++ programı `fork()` sistem çağrısı ile kendini kopyalar (Bir Parent, bir Child process oluşur). *Asıl sunucu (Parent) dinlemeye ve diğer client'lara hizmet vermeye devam etmelidir.*
+4. **Çıktı Yönlendirme (Dup2):** Child (kopya) process, `dup2(fd_array[1], STDOUT_FILENO)` diyerek *Standart Çıktısını (Yani terminale bastığı yazıları)* oluşturduğumuz Pipe'ın (borunun) yazma ucuna bağlar.
+5. **Python'u Tetikleme (Execve):** Child process, `execve("/usr/bin/python3", "script.py", ortam_degiskenleri)` diyerek kendi bedenini Python script'ine dönüştürür.
+6. **İşlemsel Süreç & Çıktı (Python):** Python işini yapar ve C++'ın ona dup2 ile bağladığı için haberi bile olmadan Pipe kanalına `print("<h1>Başarılı</h1>")` şeklinde çıktısını (raw HTML) yollar. Ve process sonlanır (ölür).
+### 7- HTTP ve Web Sunucularında "Encoding" (Kodlama) Kavramı
+**Encoding (Kodlama)**, bilginin bir sistemden diğerine aktarılırken, o sistemin anlayabileceği, taşıyabileceği veya güvenli bulduğu bir formata (genellikle byte dizisine) dönüştürülmesidir. 42 Webserv projesinde karşına çıkacak **3 temel Encoding** türü vardır:
+
+#### 1. Karakter Kodlaması (Character Encoding - UTF-8, ASCII)
+* Bilgisayarlar sadece 0 ve 1'leri anlar. "A" harfini veya "Ç" harfini 0 ve 1'lere çevirme kurallarına karakter kodlaması denir.
+* HTTP başlıkları (Headers) her zaman **ASCII** standartlarındadır (`\r\n` ile ayrılır).
+* Yanıt gövdesinde (Body) bir HTML gönderirken genelde **UTF-8** kullanırız. Tarayıcının bunu doğru okuması için şu başlığı yollarız:
+  `Content-Type: text/html; charset=UTF-8`
+
+#### 2. URL Kodlaması (URL / Percent Encoding)
+* İnternet tarayıcıları hedefe (URL'ye) giderken boşluk veya özel karakter (Türkçe harfler, vb.) kullanamazlar. Bunları `%` işareti ve 16'lık (hex) sayı sistemine dönüştürürler.
+* Örneğin; tarayıcıdan `http://localhost:8080/benim dosyam.html` istenirken, tarayıcı sunucuya şunu yollar: `GET /benim%20dosyam.html HTTP/1.1`
+* **Projedeki Görevin:** C++ sunucun `/benim%20dosyam.html`'i gördüğünde, diske gidip dosyayı bulabilmek için önce `%20`'yi tekrar boşluğa çevirmelidir (URL Decoding).
+
+#### 3. Transfer Kodlaması (Transfer-Encoding: chunked) ⚠️ PDF'TE İSTENEN ZORUNLULUK
+* Normalde tarayıcıya veya sunucuya bir veri yollarken `Content-Length: 1024` diyerek verinin toplam boyutunu baştan bildiririz.
+* Ancak bazen CGI (Python/PHP) çok büyük bir veri üretiyorsa veya istemci sunucuya devasa bir video yüklüyorsa boyutu *baştan bilemeyiz*.
+* Bu durumda veri **parça parça (chunked)** gönderilir. PDF kurallarında şu yazar: *"for chunked requests, your server needs to un-chunk them"*.
+* **İşleyişi:** Tarayıcı `Transfer-Encoding: chunked` başlığı yollar. Veri bloklar halinde gelir. Her bloğun başında o bloğun Hexadecimal (16'lık) boyutu yazar, altında veri bulunur. `0\r\n\r\n` (sıfır boyutta bir parça) geldiğinde iletimin bittiği anlaşılır.
+* **Projedeki Görevin:** Sunucun bu tarz (chunked) bir POST isteği aldığında, içindeki Hex boyutlarını temizleyip salt veriyi birleştirmeli (un-chunk) ve sonra diske veya CGI'a vermelidir.
+
+---
+
+## 🌐 Büyük Resim: Klasik Web (Bizim Projemiz) vs Modern Web ve Hosting Mimari Farkı
+
+### 1- Neden HTML'i Baştan Aşağı Yeniden (Eşşek Gibi) Yazıyoruz? (SSR vs CSR)
+* **Klasik Ağaç: Server-Side Rendering (SSR - Bizim Projemiz/1990'lar):** Kullanıcı "5+5" dediğinde veya form yolladığında; C++ sunucumuz `hello.py`'ı `fork`lar, Python 10 sonucunu bulup *en baştan* sıfır bir `<html>...<h1>10</h1>...</html>` string'i üretir. Sunucu bu kocaman metni tarayıcıya yollar. Tarayıcı ekranı beyazlatır ve her şeyi baştan yükler. (Bu projede HTML'i amele gibi satır satır Python'dan print ile basmamızın sebebi budur, saf CGI böyle çalışır).
+* **Modern Ağaç: Client-Side Rendering (CSR - React / Vue / AJAX / JavaScript):** Artık her tıklamada C++ sunucusuna (backend'e) gidilmiyor. C++ sadece en başta boş bir HTML ve devasa bir `script.js` (JavaScript) dosyasını kargolar (Statik). JS, tarayıcının beyninde (Chrome V8/Kullanıcı RAM'i ve CPU'su) yaşar.
+* **DOM (Canlı Ağaç) Mucizesi:** JS sayfadaki `<text id="sonuc">` gibi kısımları, sayfayı yenilemeden (DOM Manipülasyonu) sayesinde saniyede bulur ve değiştirir. Eğer veritabanı veya şifre kontrolü lazımsa, JS arkaplanda C++'tan gizlice (AJAX/Fetch ile) örneğin `{"sonuc": 10}` gibi saf "JSON" verisi ister. Bizim C++ yine Python'u çağırır, ama Python bu sefer koca HTML basmaz, sadece o minik veriyi verir. C++ bunu JS'ye yollar, JS sayfayı kendi süsler.
+* **Özet:** C++ Sununumuz bir kargocudur. Kutuda koca bir HTML mi var, yoksa sadece `{"sonuc":10}` yazılı minik bir not mu var ilgilenmez. Hedefe götürür.
+
+### 2- Hosting Firmaları (AWS, GoDaddy) Bizim Kodlarımızı Nasıl Çalıştırıyor?
+* "Otomatik HTML mi üretiyorlar?" Hayır! Host firmasının sunduğu sadece 7/24 kapıda bekleyen devasa bir Trafik Polisi'dir (NGINX/Apache).
+* Senin kodunun içinde 1 milyonluk döngü mü dönüyor, site basit bir sayaç mı host'un umurunda değildir. Kodu C++ (veya Python/PHP) olarak bizzat SEN YAZARSIN ve onların (Harddiskine) yüklersin.
+* Biri `seninsiten.com/hesapla.py` istediğinde, NGINX sadece "Biri benden .py istedi, ben karışmam, bu kullanıcının diske attığı scripti Python'a (CGI) paslıyayım o çözsün" der.
+* Bizim projemizdeki asıl amacımız tam da bu! Kendi bilgisayarımızdaki kodları arka planda Python'a fırlatacak o NGINX "Trafik Polisini" C++ ile, `socket`, `bind`, `listen`, `poll` kullanarak sıfırdan inşa ediyoruz!
