@@ -6,8 +6,9 @@
 #include <string>
 #include <fstream>
 
-int main() {
-    // 1. SOKET OLUŞTUR
+void execute()
+{
+ // 1. SOKET OLUŞTUR
     int server_socket = socket(AF_INET, SOCK_STREAM, 0);
     
     // 2. ADRES HAZIRLA
@@ -40,7 +41,7 @@ int main() {
 
             // --- 2. AŞAMA: Tarayıcıya HTML cevap gönderelim ---
             // html_body içeriğini index.html dosyasından oku
-            std::ifstream html_file("index.html");
+            std::ifstream html_file("html/index.html");
             std::string html_body;
 
             if (html_file) {
@@ -70,5 +71,9 @@ int main() {
     }
 
     close(server_socket);
-    return 0;
+}
+
+
+int main() {
+    execute();
 }

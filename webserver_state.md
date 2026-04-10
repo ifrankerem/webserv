@@ -5,7 +5,7 @@
 ## 📌 Genel Bilgiler
 * **Proje Adı:** Webserv 
 * **Amaç:** C++98 kullanarak, HTTP protokolünü anlayan kendi web sunucumuzu (HTTP server) yazmak
-* **Referans Kaynak:** `PDF/en.subject.pdf` (Projenin kuralları ve bütün temel bilgileri).
+* **Referans Kaynak:** `subject.txt` (Projenin kuralları ve bütün temel bilgileri).
 * **Mevcut Aşama:** İlk çalışan bloklayıcı (blocking) prototip yazıldı ve HTTP iletişimi tarayıcılarla test edildi. Şu an projeyi kurallara uygun hale getirecek olan Non-Blocking (Bloklanmayan) mimariye ve konfigürasyon (config) okuma aşamasına geçiş yapılıyor. (PDF `subject.txt` dosyası okunarak gereksinimler teyit edildi).
 
 ---
@@ -47,12 +47,13 @@ Aktif olarak dinlenen portları ve ağ durumunu kontrol etmek için kullandığ�
 * **Gerçek Dünyada Modern Sistemler (FastCGI, uWSGI, Gunicorn):** Nginx ve Python (veya Node.js) her ikisi de 7/24 arkada **ölmeden** ayrı ayrı çalışır. Nginx asıl web portunu (80) dinler. Python ise arka portta (örn. 8000) kendi özel dünyasıyla bekler. Nginx 80'den HTTP alınca, arka plandaki Python'a (8000. porta) onu tcp/socket/unix-socket üzerinden fırlatıp paslaşırlar. Python ASLA KAPANMAZ!
 * **Bizim 42 Webserv (CGI - Common Gateway Interface) Projemizde:** C++ Webserv'imiz 7/24, 80/8080. portta çalışır. Python ise **KAPALIDIR**. Ne zaman ki istek (GET /test.py) gelirse, asıl sunucumuz C++ `fork() + execve()` yapıp Python'u anlık "diriltir" (uyandırır). Python işini yapıp `stdout/pipe` içine tükürür ve anında ölür. Modern siteler saniyede binlerce istek için sürekli uyanık tutarken, tarihsel ama yapması daha "zor/öğretici" CGI modeli sadece çağrılınca çalış-bitir-öl sistemidir.
 * **🚨 Kritik Yanılgı Düzeltmesi (Veriyi Müşteriye Kim Yolluyor?):** Python kullanıcıya (Chrome/Browser'a) ASLA doğrudan veri yollamaz! Python'un internetten, TCP soketinden, ağ bağlantısından haberi bile yoktur. Python sadece `print()` ile ekrana yazı yazar gibi kapalı bir `pipe` (boru) içine metin yazar. C++ (Webserv) o borunun diğer ucundan Python'un ürettiği raw (çiğ) HTML'i okur, önüne `HTTP/1.1 200 OK` gibi resmi HTTP başlıklarını (kargo zarfını) ekler ve işlemi bitmiş, çoktan ölmüş olan Python'un "mirasını" alıp müşteriye (Sokete) **bizzat C++ programı** gönderir. İletişim yüzü daima C++'tır.
-  3. `fork()` ile programı ikiye böl (Child Process oluşur). 
+  
+  1. `fork()` ile programı ikiye böl (Child Process oluşur). 
      *(Neden fork? Çünkü execve programı tamamen değiştirip sonlandırır. Asıl sunucu (Parent) yaşamaya ve port dinlemeye devam etmelidir. Klon (Child) kendini feda eder.)*
-  4. Child Process, `execve()` kullanarak işletim sistemindeki Python'u çağırır ve ona o `.py` dosyasını çalıştır der.
-  5. C++ Webserv'in (Parent Process) Python'un ürettiği çıktıyı okuyabilmesi için `pipe()` kullanılır.
-  6. Script (Python) işini bitirip çıktıyı (örn: `<h1>Giriş Başarılı</h1>`) pipe içine tükürür ve ölür.
-  7. Parent process pipe'dan bu çıktıyı okuyup tarayıcıya (istenilen HTTP formatında) gönderir.
+  2. Child Process, `execve()` kullanarak işletim sistemindeki Python'u çağırır ve ona o `.py` dosyasını çalıştır der.
+  3. C++ Webserv'in (Parent Process) Python'un ürettiği çıktıyı okuyabilmesi için `pipe()` kullanılır.
+  4. Script (Python) işini bitirip çıktıyı (örn: `<h1>Giriş Başarılı</h1>`) pipe içine tükürür ve ölür.
+  5. Parent process pipe'dan bu çıktıyı okuyup tarayıcıya (istenilen HTTP formatında) gönderir.
 * **Sonuç:** Kodun %99'u C++98 olacak. Ama test edebilmek ve bu (CGI) kuralı yerine getirebilmek için yanına 1-2 tane örnek `.py` (veya `.php`) dosyası yazmamız (veya hazır bulmamız) gerekecek. Python/PHP webe özel arka planda çalışan o küçük scriptlerdir, asıl sunucumuz kesinlikle C++ olacak.
 * **Neden İhtiyacımız Var?** Yazdığımız ilk kod `accept` ve `read` işlemlerinde bloklanıyor (kilitleniyor). PDF kuralları gereği sunucu asla kilitlenmemelidir.
 * **Çözüm:** `poll()` fonksiyonu ile işletim sistemine bir `std::vector<struct pollfd>` listesi vererek "Olay Döngüsü (Event Loop)" kurmak.
