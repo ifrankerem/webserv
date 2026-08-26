@@ -1,5 +1,5 @@
 CXX = c++
-CXXFLAGS = -Wall -Wextra -Werror -std=c++98 -pedantic -g
+CXXFLAGS = -std=c++98 -pedantic -g
 INFILES = main.cpp sockt.cpp listensockt.cpp clientsockt.cpp
 OBJFILES = $(INFILES:.cpp=.o)
 
