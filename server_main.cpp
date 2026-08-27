@@ -36,6 +36,7 @@ int main()
 		}
 		else
 			ss << file.rdbuf();
+		//TODO NEED a parser
 		std::string content = ss.str();
 		new_socket->ft_send(content);
 		close(conn_fd);
