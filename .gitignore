@@ -2,3 +2,6 @@ cgi_tester
 tester
 /*.pdf
 notes.txt
+/*.o
+webserv
+client

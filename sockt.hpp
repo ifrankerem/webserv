@@ -10,18 +10,28 @@
 #include <netinet/in.h>
 #include <unistd.h>
 
+//Abstract CLASS
 
 class sockt
 {
 	protected:
 		int socket_nbr;
+		sockaddr_in server_addr;
+		std::string message;
 
 	public:
 		sockt();
 		sockt(int domain,int type , int protocol);
-		~sockt();
+		virtual ~sockt() = 0;
 		sockt(const sockt& other);
 		sockt& operator=(const sockt& other);
+		void ft_close();
+		void init_addr(int family, uint16_t port, uint32_t addr);
+		ssize_t ft_recv(int fd);
+		std::string getMessage();
+		void ft_send(std::string request);
+		int getSocket_nbr();
+
 };
 
 #endif

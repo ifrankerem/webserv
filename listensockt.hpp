@@ -13,6 +13,11 @@ class listensockt : public sockt
 		~listensockt();
 		listensockt(const listensockt& other);
 		listensockt& operator=(const listensockt& other);
+		int ft_bind();
+		int ft_listen();
+		int ft_accept();
+
+
 };
 
 #endif
