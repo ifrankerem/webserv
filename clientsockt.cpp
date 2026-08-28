@@ -23,7 +23,11 @@ clientsockt& clientsockt::operator=(const clientsockt& other)
 
 
 int clientsockt::ft_connect()
-{
-	return(connect(this->socket_nbr,reinterpret_cast<const sockaddr*>(&this->server_addr),sizeof(this->server_addr)));
+{	
+	int connection_status = connect(this->socket_nbr,reinterpret_cast<const sockaddr*>(&this->server_addr),sizeof(this->server_addr));
+	if(connection_status == -1)
+		throw std::runtime_error(std::string("connect: " ) + strerror(errno));
+	else
+		return connection_status;
 	//!castin eksik konu cpp06
 }

@@ -8,6 +8,8 @@ sockt::sockt()
 sockt::sockt(int domain,int type , int protocol)
 {
 	this->socket_nbr = socket(domain,type,protocol);
+	if(this->socket_nbr == -1)
+		throw std::runtime_error(std::string("socket: " ) + strerror(errno));
 }
 
 sockt::sockt(const sockt& other)
@@ -49,7 +51,7 @@ ssize_t sockt::ft_recv(int fd)
 		this->message.append(buf,nbr);
 		return nbr;
 	}
-	else //TODO else if for negative and adding exception
+	else
 		return nbr;
 }
 
@@ -58,15 +60,19 @@ std::string sockt::getMessage()
 	return(this->message);
 }
 
-void sockt::ft_send(int fd,std::string request) 
+int sockt::ft_send(int fd,const std::string &request) 
 {
-	int flag = request.size();
-	while(flag > 0)
+	size_t size = request.size();
+	size_t flag = 0;
+	while(size > 0)
 	{
-		ssize_t sent = send(fd, request.c_str(), flag, 0);
-		// if sent == -1 exceptation !!
-		flag -= sent;
+		ssize_t sent = send(fd, request.c_str() + flag, size, 0);
+		if(sent <= 0)
+			return -1;
+		flag += sent;
+		size -= sent;
 	}
+	return flag;
 }
 
 int sockt::getSocket_nbr()

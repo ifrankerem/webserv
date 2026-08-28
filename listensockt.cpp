@@ -22,23 +22,31 @@ listensockt& listensockt::operator=(const listensockt& other)
 
 int listensockt::ft_bind()
 {	
-	//TODO these two function throws exceptation so handle it
 	int value = 1;
-	setsockopt(this->socket_nbr,SOL_SOCKET,SO_REUSEADDR,&value,sizeof(value)); //TODO because of TIME_WAIT i have to use that kinda function i will look at it after for more detailed
-	return(bind(this->socket_nbr,reinterpret_cast<const sockaddr*>(&this->server_addr),sizeof(this->server_addr)));
+	int flag = setsockopt(this->socket_nbr,SOL_SOCKET,SO_REUSEADDR,&value,sizeof(value)); //TODO because of TIME_WAIT i have to use that kinda function i will look at it after for more detailed
+	if(flag == -1)
+		throw std::runtime_error(std::string("setsockopt: " ) + strerror(errno));
+	int flag2 = bind(this->socket_nbr,reinterpret_cast<const sockaddr*>(&this->server_addr),sizeof(this->server_addr));
+	if(flag2 == -1)
+		throw std::runtime_error(std::string("bind: " ) + strerror(errno));
+	else
+		return flag2;
 }
 
 int listensockt::ft_listen()
 {
-	//TODO exceptation
-	return (listen(this->socket_nbr,10)); // connect queue 
+	int flag = listen(this->socket_nbr,10); // connect queue 
+	if(flag == -1)
+		throw std::runtime_error(std::string("listen: " ) + strerror(errno));
+	else 
+		return flag;
 }
 
 
 int listensockt::ft_accept()
 {
-	//TODO exceptation
-	return(accept(this->socket_nbr,NULL,NULL));
+	int flag = accept(this->socket_nbr,NULL,NULL);
+	return flag;
 }
 
 
