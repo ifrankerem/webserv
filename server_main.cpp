@@ -1,4 +1,5 @@
 #include "listensockt.hpp"
+#include "parsing.hpp"
 #include <csignal>
 #include <fstream>
 #include <sstream>
@@ -22,9 +23,21 @@ int main()
 	{
 
 		int conn_fd = new_socket->ft_accept();
+		new_socket->clearMessage();
 		while(new_socket->ft_recv(conn_fd) != 0)
 		{
+			std::string::size_type pos = new_socket->getMessage().find("\r\n\r\n");
+			if(pos == std::string::npos)
+			{
+				// continue
+			}
+			else
+			{
+				break;
+			}
 		}
+
+		
 
 		std::cout << new_socket->getMessage() << std::endl;
 
@@ -36,9 +49,13 @@ int main()
 		}
 		else
 			ss << file.rdbuf();
-		//TODO NEED a parser
 		std::string content = ss.str();
-		new_socket->ft_send(content);
+		std::string content_length_text = "content-length: ";
+		std::string content_length_str = parsing::to_str(content.length());
+		content_length_text.append(content_length_str);
+		content_length_text.append("\r\n\r\n");
+		content = content.insert(0,content_length_text);
+		new_socket->ft_send(conn_fd,content);
 		close(conn_fd);
 		//TODO connection closed and main closed properly
 	}

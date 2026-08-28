@@ -58,12 +58,12 @@ std::string sockt::getMessage()
 	return(this->message);
 }
 
-void sockt::ft_send(std::string request) //? parameter maybe string request??
+void sockt::ft_send(int fd,std::string request) 
 {
 	int flag = request.size();
 	while(flag > 0)
 	{
-		ssize_t sent = send(this->socket_nbr, request.c_str(), flag, 0);
+		ssize_t sent = send(fd, request.c_str(), flag, 0);
 		// if sent == -1 exceptation !!
 		flag -= sent;
 	}
@@ -74,4 +74,7 @@ int sockt::getSocket_nbr()
 	return(this->socket_nbr);
 }
 
-
+void sockt::clearMessage()
+{
+	this->message.clear();
+}

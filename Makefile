@@ -4,7 +4,7 @@ CXXFLAGS = -std=c++98 -pedantic -g
 NAME        = webserv
 CLIENT_NAME = client
 
-COMMON_SRC = sockt.cpp listensockt.cpp clientsockt.cpp
+COMMON_SRC = sockt.cpp listensockt.cpp clientsockt.cpp parsing.cpp
 SERVER_SRC = server_main.cpp $(COMMON_SRC)
 CLIENT_SRC = client_main.cpp $(COMMON_SRC)
 

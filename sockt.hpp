@@ -29,8 +29,9 @@ class sockt
 		void init_addr(int family, uint16_t port, uint32_t addr);
 		ssize_t ft_recv(int fd);
 		std::string getMessage();
-		void ft_send(std::string request);
+		void ft_send(int fd, std::string request);
 		int getSocket_nbr();
+		void clearMessage();
 
 };
 
