@@ -1,0 +1,100 @@
+@startuml
+title Webserv - Current Class Diagram
+
+skinparam linetype ortho
+skinparam classAttributeIconSize 0
+hide empty members
+
+abstract class sockt {
+  # int socket_nbr
+  # sockaddr_in server_addr
+  # std::string message
+  --
+  + sockt()
+  + sockt(domain: int, type: int, protocol: int)
+  + {abstract} ~sockt()
+  + sockt(other: const sockt&)
+  + operator=(other: const sockt&): sockt&
+  --
+  + ft_close(): void
+  + init_addr(family: int, port: uint16_t, addr: uint32_t): void
+  + ft_recv(fd: int): ssize_t
+  + ft_send(fd: int, request: const std::string&): int
+  + getMessage(): std::string
+  + getSocket_nbr(): int
+  + clearMessage(): void
+}
+
+class listensockt {
+  + listensockt()
+  + listensockt(domain: int, type: int, protocol: int)
+  + ~listensockt()
+  + listensockt(other: const listensockt&)
+  + operator=(other: const listensockt&): listensockt&
+  --
+  + ft_bind(): int
+  + ft_listen(): int
+  + ft_accept(): int
+}
+
+class clientsockt {
+  + clientsockt()
+  + clientsockt(domain: int, type: int, protocol: int)
+  + ~clientsockt()
+  + clientsockt(other: const clientsockt&)
+  + operator=(other: const clientsockt&): clientsockt&
+  --
+  + ft_connect(): int
+}
+
+class parsing <<utility>> {
+  - {static} toLower(s: const std::string&): std::string
+  --
+  + parsing()
+  + ~parsing()
+  + parsing(other: const parsing&)
+  + operator=(other: const parsing&): parsing&
+  --
+  + {static} to_str(n: size_t): std::string
+  + {static} getContentLength(raw: const std::string&): long
+}
+
+class server_main <<program>> {
+  + main(): int
+}
+
+class client_main <<program>> {
+  + main(): int
+}
+
+sockt <|-- listensockt
+sockt <|-- clientsockt
+
+server_main ..> listensockt : creates / owns
+server_main ..> parsing : to_str()
+client_main ..> clientsockt : creates / owns
+client_main ..> parsing : getContentLength()
+
+note bottom of sockt
+  "message" is a single member
+  shared by every connection.
+  Works only for one client at a
+  time. It has to become a
+  per-connection buffer once
+  poll() and multiple clients
+  are added.
+end note
+
+note right of listensockt
+  Responsible only for:
+  socket(), setsockopt(),
+  bind(), listen(), accept().
+  Does NOT parse HTTP.
+end note
+
+note bottom of parsing
+  Static helpers.
+  C++98 has no std::to_string,
+  so to_str() uses ostringstream.
+end note
+@enduml

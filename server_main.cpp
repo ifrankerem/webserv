@@ -54,9 +54,11 @@ int main()
 			std::string content = ss.str();
 			std::string content_length_text = "content-length: ";
 			std::string content_length_str = parsing::to_str(content.length());
+			std::string dummy_header = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n";
 			content_length_text.append(content_length_str);
-			content_length_text.append("\r\n\r\n");
-			content = content.insert(0,content_length_text);
+			dummy_header.append(content_length_text);
+			dummy_header.append("\r\n\r\n");
+			content.insert(0,dummy_header);
 			if(flag)
 				new_socket->ft_send(conn_fd,content);
 			close(conn_fd);
