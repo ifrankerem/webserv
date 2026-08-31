@@ -31,7 +31,7 @@ class sockt
 		sockt& operator=(const sockt& other);
 		void ft_close();
 		void init_addr(int family, uint16_t port, uint32_t addr);
-		ssize_t ft_recv(int fd);
+		ssize_t ft_recv();
 		std::string getMessage();
 		int ft_send(int fd, const std::string &request);
 		int getSocket_nbr();

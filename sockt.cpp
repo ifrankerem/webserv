@@ -42,10 +42,10 @@ void sockt::init_addr(int family, uint16_t port, uint32_t addr)
 	//!burada bir okuma farki var buraya geri donucem en temiz sekilde yazacak olursak mainde temz bir ip vericez burada donusum yapicaz bu sefer hata bakmasi daha kolay olucak
 }
 
-ssize_t sockt::ft_recv(int fd)
+ssize_t sockt::ft_recv()
 {
 	char buf[4096];
-	ssize_t nbr = recv(fd,buf,sizeof(buf),0);
+	ssize_t nbr = recv(this->socket_nbr,buf,sizeof(buf),0);
 	if(nbr > 0)
 	{
 		this->message.append(buf,nbr);

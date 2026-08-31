@@ -7,3 +7,9 @@ webserv
 client
 docs/*.svg
 docs/*.png
+docs/*.txt
+nginx/
+telnet/
+docs/nginx-notlu/
+docs/nginx-okuma-rehberi.md
+docs/telnet-notlu/

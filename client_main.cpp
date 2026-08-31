@@ -18,6 +18,7 @@ int main()
 		std::string request = "GET / HTTP/1.0\r\nHost: 127.0.0.1\r\n\r\n"; //headerlarim bitti demelisin yoksa sunucu surekli bkeler
 	
 		new_socket->ft_send(new_socket->getSocket_nbr(),request);
+		//write(new_socket->getSocket_nbr(),request.c_str(),request.size()); ALSO we can use write funct
 
 
 

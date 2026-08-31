@@ -1,48 +1,71 @@
 #include "listensockt.hpp"
+#include "clientsockt.hpp"
 #include "parsing.hpp"
 #include <csignal>
 #include <fstream>
 #include <sstream>
+#include <vector>
+#include <map>
+#include <poll.h>
 
 
 int main()
 {
-		listensockt *new_socket;
+	listensockt *listen_socket;
+	clientsockt *client_socket;
+	std::vector<struct pollfd> pollfds;
+	std::vector <struct pollfd> pendingfds;
+	std::map<int,clientsockt*> connections;
+
 	try{
 		signal(SIGPIPE, SIG_IGN); //TODO simdilik ekliyorum daha detayli arastirmasini yapicam
 		//creating socket
-		new_socket = new listensockt(AF_INET,SOCK_STREAM,0);
+		listen_socket = new listensockt(AF_INET,SOCK_STREAM,0);
 		//where i can connect with that socket
-		new_socket->init_addr(AF_INET,8080,0x7F000001); //127.0.0.1 for testing
+		listen_socket->init_addr(AF_INET,8080,0x7F000001); //127.0.0.1 for testing
 
-		new_socket->ft_bind();
+		listen_socket->ft_bind();
 
-		new_socket->ft_listen();
-
+		listen_socket->ft_listen();
+		struct pollfd pfd = pollfd(); // no memset so recreate the struct
+		pfd.fd = listen_socket->getSocket_nbr(); //adding listen sockt to q
+		pfd.events = POLLIN;
+		pollfds.push_back(pfd);
 
 		while(1)
 		{
-
-			int conn_fd = new_socket->ft_accept();
-			if(conn_fd == -1)
-				continue; //this connection cannot made it so continue
-			new_socket->clearMessage();
-			bool flag = true;
-			while(1)
+			poll(&pollfds[0],pollfds.size(),-1); //waiting unlimited
+			for(size_t i = 0; i < pollfds.size();i++)
 			{
-				ssize_t x = new_socket->ft_recv(conn_fd);
-				if(x <= 0) //error  case
+				if(pollfds[i].revents == 0)
+					continue; //nothing happens in this socket
+				else if(pollfds[i].revents == POLL_IN)
 				{
-					flag = false;
-					break;
-				}
-				if(new_socket->getMessage().find("\r\n\r\n") != std::string::npos)
-				{
-					break; //header comes successfuly!
+					if(pollfds[i].fd == listen_socket->getSocket_nbr()) // this is the listen_fd
+					{
+						int conn_fd = listen_socket->ft_accept();
+						if(conn_fd == -1)
+							continue; //this connection cannot made it so continue
+						struct pollfd nw_sckt = pollfd(); // no memset so recreate the struct
+						nw_sckt.fd = listen_socket->getSocket_nbr(); //adding listen sockt to q
+						nw_sckt.events = POLLIN;
+						pendingfds.push_back(nw_sckt);
+						connections[conn_fd] = new clientsockt(AF_INET,SOCK_STREAM,0);
+						
+						listen_socket->clearMessage();
+					}
+					else
+					{
+						clientsockt *curr = connections[pollfds[i].fd];
+						curr->ft_recv();
+					}
 				}
 			}
+			for(size_t i = 0; i < pendingfds.size(); i++)
+				pollfds.push_back(pendingfds[i]);
+			pendingfds.clear();
 
-			std::cout << new_socket->getMessage() << std::endl;
+			//std::cout << listen_socket->getMessage() << std::endl;
 			std::stringstream ss;
 			std::ifstream file("index.html", std::ios::binary);
 			if (!file.is_open())
@@ -60,18 +83,18 @@ int main()
 			dummy_header.append("\r\n\r\n");
 			content.insert(0,dummy_header);
 			if(flag)
-				new_socket->ft_send(conn_fd,content);
+				listen_socket->ft_send(conn_fd,content);
 			close(conn_fd);
 			//TODO connection closed and main closed properly
 		}
 
-		delete(new_socket); //will call ft_close
+		delete(listen_socket); //will call ft_close
 		return 0;
 	}
 	catch(std::exception & e)
 	{
 		std::cerr << e.what() << std::endl;
-		delete(new_socket);
+		delete(listen_socket);
 		return 1;
 	}
 }
