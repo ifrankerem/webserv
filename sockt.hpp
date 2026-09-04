@@ -21,7 +21,8 @@ class sockt
 	protected:
 		int socket_nbr;
 		sockaddr_in server_addr;
-		std::string message;
+		std::string writeBuffer;
+		std::string readBuffer;
 
 	public:
 		sockt();
@@ -32,10 +33,10 @@ class sockt
 		void ft_close();
 		void init_addr(int family, uint16_t port, uint32_t addr);
 		ssize_t ft_recv();
-		std::string getMessage();
-		int ft_send(int fd, const std::string &request);
+		int ft_send(int fd, const std::string &data);
 		int getSocket_nbr();
-		void clearMessage();
+		std::string getWriteBuffer();
+		std::string getReadBuffer();
 
 };
 

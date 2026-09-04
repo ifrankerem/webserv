@@ -48,25 +48,21 @@ ssize_t sockt::ft_recv()
 	ssize_t nbr = recv(this->socket_nbr,buf,sizeof(buf),0);
 	if(nbr > 0)
 	{
-		this->message.append(buf,nbr);
+		this->readBuffer.append(buf,nbr);
 		return nbr;
 	}
 	else
 		return nbr;
 }
 
-std::string sockt::getMessage()
-{
-	return(this->message);
-}
 
-int sockt::ft_send(int fd,const std::string &request) 
+int sockt::ft_send(int fd, const std::string &data) 
 {
-	size_t size = request.size();
+	size_t size = data.size();
 	size_t flag = 0;
 	while(size > 0)
 	{
-		ssize_t sent = send(fd, request.c_str() + flag, size, 0);
+		ssize_t sent = send(fd, data.c_str() + flag, size, 0);
 		if(sent <= 0)
 			return -1;
 		flag += sent;
@@ -80,7 +76,12 @@ int sockt::getSocket_nbr()
 	return(this->socket_nbr);
 }
 
-void sockt::clearMessage()
+std::string sockt::getWriteBuffer()
 {
-	this->message.clear();
+	return(this->writeBuffer);
+}
+
+std::string sockt::getReadBuffer()
+{
+	return(this->readBuffer);
 }

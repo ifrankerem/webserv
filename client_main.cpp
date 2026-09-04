@@ -26,24 +26,24 @@ int main()
 		size_t header_len = 0;
 		while (1)
 		{
-			if (new_socket->ft_recv(new_socket->getSocket_nbr()) <= 0)
+			if (new_socket->ft_recv() <= 0)
 				break;
 
 			if (content_length < 0)
 			{
-				std::string::size_type pos = new_socket->getMessage().find("\r\n\r\n");
+				std::string::size_type pos = new_socket->getReadBuffer().find("\r\n\r\n");
 				if (pos != std::string::npos)
 				{
 					header_len = pos + 4; // \r\n\r\n
-					content_length = parsing::getContentLength(new_socket->getMessage());
+					content_length = parsing::getContentLength(new_socket->getReadBuffer());
 				}
 			}
 
-			if (content_length >= 0 && new_socket->getMessage().size() >= header_len + content_length)
+			if (content_length >= 0 && new_socket->getReadBuffer().size() >= header_len + content_length)
 				break;
 		}
 
-		std::cout << new_socket->getMessage() << std::endl;
+		std::cout << new_socket->getReadBuffer() << std::endl;
 
 
 		delete(new_socket); //will call ft_close
