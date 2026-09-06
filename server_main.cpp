@@ -37,6 +37,7 @@ int main()
 	std::vector <struct pollfd> pollfds;
 	std::vector <struct pollfd> pendingfds;
 	std::map<int,clientsockt*> connections;
+	std::vector <int> closing_fds;
 
 	try{
 		signal(SIGPIPE, SIG_IGN); //TODO simdilik ekliyorum daha detayli arastirmasini yapicam
@@ -65,10 +66,10 @@ int main()
 					int conn_fd = listen_socket->ft_accept();
 					if(conn_fd == -1)
 						continue; //this connection cannot made it so continue
-					struct pollfd nw_sckt = pollfd(); // no memset so recreate the struct
-					nw_sckt.fd = conn_fd;
-					nw_sckt.events = POLLIN;
-					pendingfds.push_back(nw_sckt);
+					struct pollfd client_sckt = pollfd(); // no memset so recreate the struct
+					client_sckt.fd = conn_fd;
+					client_sckt.events = POLLIN;
+					pendingfds.push_back(client_sckt);
 					connections[conn_fd] = new clientsockt(conn_fd);
 					// listen_socket->clearMessage();
 				}
@@ -85,32 +86,46 @@ int main()
 						//READ FIRST IF POLLIN OR HANG UP THE LINE
 						continue;
 					}
-					if (re & POLLOUT)
+					if (re & POLLIN) // looking for reading
 					{
-						curr->ft_handleWrite();
-					}
-					if (re & POLLIN)
-					{
-						curr->ft_recv();
+						ssize_t n = curr->ft_recv();
+						if(n == 0)
+							closing_fds.push_back(curr->getSocket_nbr());
 						if (curr->getReadBuffer().find("\r\n\r\n") != std::string::npos)
 						{
 							curr->setWriteBuffer(ft_make_dummyheader()); 
 							pollfds[i].events = POLLOUT;  
 						}
 					}
+					if (re & POLLOUT) // looking for writing
+					{
+						if(curr->ft_handleWrite())
+							pollfds[i].events = POLLIN;
+						else
+							closing_fds.push_back(curr->getSocket_nbr());
+					}
 				}
 			}
-			for(size_t i = 0; i < pendingfds.size(); i++)
+			for(size_t i = 0; i < closing_fds.size(); i++)
 			{
-				pollfds.push_back(pendingfds[i]);
-				
+				for (size_t j = 0; j < pollfds.size(); j++)
+				{
+					if (pollfds[j].fd == closing_fds[i])
+					{ 
+						pollfds.erase(pollfds.begin() + j); 
+						break; 
+					}
+				} //TODO i dont like this solution maybe more practical one can done
+				delete connections[closing_fds[i]];
+				connections.erase(closing_fds[i]);
 			}
+			closing_fds.clear();
+			for(size_t i = 0; i < pendingfds.size(); i++)
+				pollfds.push_back(pendingfds[i]);
 			pendingfds.clear();
-			//close(conn_fd);
-			//TODO connection closed and main closed properly
 		}
 
-		delete(listen_socket); //will call ft_close
+		delete(listen_socket);
 		return 0;
 	}
 	catch(std::exception & e)

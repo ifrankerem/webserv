@@ -3,12 +3,14 @@
 clientsockt::clientsockt() 
 { 
 	this->sent_bytes = 0;
+
 }
 
 clientsockt::clientsockt(int fd) 
 {
 	this->socket_nbr = fd;
 	this->sent_bytes = 0;
+
 }
 
 
@@ -50,10 +52,13 @@ bool clientsockt::ft_handleWrite()
 	if(n <= 0)
 		return false;
 	this->sent_bytes += n;
-	return (sent_bytes == this->writeBuffer.size());
+	return (this->sent_bytes == this->writeBuffer.size());
 }
 
 void clientsockt::setWriteBuffer(std::string data)
 {
 	this->writeBuffer = data;
 }
+
+
+

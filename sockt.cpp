@@ -47,12 +47,8 @@ ssize_t sockt::ft_recv()
 	char buf[4096];
 	ssize_t nbr = recv(this->socket_nbr,buf,sizeof(buf),0);
 	if(nbr > 0)
-	{
 		this->readBuffer.append(buf,nbr);
-		return nbr;
-	}
-	else
-		return nbr;
+	return nbr;
 }
 
 

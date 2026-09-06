@@ -19,6 +19,7 @@ class clientsockt : public sockt
 		void setWriteBuffer(std::string data);
 		bool ft_handleWrite();
 
+
 };
 
 #endif
