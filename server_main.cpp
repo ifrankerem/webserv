@@ -27,6 +27,7 @@ std::string ft_make_dummyheader()
 	content_length_text.append(content_length_str);
 	dummy_header.append(content_length_text);
 	dummy_header.append("\r\n\r\n");
+	dummy_header.append(content);
 	return dummy_header;
 }
 
@@ -93,6 +94,7 @@ int main()
 							closing_fds.push_back(curr->getSocket_nbr());
 						if (curr->getReadBuffer().find("\r\n\r\n") != std::string::npos)
 						{
+							std::cout << "From client_fd: " << curr->getSocket_nbr() << "\n"  << curr->getReadBuffer() << std::endl;
 							curr->setWriteBuffer(ft_make_dummyheader()); 
 							pollfds[i].events = POLLOUT;  
 						}
