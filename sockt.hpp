@@ -37,6 +37,8 @@ class sockt
 		int getSocket_nbr();
 		std::string getWriteBuffer();
 		std::string getReadBuffer();
+		void clearWriteBuffer();
+		void cleaReadBuffer();
 
 };
 

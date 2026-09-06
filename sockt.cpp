@@ -81,3 +81,14 @@ std::string sockt::getReadBuffer()
 {
 	return(this->readBuffer);
 }
+
+void sockt::clearWriteBuffer()
+{
+	this->writeBuffer.clear();
+}
+
+void sockt::cleaReadBuffer()
+{
+	this->readBuffer.clear();
+
+}

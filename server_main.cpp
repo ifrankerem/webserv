@@ -90,11 +90,17 @@ int main()
 					if (re & POLLIN) // looking for reading
 					{
 						ssize_t n = curr->ft_recv();
+						if(curr->getReadBuffer().size() > 0)
+						{
+							std::cout << "From client_fd: " << curr->getSocket_nbr() << "\n"  << curr->getReadBuffer();
+							std::cout << "---------------" << std::endl;
+						}
+
 						if(n == 0)
 							closing_fds.push_back(curr->getSocket_nbr());
 						if (curr->getReadBuffer().find("\r\n\r\n") != std::string::npos)
 						{
-							std::cout << "From client_fd: " << curr->getSocket_nbr() << "\n"  << curr->getReadBuffer() << std::endl;
+							curr->cleaReadBuffer();
 							curr->setWriteBuffer(ft_make_dummyheader()); 
 							pollfds[i].events = POLLOUT;  
 						}
