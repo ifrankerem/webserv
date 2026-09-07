@@ -2,7 +2,7 @@
 
 sockt::sockt()
 {
-	this->socket_nbr = -1; //for default there is no socket rn
+	this->socket_nbr = -1; //INFO for default there is no socket rn
 }
 
 sockt::sockt(int domain,int type , int protocol)
@@ -39,7 +39,7 @@ void sockt::init_addr(int family, uint16_t port, uint32_t addr)
 	this->server_addr.sin_addr.s_addr = htonl(addr);
 	this->server_addr.sin_port = htons(port);
 	this->server_addr.sin_family = family;
-	//!burada bir okuma farki var buraya geri donucem en temiz sekilde yazacak olursak mainde temz bir ip vericez burada donusum yapicaz bu sefer hata bakmasi daha kolay olucak
+	//WARN burada bir okuma farki var buraya geri donucem en temiz sekilde yazacak olursak mainde temz bir ip vericez burada donusum yapicaz bu sefer hata bakmasi daha kolay olucak
 }
 
 ssize_t sockt::ft_recv()
@@ -87,7 +87,7 @@ void sockt::clearWriteBuffer()
 	this->writeBuffer.clear();
 }
 
-void sockt::cleaReadBuffer()
+void sockt::clearReadBuffer()
 {
 	this->readBuffer.clear();
 

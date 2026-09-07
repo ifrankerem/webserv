@@ -38,7 +38,7 @@ class sockt
 		std::string getWriteBuffer();
 		std::string getReadBuffer();
 		void clearWriteBuffer();
-		void cleaReadBuffer();
+		void clearReadBuffer();
 
 };
 

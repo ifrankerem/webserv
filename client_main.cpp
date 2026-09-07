@@ -7,18 +7,18 @@ int main()
 {
 	clientsockt *new_socket;
 	try{
-		signal(SIGPIPE, SIG_IGN); //TODO simdilik ekliyorum daha detayli arastirmasini yapicam
-		//creating socket
-		new_socket = new clientsockt(AF_INET,SOCK_STREAM,0);
-		//where i can connect with that socket
+		signal(SIGPIPE, SIG_IGN); //TODO simdilik ekliyorum daha detayli arastirmasini yapicam 
+		new_socket = new clientsockt(AF_INET,SOCK_STREAM,0);		//INFO creating socket
+
+		//INFO where i can connect with that socket
 		new_socket->init_addr(AF_INET,8080,0x7F000001); //127.0.0.1 for testing
 
 		new_socket->ft_connect();
 
 		std::string request = "GET / HTTP/1.0\r\nHost: 127.0.0.1\r\n\r\n"; //headerlarim bitti demelisin yoksa sunucu surekli bkeler
-	
+
 		new_socket->ft_send(new_socket->getSocket_nbr(),request);
-		//write(new_socket->getSocket_nbr(),request.c_str(),request.size()); ALSO we can use write funct
+		//NOTE write(new_socket->getSocket_nbr(),request.c_str(),request.size()); ALSO we can use write funct
 
 
 
@@ -34,7 +34,7 @@ int main()
 				std::string::size_type pos = new_socket->getReadBuffer().find("\r\n\r\n");
 				if (pos != std::string::npos)
 				{
-					header_len = pos + 4; // \r\n\r\n
+					header_len = pos + 4; //INFO \r\n\r\n
 					content_length = parsing::getContentLength(new_socket->getReadBuffer());
 				}
 			}
@@ -46,7 +46,7 @@ int main()
 		std::cout << new_socket->getReadBuffer() << std::endl;
 
 
-		delete(new_socket); //will call ft_close
+		delete(new_socket); //INFO will call ft_close
 		return 0;
 	}
 	catch(std::exception & e)

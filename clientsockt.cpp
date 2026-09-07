@@ -40,7 +40,7 @@ int clientsockt::ft_connect()
 		throw std::runtime_error(std::string("connect: " ) + strerror(errno));
 	else
 		return connection_status;
-	//!castin eksik konu cpp06
+	//WARN castin eksik konu cpp06
 }
 
 bool clientsockt::ft_handleWrite()

@@ -4,10 +4,14 @@
 #include <csignal>
 #include <fstream>
 #include <sstream>
+#include <sys/types.h>
 #include <vector>
 #include <map>
 #include <poll.h>
+#include "Parse.hpp"
 
+
+#define MAX_HEADER_SIZE = 431;
 
 
 std::string ft_make_dummyheader()
@@ -42,32 +46,32 @@ int main()
 
 	try{
 		signal(SIGPIPE, SIG_IGN); //TODO simdilik ekliyorum daha detayli arastirmasini yapicam
-		//creating socket
+		//INFO creating socket
 		listen_socket = new listensockt(AF_INET,SOCK_STREAM,0);
-		//where i can connect with that socket
-		listen_socket->init_addr(AF_INET,8080,0x7F000001); //127.0.0.1 for testing
+		//INFO where i can connect with that socket
+		listen_socket->init_addr(AF_INET,8080,0x7F000001); //INFO 127.0.0.1 for testing
 
 		listen_socket->ft_bind();
 
 		listen_socket->ft_listen();
-		struct pollfd pfd = pollfd(); // no memset so recreate the struct
-		pfd.fd = listen_socket->getSocket_nbr(); //adding listen sockt to q
+		struct pollfd pfd = pollfd(); //INFO no memset so recreate the struct
+		pfd.fd = listen_socket->getSocket_nbr(); //INFO adding listen sockt to q
 		pfd.events = POLLIN;
 		pollfds.push_back(pfd);
 
 		while(1)
 		{
-			poll(&pollfds[0],pollfds.size(),-1); //waiting unlimited
+			poll(&pollfds[0],pollfds.size(),-1); //INFO waiting unlimited
 			for(size_t i = 0; i < pollfds.size();i++)
 			{
 				if(pollfds[i].revents == 0)
 					continue; //nothing happens in this socket
-				if(pollfds[i].fd == listen_socket->getSocket_nbr()) // this is the listen_fd
+				if(pollfds[i].fd == listen_socket->getSocket_nbr()) //INFO this is the listen_fd
 				{
 					int conn_fd = listen_socket->ft_accept();
 					if(conn_fd == -1)
 						continue; //this connection cannot made it so continue
-					struct pollfd client_sckt = pollfd(); // no memset so recreate the struct
+					struct pollfd client_sckt = pollfd(); //INFO no memset so recreate the struct
 					client_sckt.fd = conn_fd;
 					client_sckt.events = POLLIN;
 					pendingfds.push_back(client_sckt);
@@ -87,25 +91,27 @@ int main()
 						//READ FIRST IF POLLIN OR HANG UP THE LINE
 						continue;
 					}
-					if (re & POLLIN) // looking for reading
+					if (re & POLLIN) //INFO looking for reading
 					{
+						size_t perv = curr->getReadBuffer().size();
 						ssize_t n = curr->ft_recv();
-						if(curr->getReadBuffer().size() > 0)
-						{
-							std::cout << "From client_fd: " << curr->getSocket_nbr() << "\n"  << curr->getReadBuffer();
-							std::cout << "---------------" << std::endl;
-						}
-
-						if(n == 0)
+						if((curr->getReadBuffer().size() > MAX_HEADER_SIZE) || n == 0)
 							closing_fds.push_back(curr->getSocket_nbr());
+						Parse::parse(curr->getReadBuffer(),perv);
+						// if(curr->getReadBuffer().size() > 0)
+						// {
+						// 	std::cout << "From client_fd: " << curr->getSocket_nbr() << "\n"  << curr->getReadBuffer();
+						// 	std::cout << "---------------" << std::endl;
+						// }
+
 						if (curr->getReadBuffer().find("\r\n\r\n") != std::string::npos)
 						{
-							curr->cleaReadBuffer();
+							curr->clearReadBuffer();
 							curr->setWriteBuffer(ft_make_dummyheader()); 
 							pollfds[i].events = POLLOUT;  
 						}
 					}
-					if (re & POLLOUT) // looking for writing
+					if (re & POLLOUT) //INFO looking for writing
 					{
 						if(curr->ft_handleWrite())
 							pollfds[i].events = POLLIN;
@@ -123,7 +129,7 @@ int main()
 						pollfds.erase(pollfds.begin() + j); 
 						break; 
 					}
-				} //TODO i dont like this solution maybe more practical one can done
+				} //FIXME i dont like this solution maybe more practical one can done
 				delete connections[closing_fds[i]];
 				connections.erase(closing_fds[i]);
 			}

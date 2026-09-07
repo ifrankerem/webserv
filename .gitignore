@@ -13,3 +13,7 @@ telnet/
 docs/nginx-notlu/
 docs/nginx-okuma-rehberi.md
 docs/telnet-notlu/
+picohttpparser/
+tinyhttpd/
+docs/picohttpparser-notlu/
+docs/tinyhttpd-notlu/

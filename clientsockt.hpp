@@ -12,10 +12,10 @@ class clientsockt : public sockt
 		clientsockt();
 		clientsockt(int fd);
 		clientsockt(int domain, int type , int protocol);
-		~clientsockt();
+		~clientsockt(); 
 		clientsockt(const clientsockt& other);
 		clientsockt& operator=(const clientsockt& other);
-		int ft_connect();	
+		int ft_connect();
 		void setWriteBuffer(std::string data);
 		bool ft_handleWrite();
 

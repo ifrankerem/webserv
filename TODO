@@ -1,2 +1,32 @@
 sockt sinifi kopyalanabilir nasil olucak?? Bunun ustune dusunce
-Yarin parser hakkinda bir mimari dusun ve bunu tasarlayip belirle sonra mustafayla konus
+PARSER NOTES:
+
+1-)  Parser uc donusu olmali. Parser'in tek bir "bool" donusu olamaz:
+ *         >= 0   basarili, bu kadar bayt tuketildi
+ *         -1     bozuk istek        -> 400 Bad Request, baglantiyi kapat
+ *         -2     eksik istek        -> poll'a don, daha fazla veri bekle
+
+ 2-)Kopyalama yapmak yok sadece parse edicez parcalara ayiracagiz
+
+ 3-)recv den sonra tamponu bastan taramali miyiz yoksa , state + pozisyon tutup ngnixdeki gibi mi yapmaliyiz?
+
+ 4-)Bir onceki cagrida tamponun uzunlugu neydi, onu sakla. Yeni aramaya
+(last_len - 3) noktasindan basla.
+
+Mantik su sekilde olucak sonu bulana kadar devam edicez is_complete ile ondan sonra
+sonu buldugumuzda parse edicez.
+Tricks : tek recv de gelirse diye ilkini is_complete e sokmadan direkt parse a yollicaz zaten son
+
+
+
+
+
+
+
+
+
+
+
+
+
+
