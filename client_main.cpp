@@ -1,5 +1,4 @@
 #include "clientsockt.hpp"
-#include "parsing.hpp"
 #include <csignal>
 
 
@@ -35,7 +34,7 @@ int main()
 				if (pos != std::string::npos)
 				{
 					header_len = pos + 4; //INFO \r\n\r\n
-					content_length = parsing::getContentLength(new_socket->getReadBuffer());
+				//	content_length = parsing::getContentLength(new_socket->getReadBuffer());
 				}
 			}
 

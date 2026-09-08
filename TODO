@@ -18,6 +18,9 @@ sonu buldugumuzda parse edicez.
 Tricks : tek recv de gelirse diye ilkini is_complete e sokmadan direkt parse a yollicaz zaten son
 
 
+TODO getContentLength isini coz bozuk bozuk headerlar felan gonderiyorduk baglantilara bi bakalim yarin parsing ile
+
+
 
 
 

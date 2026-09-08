@@ -2,6 +2,8 @@
 #define sockt_HPP
 
 
+#include "HttpRequest.hpp"
+#include "HttpResponse.hpp"
 #include <iostream>
 #include <string>
 
@@ -23,6 +25,8 @@ class sockt
 		sockaddr_in server_addr;
 		std::string writeBuffer;
 		std::string readBuffer;
+		HttpRequest request;
+		HttpResponse response;
 
 	public:
 		sockt();
@@ -39,6 +43,8 @@ class sockt
 		std::string getReadBuffer();
 		void clearWriteBuffer();
 		void clearReadBuffer();
+		HttpRequest& getRequest() ;
+
 
 };
 

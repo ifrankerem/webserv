@@ -1,6 +1,7 @@
+#include "HttpResponse.hpp"
 #include "listensockt.hpp"
+#include "HttpRequest.hpp"
 #include "clientsockt.hpp"
-#include "parsing.hpp"
 #include <csignal>
 #include <fstream>
 #include <sstream>
@@ -8,10 +9,8 @@
 #include <vector>
 #include <map>
 #include <poll.h>
-#include "Parse.hpp"
 
 
-#define MAX_HEADER_SIZE = 431;
 
 
 std::string ft_make_dummyheader()
@@ -26,7 +25,9 @@ std::string ft_make_dummyheader()
 	ss << file.rdbuf();			
 	std::string content = ss.str();
 	std::string content_length_text = "content-length: ";
-	std::string content_length_str = parsing::to_str(content.length());
+	std::ostringstream oss;
+	oss << content.length();
+	std::string content_length_str = oss.str(); // FIXME REMOVE LATER IT BECAUSE ITS NOT CPP 98 !!!!! 
 	std::string dummy_header = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n";
 	content_length_text.append(content_length_str);
 	dummy_header.append(content_length_text);
@@ -93,23 +94,36 @@ int main()
 					}
 					if (re & POLLIN) //INFO looking for reading
 					{
-						size_t perv = curr->getReadBuffer().size();
+						// *** **** ****
+						HttpRequest &request = curr->getRequest();
+						request.incrementFlag();
+						ssize_t prev = curr->getReadBuffer().size();
 						ssize_t n = curr->ft_recv();
-						if((curr->getReadBuffer().size() > MAX_HEADER_SIZE) || n == 0)
+						request.setByteSent(n);
+						if(n == 0)
 							closing_fds.push_back(curr->getSocket_nbr());
-						Parse::parse(curr->getReadBuffer(),perv);
+						if(request.is_complete(curr->getReadBuffer(),prev) == true)
+						{
+							switch (request.parse(curr->getReadBuffer()))
+							{
+								case HttpRequest::PARSE_INCOMPLETE:
+									continue; //INFO waiting for more data, next fd
+								case HttpRequest::PARSE_ERROR:
+									closing_fds.push_back(curr->getSocket_nbr()); //NOTE closing fd for errors
+									break;
+								case HttpRequest::PARSE_OK:
+									// INFO Making preparetment for RESPONSE
+									curr->clearReadBuffer();
+									curr->setWriteBuffer(ft_make_dummyheader());
+									pollfds[i].events = POLLOUT;
+									break;
+							}
+						}
 						// if(curr->getReadBuffer().size() > 0)
 						// {
 						// 	std::cout << "From client_fd: " << curr->getSocket_nbr() << "\n"  << curr->getReadBuffer();
 						// 	std::cout << "---------------" << std::endl;
 						// }
-
-						if (curr->getReadBuffer().find("\r\n\r\n") != std::string::npos)
-						{
-							curr->clearReadBuffer();
-							curr->setWriteBuffer(ft_make_dummyheader()); 
-							pollfds[i].events = POLLOUT;  
-						}
 					}
 					if (re & POLLOUT) //INFO looking for writing
 					{

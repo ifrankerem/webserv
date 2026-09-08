@@ -1,4 +1,5 @@
 #include "sockt.hpp"
+#include "HttpRequest.hpp"
 
 sockt::sockt()
 {
@@ -92,3 +93,9 @@ void sockt::clearReadBuffer()
 	this->readBuffer.clear();
 
 }
+
+HttpRequest& sockt::getRequest()
+{
+    return this->request;
+}
+
