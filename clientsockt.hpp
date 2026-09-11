@@ -7,6 +7,10 @@ class clientsockt : public sockt
 {
 	private:
 		ssize_t sent_bytes;
+		std::string writeBuffer;
+		std::string readBuffer;
+		HttpRequest request;
+		HttpResponse response;
 
 	public:
 		clientsockt();

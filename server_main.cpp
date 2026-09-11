@@ -1,4 +1,5 @@
 #include "HttpResponse.hpp"
+#include "ServerConfig.hpp"
 #include "listensockt.hpp"
 #include "HttpRequest.hpp"
 #include "clientsockt.hpp"
@@ -9,6 +10,7 @@
 #include <vector>
 #include <map>
 #include <poll.h>
+#include "Config.hpp"
 
 
 
@@ -38,31 +40,40 @@ std::string ft_make_dummyheader()
 
 int main()
 {
-	listensockt *listen_socket;
-	clientsockt *client_socket;
+	Config config;
+	std::map<int,ServerConfig> listen_sockets;
 	std::vector <struct pollfd> pollfds;
 	std::vector <struct pollfd> pendingfds;
 	std::map<int,clientsockt*> connections;
 	std::vector <int> closing_fds;
+	std::vector<ServerConfig> servers_list = config.getServers(); //INFO gettin serverslist
 
 	try{
 		signal(SIGPIPE, SIG_IGN); //TODO simdilik ekliyorum daha detayli arastirmasini yapicam
-		//INFO creating socket
-		listen_socket = new listensockt(AF_INET,SOCK_STREAM,0);
-		//INFO where i can connect with that socket
-		listen_socket->init_addr(AF_INET,8080,0x7F000001); //INFO 127.0.0.1 for testing
 
-		listen_socket->ft_bind();
 
-		listen_socket->ft_listen();
-		struct pollfd pfd = pollfd(); //INFO no memset so recreate the struct
-		pfd.fd = listen_socket->getSocket_nbr(); //INFO adding listen sockt to q
-		pfd.events = POLLIN;
-		pollfds.push_back(pfd);
+		for(int i = 0; i < config.getNbr_of_UniquePairs(); i++)
+		{
+			listensockt *listen_socket = new listensockt(AF_INET,SOCK_STREAM,0);
+			uint16_t port = servers_list[i].getPort();
+			uint32_t host = servers_list[i].getHost();
+			//INFO where i can connect with that socket
+			listen_socket->set_Host(servers_list[i].getHost_str());
+			listen_socket->setPort(servers_list[i].getPort_int());
+			listen_socket->init_addr(AF_INET,port,host); //INFO 127.0.0.1 for testing
+			listen_socket->ft_bind();
+			listen_socket->ft_listen();
+			struct pollfd pfd = pollfd(); //INFO no memset so recreate the struct
+			pfd.fd = listen_socket->getSocket_nbr(); //INFO adding listen sockt to q
+			pfd.events = POLLIN;
+			pollfds.push_back(pfd);
+			listen_sockets[listen_socket->getSocket_nbr()] = servers_list[i];
+		}
+
 
 		while(1)
-		{
-			poll(&pollfds[0],pollfds.size(),-1); //INFO waiting unlimited
+		{ //TODO connect to listen fds to this loop
+			poll(&pollfds[0],pollfds.size(),-1); //TODO Subject: "A request to your server should never hang indefinitely."
 			for(size_t i = 0; i < pollfds.size();i++)
 			{
 				if(pollfds[i].revents == 0)
@@ -94,7 +105,6 @@ int main()
 					}
 					if (re & POLLIN) //INFO looking for reading
 					{
-						// *** **** ****
 						HttpRequest &request = curr->getRequest();
 						request.incrementFlag();
 						ssize_t prev = curr->getReadBuffer().size();
@@ -113,17 +123,15 @@ int main()
 									break;
 								case HttpRequest::PARSE_OK:
 									// INFO Making preparetment for RESPONSE
+									HttpResponse &response = curr->getResponse();
+									std::string dummy_config; // TODO there will be a config file while webserv started
+									response.build(request, dummy_config);
 									curr->clearReadBuffer();
-									curr->setWriteBuffer(ft_make_dummyheader());
+									curr->setWriteBuffer(response.ft_make_response());
 									pollfds[i].events = POLLOUT;
 									break;
 							}
 						}
-						// if(curr->getReadBuffer().size() > 0)
-						// {
-						// 	std::cout << "From client_fd: " << curr->getSocket_nbr() << "\n"  << curr->getReadBuffer();
-						// 	std::cout << "---------------" << std::endl;
-						// }
 					}
 					if (re & POLLOUT) //INFO looking for writing
 					{

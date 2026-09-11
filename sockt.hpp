@@ -23,10 +23,7 @@ class sockt
 	protected:
 		int socket_nbr;
 		sockaddr_in server_addr;
-		std::string writeBuffer;
-		std::string readBuffer;
-		HttpRequest request;
-		HttpResponse response;
+
 
 	public:
 		sockt();
@@ -43,7 +40,9 @@ class sockt
 		std::string getReadBuffer();
 		void clearWriteBuffer();
 		void clearReadBuffer();
-		HttpRequest& getRequest() ;
+		HttpRequest& getRequest();
+		HttpResponse& getResponse();
+
 
 
 };

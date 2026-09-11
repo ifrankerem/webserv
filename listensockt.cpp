@@ -46,5 +46,6 @@ int listensockt::ft_listen()
 int listensockt::ft_accept()
 {
 	int flag = accept(this->socket_nbr,NULL,NULL);
+	fcntl(this->socket_nbr, F_SETFL, O_NONBLOCK);
 	return flag;
 }

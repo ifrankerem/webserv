@@ -21,6 +21,14 @@ Tricks : tek recv de gelirse diye ilkini is_complete e sokmadan direkt parse a y
 TODO getContentLength isini coz bozuk bozuk headerlar felan gonderiyorduk baglantilara bi bakalim yarin parsing ile
 
 
+TODO connect to listen fds to this loop
+
+TODO all nonblocking fcntl
+
+ non-blocking → connection state machine (body okuma dahil) → çoklu listen soketi → config parser → matching katmanı → CGI.
+
+
+
 
 
 

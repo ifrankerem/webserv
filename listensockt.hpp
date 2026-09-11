@@ -6,6 +6,8 @@
 class listensockt : public sockt
 {
 	private:
+		std::string host;
+		int port;
 
 	public:
 		listensockt();
@@ -16,6 +18,8 @@ class listensockt : public sockt
 		int ft_bind();
 		int ft_listen();
 		int ft_accept();
+		void set_Host(std::string str);
+		void setPort(int nbr);
 
 
 };

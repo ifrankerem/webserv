@@ -99,3 +99,9 @@ HttpRequest& sockt::getRequest()
     return this->request;
 }
 
+HttpResponse sockt::getResponse()
+{
+	return this->response;
+}
+
+
