@@ -23,7 +23,6 @@ SSL/TLS = Secure Sockets Layer / Transport Layer Security (Güvenli Yuva Katman�
 DNS = Domain Name System (Alan Adı Sistemi)
 SMTP = Simple Mail Transfer Protocol (Basit Posta Aktarım Protokolü)
 TLS = Transport Layer Security (Taşıma Katmanı Güvenliği)
-JavaScript = A programming language commonly used in web development (Web geliştirmede yaygın olarak kullanılan bir programlama dili)
 AJAX = Asynchronous JavaScript and XML (Asenkron JavaScript ve XML)
 SOAP = Simple Object Access Protocol (Basit Nesne Erişim Protokolü)         
 OAuth = Open Authorization (Açık Yetkilendirme)
