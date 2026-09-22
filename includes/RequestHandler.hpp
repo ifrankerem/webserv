@@ -7,14 +7,13 @@
 #include "HttpRequest.hpp"
 #include "HttpResponse.hpp"
 
-// A'nin poll'da izlemesi gereken fd.
-struct WatchFd {
+struct WatchFd { //CGI
     int   fd;
     short events;
 };
 
-// handle() ve onReady() donusu.
 struct Step {
+	
     enum Kind {
         RESPOND,
         WAIT
@@ -25,21 +24,26 @@ struct Step {
     std::vector<WatchFd> watch;
 };
 
-// A ile B arasindaki tek kapi. B yazar, A kullanir.
-// Her istek icin bir tane; A olusturur, A siler.
 class RequestHandler {
-public:
-    RequestHandler(const ServerConfig& server);
-    ~RequestHandler();
-
-    size_t       bodyLimit(const HttpRequest& req);
-    Step         handle(const HttpRequest& req);
-    Step         onReady(int fd, short revents);
-    HttpResponse error(int status);
 
 private:
-    RequestHandler(const RequestHandler& other);
-    RequestHandler& operator=(const RequestHandler& other);
+
+	const ServerConfig* server;
+	const LocationConfig* findLocation(const std::string& path);
+	bool            normalizePath(const std::string& path, std::string& out); //NOTE A decoded sekilde path vermeli bana!
+	std::string     resolveDiskPath(const LocationConfig& loc, const std::string& path);
+	RequestHandler(const RequestHandler& other);
+	RequestHandler& operator=(const RequestHandler& other);
+	
+public:
+	
+    RequestHandler(const ServerConfig& server);
+    ~RequestHandler();
+    size_t       bodyLimit(const HttpRequest& req);
+    Step         handle(const HttpRequest& req);
+    Step         onReady(int fd, short revents); //b4
+    HttpResponse error(int status);
+
 };
 
 #endif
