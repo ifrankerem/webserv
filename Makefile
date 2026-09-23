@@ -5,6 +5,10 @@ CXXFLAGS =-std=c++98 #-Wall -Wextra -Werror
 SRC = main.cpp parser/LocationParser.cpp  parser/ServerParser.cpp
 OBJS = $(SRC:.cpp=.o)
 
+TEST_NAME = webserv_test
+TEST_SRC = tests/test_router.cpp $(B_SRC)
+TEST_OBJS = $(TEST_SRC:.cpp=.o)
+
 all: $(NAME)
 
 $(NAME): $(OBJS)
@@ -15,13 +19,21 @@ run: $(NAME)
 	clear
 	./$(NAME)
 
+test: $(TEST_NAME)
+	./$(TEST_NAME)
+
+$(TEST_NAME): $(TEST_OBJS)
+	$(CXX) -o $(TEST_NAME) $(CXXFLAGS) $(TEST_OBJS)
+
 leak:
 	valgrind ./$(NAME) 
 
 clean:
-	rm -rf $(OBJS)
+	rm -rf $(OBJS) $(TEST_OBJS)
 	
 fclean: clean
-	rm -rf $(NAME)
+	rm -rf $(NAME) $(TEST_NAME)
 
-re: fclean all 
+re: fclean all
+
+.PHONY: all run leak test clean fclean re

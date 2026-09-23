@@ -1,0 +1,105 @@
+!if %variable_exists("DARK")
+!$BG        = "#1E1E1E"
+!$FG        = "#E0E0E0"
+!$MUTED     = "#A0A0A0"
+!$BOX       = "#2B2B2B"
+!$LINE      = "#9E9E9E"
+!$NOTE      = "#3A3826"
+!$NOTE_LINE = "#8A8456"
+!$A_BG      = "#16263A"
+!$C_BG      = "#3A3220"
+!$B_BG      = "#1B3322"
+!$CHILD_BG  = "#4A2626"
+!$SPOT_C    = "#2E7D32"
+!$SPOT_E    = "#B23B3B"
+!$SPOT_A    = "#1565C0"
+!$SPOT_FG   = "#FFFFFF"
+!else
+!$BG        = "#FFFFFF"
+!$FG        = "#000000"
+!$MUTED     = "#555555"
+!$BOX       = "#F1F1F1"
+!$LINE      = "#181818"
+!$NOTE      = "#FEFFDD"
+!$NOTE_LINE = "#A8A87A"
+!$A_BG      = "#E3F2FD"
+!$C_BG      = "#FFF8E1"
+!$B_BG      = "#E8F5E9"
+!$CHILD_BG  = "#FFEBEE"
+!$SPOT_C    = "#ADD1B2"
+!$SPOT_E    = "#EB937F"
+!$SPOT_A    = "#A9DCDF"
+!$SPOT_FG   = "#000000"
+!endif
+
+skinparam backgroundColor $BG
+skinparam defaultFontColor $FG
+skinparam titleFontColor $FG
+<style>
+spot {
+  spotClass { BackgroundColor $SPOT_C; FontColor $SPOT_FG }
+  spotEnum { BackgroundColor $SPOT_E; FontColor $SPOT_FG }
+  spotAbstractClass { BackgroundColor $SPOT_A; FontColor $SPOT_FG }
+}
+activityDiagram {
+  activity { BackgroundColor $BOX; LineColor $LINE; FontColor $FG }
+  diamond { BackgroundColor $BOX; LineColor $LINE; FontColor $FG }
+  arrow { LineColor $LINE; FontColor $FG }
+  circle { BackgroundColor $FG; LineColor $FG }
+  note { BackgroundColor $NOTE; LineColor $NOTE_LINE; FontColor $FG }
+  swimlane { LineColor $LINE; FontColor $FG }
+}
+</style>
+
+skinparam class {
+  BackgroundColor $BOX
+  BorderColor $LINE
+  FontColor $FG
+  AttributeFontColor $FG
+  StereotypeFontColor $MUTED
+}
+
+skinparam package {
+  BorderColor $LINE
+  FontColor $FG
+}
+
+skinparam arrow {
+  Color $LINE
+  FontColor $FG
+}
+
+skinparam note {
+  BackgroundColor $NOTE
+  BorderColor $NOTE_LINE
+  FontColor $FG
+}
+
+skinparam participant {
+  BackgroundColor $BOX
+  BorderColor $LINE
+  FontColor $FG
+}
+
+skinparam actor {
+  BackgroundColor $BOX
+  BorderColor $LINE
+  FontColor $FG
+}
+
+skinparam sequence {
+  ArrowColor $LINE
+  ArrowFontColor $FG
+  LifeLineBorderColor $LINE
+  BoxBorderColor $LINE
+  BoxFontColor $FG
+  GroupBorderColor $LINE
+  GroupBackgroundColor $BOX
+  GroupHeaderFontColor $FG
+  GroupFontColor $FG
+  GroupBodyBackgroundColor transparent
+  DividerBackgroundColor $BOX
+  DividerBorderColor $LINE
+  DividerFontColor $FG
+  ReferenceBackgroundColor $BOX
+}
