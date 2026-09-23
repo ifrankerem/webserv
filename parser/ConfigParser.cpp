@@ -22,7 +22,7 @@ Config ConfigParser::parse_config_file(const std::string& filename)
     
     std::vector<std::string> tokens = tokenize(file);
     
-    return Config(); 
+    return config; 
 }
 
 void ConfigParser::parse_listen(std::vector<std::string>& tokens, size_t& i, ServerConfig& server)
@@ -90,12 +90,48 @@ void ConfigParser::parse_cgi_ext(std::vector<std::string>& tokens, size_t& i, Lo
 {
 }
 
-// =========================================================================
-//                         YARDIMCI FONKSİYONLAR
-// =========================================================================
+
 
 std::vector<std::string> ConfigParser::tokenize(std::ifstream& file)
 {
+    std::vector<std::string> tokens;
+    std::string current_token = "";
+    char c;
 
-    return std::vector<std::string>(); 
+    while (file.get(c)) {
+
+        if (c == '#') {
+            while (c != '\n' && file.get(c)) {
+            }
+            continue; 
+        }
+
+        if (std::isspace(c)) 
+        {
+            if (!current_token.empty()) 
+            {
+                tokens.push_back(current_token);
+                current_token.clear();
+            }
+        }
+        
+        else if (c == '{' || c == '}' || c == ';')
+        {
+            if (!current_token.empty()) 
+            {
+                tokens.push_back(current_token);
+                current_token.clear();
+            }
+
+            std::string special_char(1, c); 
+            tokens.push_back(special_char);
+        }
+        else 
+            current_token += c;
+    }
+
+    if (!current_token.empty())
+        tokens.push_back(current_token);
+
+    return tokens;
 }

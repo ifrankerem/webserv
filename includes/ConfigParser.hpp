@@ -7,6 +7,8 @@
 #include <map>
 #include <stdexcept>
 #include <fstream>
+#include <cctype> 
+#include <iostream>
 
 class ConfigParser {
 private:
