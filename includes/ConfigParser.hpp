@@ -13,8 +13,11 @@
 class ConfigParser {
 private:
     typedef void (ConfigParser::*ParseFunction)(std::vector<std::string>&, size_t&, ServerConfig&);
+    typedef void (ConfigParser::*LocationParseFunction)(std::vector<std::string>&, size_t&, LocationConfig&);
     
     std::map<std::string, ParseFunction> command_map;
+    std::map<std::string, LocationParseFunction> location_command_map;
+
 
     void parse_listen(std::vector<std::string>& tokens, size_t& i, ServerConfig& server);
     void parse_server_name(std::vector<std::string>& tokens, size_t& i, ServerConfig& server);

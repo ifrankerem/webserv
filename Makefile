@@ -2,7 +2,7 @@ NAME=webserv
 
 CXX = c++
 CXXFLAGS =-std=c++98 #-Wall -Wextra -Werror
-SRC = main.cpp parser/ConfigParser.cpp
+SRC = main.cpp parser/LocationParser.cpp  parser/ServerParser.cpp
 OBJS = $(SRC:.cpp=.o)
 
 all: $(NAME)
