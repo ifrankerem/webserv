@@ -84,7 +84,7 @@ void ConfigParser::parse_upload_enable(std::vector<std::string>& tokens, size_t&
 {
     i++;
     // Burada struct'ta upload_enable bool'unun olduğunu varsayıyoruz
-    // location.upload_enable = (tokens[i] == "on");
+    location.upload_enable = (tokens[i] == "on");
     i++;
     if (tokens[i] != ";") throw std::runtime_error("Config Error: 'upload_enable' must end with ';'");
 }

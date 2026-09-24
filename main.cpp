@@ -1,5 +1,6 @@
 #include <iostream>
 #include "includes/ConfigParser.hpp"
+#include "includes/ServerManager.hpp"
 
 // Terminal çıktısını renklendirmek (isteğe bağlı) ve düzenlemek için
 void debug_config(const Config& config) {
@@ -67,15 +68,14 @@ int main() {
     try {
         ConfigParser Conf;
         Config serv;
-        
         serv = Conf.parse_config_file("conf/default.conf");
+        ServerManager manage(serv);
         
-        // Bütün o teker teker yazdığın cout'ları silip tek satırda şovu yapıyorsun
-        debug_config(serv);
+        manage.setupServers();
+        //debug_config(serv);
         
     } 
     catch (const std::exception& e) {
-        // Eğer dosyada bir hata varsa (mesela eksik noktalı virgül), program çökmek yerine buraya düşer
         std::cerr << "\n[!] KARDESIM PARSER PATLADI: " << e.what() << "\n\n";
     }
 
