@@ -3,7 +3,7 @@ NAME=webserv
 CXX = c++
 CXXFLAGS = -std=c++98 -Wall -Wextra -Werror -Iincludes
 B_SRC = src/RequestHandler.cpp src/ResponseHandler.cpp
-A_SRC = parser/LocationParser.cpp parser/ServerParser.cpp
+A_SRC = parser/LocationParser.cpp parser/ServerParser.cpp src/ServerManager.cpp
 SRC = main.cpp $(B_SRC) $(A_SRC)
 OBJS = $(SRC:.cpp=.o)
 
@@ -17,7 +17,6 @@ $(NAME): $(OBJS)
 	c++  -o $(NAME) $(CXXFLAGS) $(OBJS) 
 
 run: $(NAME)
-	make clean
 	clear
 	./$(NAME)
 
