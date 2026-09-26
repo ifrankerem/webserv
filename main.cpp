@@ -64,6 +64,12 @@ void debug_config(const Config& config) {
     }
 }
 
+#include <dirent.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <dirent.h>
+
 int main() {
     try {
         ConfigParser Conf;
@@ -80,6 +86,8 @@ int main() {
         std::cerr << "\n[!] KARDESIM PARSER PATLADI: " << e.what() << "\n\n";
     }
 
-	
-
+	struct stat info;
+	std::string path = "/home/kero/Desktop/Projeler/webservortak/conf";
+	if(::stat(path.c_str(), &info) != -1)
+		std::cout << info.st_mode << info.st_gid << "    "  << info.st_uid << "      " << info.st_size << std::endl;
 }

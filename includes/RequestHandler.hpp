@@ -42,7 +42,7 @@ public:
     size_t       bodyLimit(const HttpRequest& req);
     Step         handle(const HttpRequest& req);
     Step         onReady(int fd, short revents); //b4
-    HttpResponse error(int status);
+    static HttpResponse error(int status,const ServerConfig *server);
 
 };
 
