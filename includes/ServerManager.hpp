@@ -13,7 +13,7 @@
 #include <arpa/inet.h>
 #include <cstring>
 #include "ConfigParser.hpp"
-// #include "Client.hpp"
+#include "Client.hpp"
 
 #define MAX_EVENTS 1024
 
@@ -25,7 +25,7 @@ private:
     
     std::map<int, int>              _server_fds; 
     
-    // std::map<int, Client>           _clients;
+    std::map<int, Client>           _clients;
 
     void acceptConnection(int server_fd); 
     void handleClientRead(int client_fd);

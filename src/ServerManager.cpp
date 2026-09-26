@@ -93,7 +93,6 @@ void ServerManager::run()
         }
         for (int i = 0; i < count_fd; i++){
             int current_fd = _events[i].data.fd;
-
             if (_server_fds.count(current_fd) > 0 )
             {
                 acceptConnection(current_fd);
@@ -110,28 +109,94 @@ void ServerManager::run()
             {
                 handleClientWrite(current_fd);
             }
-            
         }
     }
 }
 
 void ServerManager::acceptConnection(int server_fd)
 {
-
-    (void)server_fd;
+    struct sockaddr_in cl;
+    socklen_t cl_len = sizeof(cl);
+    int new_client_fd = accept(server_fd, (struct sockaddr *)&cl, &cl_len);
+    if( new_client_fd == -1)
+    {
+        std::cout << "error1";
+    }
+    fcntl(new_client_fd, F_SETFL, O_NONBLOCK);          
+    
+    struct epoll_event event;
+    std::memset(&event, 0, sizeof(event));
+    event.events = EPOLLIN; 
+    event.data.fd = new_client_fd;
+    epoll_ctl(_epoll_fd, EPOLL_CTL_ADD, new_client_fd, &event); 
+    
+    Client new_client(new_client_fd,cl);
+    _clients[new_client_fd] = new_client;
+    _clients[new_client_fd].setState(READING);
 }
 
 void ServerManager::handleClientRead(int client_fd)
 {
+    char buffer[4096];
+    int byte;
+    byte = recv(client_fd,buffer,sizeof(buffer)-1, 0);
+    
+    if (byte > 0)
+    {
+        buffer[byte] = '\0'; 
+        std::cout << "\n--- GELEN HTTP ISTEGI ---\n" << buffer << "-------------------------\n" << std::endl;
+        _clients[client_fd].setState(WRITING);
 
+        struct epoll_event event;
+        std::memset(&event, 0, sizeof(event));
+        event.events = EPOLLOUT; 
+        event.data.fd = client_fd;
+        epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, client_fd, &event);
+    }
+    else if (byte == 0)
+    {
+        std::cout << "Müşteri sekmeyi kapattı (Bağlantı koptu)." << std::endl;
+        closeConnection(client_fd);
+    }
+    else
+    {
+        std::cerr << "Okuma yaparken hata oluştu!" << std::endl;
+        closeConnection(client_fd);
+    }
+    
 }
 
 void ServerManager::handleClientWrite(int client_fd)
 {
-    (void)client_fd;
+    std::ifstream file("html/index.html");
+    
+    char c;
+    std::string test_site = 
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Type: text/html\r\n"
+        "Content-Length: 1441\r\n"
+        "\r\n";
+    while (file.get(c))
+    {
+        test_site += c;
+    }
+    int bytes_sent = send(client_fd, test_site.c_str(), test_site.length(), 0);
+
+    if (bytes_sent > 0)
+    {
+        std::cout << "Cevap gönderildi! (" << bytes_sent << " bayt)" << std::endl;
+                closeConnection(client_fd); 
+    }
+    else
+    {
+        std::cerr << "Gönderme işlemi başarısız!" << std::endl;
+        closeConnection(client_fd);
+    }
 }
 
 void ServerManager::closeConnection(int client_fd)
 {
+    _server_fds.erase(client_fd);
+    _clients.erase(client_fd);
     (void)client_fd;
 }
