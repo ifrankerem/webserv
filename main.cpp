@@ -72,6 +72,7 @@ int main() {
         ServerManager manage(serv);
         
         manage.setupServers();
+        manage.run();
         //debug_config(serv);
         
     } 
