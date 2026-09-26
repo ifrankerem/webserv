@@ -83,17 +83,47 @@ void ServerManager::setupServers()
 
 void ServerManager::run()
 {
+    while (true)
+    {
+        int count_fd = epoll_wait(_epoll_fd, _events, MAX_EVENTS, -1);
+        if(count_fd == -1)
+        {
+            std::cout << "Error: Ctrl + c";
+            break;
+        }
+        for (int i = 0; i < count_fd; i++){
+            int current_fd = _events[i].data.fd;
 
+            if (_server_fds.count(current_fd) > 0 )
+            {
+                acceptConnection(current_fd);
+            }
+            else if (_events[i].events & (EPOLLERR | EPOLLHUP | EPOLLRDHUP))
+            {
+                closeConnection(current_fd);
+            }
+            else if ((_events[i].events & EPOLLIN) && _clients[current_fd].getState() == READING)
+            {
+                handleClientRead(current_fd);
+            }
+            else if ((_events[i].events & EPOLLOUT) && _clients[current_fd].getState() == WRITING)
+            {
+                handleClientWrite(current_fd);
+            }
+            
+        }
+    }
 }
 
 void ServerManager::acceptConnection(int server_fd)
 {
+
     (void)server_fd;
 }
 
 void ServerManager::handleClientRead(int client_fd)
 {
-    (void)client_fd;
+
 }
 
 void ServerManager::handleClientWrite(int client_fd)
