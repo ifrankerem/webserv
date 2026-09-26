@@ -3,12 +3,11 @@
 
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include "../includes/HttpRequest.hpp"
-#include "../includes/HttpResponse.hpp"
+#include "HttpParser.hpp"
 
 enum ClientState {
     READING,
-    PROCESSING, 
+    PROCESSING,
     WRITING,
     CLOSING
 };
@@ -18,21 +17,20 @@ private:
     int                 _fd;
     struct sockaddr_in  _address;
     ClientState         _state;
-    
-    HttpRequest         _request;  
-    HttpResponse        _response;
+
+    HttpParser          _parser;   
 
 public:
     Client();
-    Client(int fd, struct sockaddr_in &address);
+    Client(int fd, struct sockaddr_in address);
     ~Client();
 
     int getFd() const;
     ClientState getState() const;
     void setState(ClientState state);
 
-    // HttpRequest& getRequestObj();
-    // HttpResponse& getResponseObj();
+    HttpParser& getParserObj();
+    void resetForNextRequest();
 };
 
 #endif
