@@ -1,38 +1,38 @@
-#ifndef CLIENT_HPP
-#define CLIENT_HPP
+    #ifndef CLIENT_HPP
+    #define CLIENT_HPP
 
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include "../includes/HttpRequest.hpp"
-#include "../includes/HttpResponse.hpp"
+    #include <sys/socket.h>
+    #include <netinet/in.h>
+    #include "HttpParser.hpp"
 
-enum ClientState {
-    READING,
-    PROCESSING, 
-    WRITING,
-    CLOSING
-};
+    enum ClientState {
+        READING,
+        PROCESSING,
+        WRITING,
+        CLOSING
+    };
 
-class Client {
-private:
-    int                 _fd;
-    struct sockaddr_in  _address;
-    ClientState         _state;
-    
-    HttpRequest         _request;  
-    HttpResponse        _response;
+    class Client {
+    private:
+        int                 _fd;
+        struct sockaddr_in  _address;
+        ClientState         _state;
 
-public:
-    Client();
-    Client(int fd, struct sockaddr_in &address);
-    ~Client();
+        HttpParser          _parser;   
 
-    int getFd() const;
-    ClientState getState() const;
-    void setState(ClientState state);
+    public:
+        Client();
+        Client(int fd, struct sockaddr_in &address);
+        ~Client();
 
-    // HttpRequest& getRequestObj();
-    // HttpResponse& getResponseObj();
-};
+        int getFd() const;
+        ClientState getState() const;
+        void setState(ClientState state);
+        void parseData();                          
+        ParseState getParseState() const;
+        void feedData(const char* chunk, int size);
+        HttpParser& getParserObj();
+        void resetForNextRequest();
+    };
 
-#endif
+    #endif

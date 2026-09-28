@@ -135,35 +135,53 @@ void ServerManager::acceptConnection(int server_fd)
     _clients[new_client_fd].setState(READING);
 }
 
+void HttpParser::printDebug() const { // bunu sil
+    std::cout << "\n========== [ PARSER DEBUG ] ==========" << std::endl;
+    std::cout << "Method  : [" << _request.method << "]" << std::endl;
+    std::cout << "Path    : [" << _request.path << "]" << std::endl;
+    std::cout << "Query   : [" << _request.query << "]" << std::endl;
+    std::cout << "Version : [" << _request.version << "]" << std::endl;
+    
+    std::cout << "--- Headers (" << _request.headers.size() << ") ---" << std::endl;
+    for (std::map<std::string, std::string>::const_iterator it = _request.headers.begin(); 
+         it != _request.headers.end(); ++it) {
+        std::cout << "  '" << it->first << "' : '" << it->second << "'" << std::endl;
+    }
+    
+    std::cout << "--- Body (" << _request.body.length() << " bytes) ---" << std::endl;
+    if (_request.body.empty())
+        std::cout << "  (Body Bos)" << std::endl;
+    else
+        std::cout << _request.body << std::endl;
+    std::cout << "======================================\n" << std::endl;
+}
+
 void ServerManager::handleClientRead(int client_fd)
 {
     char buffer[4096];
     int byte;
     byte = recv(client_fd,buffer,sizeof(buffer)-1, 0);
-    
     if (byte > 0)
     {
-        buffer[byte] = '\0'; 
-        std::cout << "\n--- GELEN HTTP ISTEGI ---\n" << buffer << "-------------------------\n" << std::endl;
-        _clients[client_fd].setState(WRITING);
+       _clients[client_fd].feedData(buffer,byte);
+       _clients[client_fd].parseData();
 
-        struct epoll_event event;
-        std::memset(&event, 0, sizeof(event));
-        event.events = EPOLLOUT; 
-        event.data.fd = client_fd;
-        epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, client_fd, &event);
+       if (_clients[client_fd].getParseState() == PARSE_DONE)
+        {
+            _clients[client_fd].getParserObj().printDebug();
+            _clients[client_fd].setState(WRITING);
+
+            struct epoll_event event;
+            std::memset(&event, 0, sizeof(event));
+            event.events = EPOLLOUT; 
+            event.data.fd = client_fd;
+            epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, client_fd, &event);
+        }
+        else if (byte == 0)
+        {
+            closeConnection(client_fd);
+        }       
     }
-    else if (byte == 0)
-    {
-        std::cout << "Müşteri sekmeyi kapattı (Bağlantı koptu)." << std::endl;
-        closeConnection(client_fd);
-    }
-    else
-    {
-        std::cerr << "Okuma yaparken hata oluştu!" << std::endl;
-        closeConnection(client_fd);
-    }
-    
 }
 
 void ServerManager::handleClientWrite(int client_fd)

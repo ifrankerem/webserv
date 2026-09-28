@@ -1,9 +1,10 @@
 NAME=webserv
 
 CXX = c++
-CXXFLAGS = -g -std=c++98 -Wextra -Wall -Werror -Iincludes
+CXXFLAGS = -std=c++98 -Wall -Wextra -Werror -Iincludes
 B_SRC = src/RequestHandler.cpp src/ResponseHandler.cpp src/Mime.cpp src/HttpResponse.cpp
-SRC = main.cpp $(B_SRC)
+A_SRC = parser/LocationParser.cpp parser/ServerParser.cpp src/ServerManager.cpp src/Client.cpp src/HttpParser.cpp
+SRC = main.cpp $(B_SRC) $(A_SRC)
 OBJS = $(SRC:.cpp=.o)
 
 TEST_NAME = webserv_test

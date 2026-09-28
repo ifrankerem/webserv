@@ -4,12 +4,6 @@
 #include <string>
 #include <map>
 
-enum ParseState {
-    PARSE_OK,
-    PARSE_INCOMPLETE,
-    PARSE_ERROR
-};
-
 struct HttpRequest {
     std::string method;
     std::string path;
