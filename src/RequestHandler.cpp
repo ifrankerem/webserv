@@ -3,6 +3,19 @@
 #include "HttpResponse.hpp"
 #include "ResponseHandler.hpp"
 #include <cstddef>
+#include <sstream>
+#include <cstddef>
+#include <vector>
+#include <cstdio>
+#include <dirent.h>
+#include <fstream>
+#include <iostream>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <dirent.h>
+#include <cstdio>
+
 
 RequestHandler::RequestHandler(const ServerConfig& server) : server(&server)
 {
@@ -17,7 +30,7 @@ RequestHandler& RequestHandler::operator=(const RequestHandler& other)
 {
     if (this != &other)
     {
-        
+
     }
 
     return *this;
@@ -104,21 +117,45 @@ size_t RequestHandler::bodyLimit(const HttpRequest &req)
 	return loc->client_max_body_size;
 }
 
-
-HttpResponse RequestHandler::error(int status)
+static HttpResponse defaultErrorPage(int status)
 {
-	HttpResponse response;
-	response.status = status;
-	//TODO there will be a document reading part
-	if(status == 404)
-	{
-		response.body = "<html><body><h1>404 Not Found</h1></body></html>";
-		response.headers["Content-Type"] = "text/html";
-	}
-	
-	return response;
+	std::ostringstream line;
+	line << status;
+
+	HttpResponse x;
+	x.status = status;
+	x.headers["Content-Type"] = "text/html; charset=UTF-8";
+	x.body =
+		"<html>\n<head><title>" + line.str() + "</title></head>\n"
+		"<body>\n<center><h1>" + line.str() + "</h1></center>\n"
+		"<hr><center>webserv</center>\n</body>\n</html>\n";
+	return x;
 }
 
+
+HttpResponse RequestHandler::error(int status, const ServerConfig *server)
+{
+	HttpResponse x;
+
+	std::map<int, std::string>::const_iterator it = server->error_pages.find(status);
+	if (it == server->error_pages.end())
+		return defaultErrorPage(status);
+
+	std::string path = server->root + it->second;
+	std::ifstream file(path.c_str());
+
+	if (!file.is_open())
+		return defaultErrorPage(status);
+
+	char c;
+	while (file.get(c)) {
+		 x.body += c;
+	}
+
+	x.status = status;
+	x.headers["Content-Type"] = "text/html; charset=UTF-8";
+	return x;
+}
 
 
 Step RequestHandler::handle(const HttpRequest &req)
@@ -128,7 +165,7 @@ Step RequestHandler::handle(const HttpRequest &req)
 	{
 		Step x;
 		x.kind = Step::RESPOND;
-		x.response = error(400);
+		x.response = error(400,server);
 		return x;
 	}
 
@@ -139,12 +176,12 @@ Step RequestHandler::handle(const HttpRequest &req)
 		//TODO conf has no location so maybe use Default Settings?
 		struct Step x = Step();
 		x.kind = Step::RESPOND;
-		x.response = error(404);
+		x.response = error(404,server);
 		return x;
 	}
 
 	bool allowed = false;
-	
+
 	for(size_t i = 0 ; i < best->allowed_methods.size(); i++)
 	{
 		if(best->allowed_methods[i].compare(req.method) == 0)
@@ -153,7 +190,7 @@ Step RequestHandler::handle(const HttpRequest &req)
 			break;
 		}
 	}
-	
+
 	if (allowed == false)
 	{
 	    std::string allow;
@@ -163,14 +200,14 @@ Step RequestHandler::handle(const HttpRequest &req)
 	            allow += ", ";
 	        allow += best->allowed_methods[i];
 	    }
-		
+
 	    Step x;
 	    x.kind = Step::RESPOND;
-	    x.response = error(405);
+	    x.response = error(405,server);
 	    x.response.headers["Allow"] = allow;
 	    return x;
 	}
-	
+
 	if(best->redirect_code != 0)
 	{
 		struct Step x = Step();
@@ -179,13 +216,10 @@ Step RequestHandler::handle(const HttpRequest &req)
 		return x;
 	}
 	else {
-		std::string diskPath = resolveDiskPath(*best, path);
+		std::string diskPath = resolveDiskPath(*best, path); // its final version of path root + req
 		struct Step x = Step();
 		x.kind = Step::RESPOND;
-		//TODO B2: serve diskPath (200 / 403 / 404); for now show what routing produced
-		x.response.status = 200;
-		x.response.headers["Content-Type"] = "text/plain";
-		x.response.body = diskPath;
+		x.response = ResponseHandler::handle(diskPath,req, *best, *server);
 		return x;
 	}
 }

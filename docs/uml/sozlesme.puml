@@ -43,7 +43,7 @@ package "ARAYÜZ SÖZLEŞMESİ\n(tek kapı)" as I $C_BG {
     + bodyLimit(const HttpRequest& req): size_t
     + handle(const HttpRequest& req): Step
     + onReady(int fd, short revents): Step
-    + error(int status): HttpResponse
+    + {static} error(int status, const ServerConfig* server): HttpResponse
   }
 
   class Step <<B döndürür, A uygular>> {
@@ -136,6 +136,8 @@ note right of RequestHandler
   2. handle()     istek tamamen okununca
   3. onReady()    watch'taki bir fd hazır olunca
   4. error()      A'nın kendi bulduğu hatalar
+     (static: nesne gerekmez,
+      A config'i kendi verir)
   --
   ~RequestHandler(): B'nin açtığı her şeyi
   kapatır (dosya, pipe, süreç).
