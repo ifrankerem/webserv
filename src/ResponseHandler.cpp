@@ -1,19 +1,19 @@
 #include "ResponseHandler.hpp"
+#include "Config.hpp"
 #include "HttpRequest.hpp"
 #include "HttpResponse.hpp"
 #include "RequestHandler.hpp"
 #include "Mime.hpp"
 #include <algorithm>
+#include <cctype>
 #include <cerrno>
 #include <cstddef>
 #include <vector>
-#include <cstdio>
 #include <dirent.h>
-#include <iostream>
+#include <cstdio>
 #include <fstream>
+#include <iterator>
 #include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
 #include <dirent.h>
 
 ResponseHandler::ResponseHandler()
@@ -35,7 +35,7 @@ ResponseHandler& ResponseHandler::operator=(const ResponseHandler& other)
 {
     if (this != &other)
     {
-        
+
     }
 
     return *this;
@@ -54,27 +54,23 @@ HttpResponse ResponseHandler::redirect_handler(int status_code,const std::string
 }
 
 
-HttpResponse ResponseHandler::handle(const std::string diskPath,const HttpRequest &req, const LocationConfig& loc,const ServerConfig& srv)
+HttpResponse ResponseHandler::handle(const std::string& diskPath,const std::string& path,const HttpRequest &req, const LocationConfig& loc,const ServerConfig& srv)
 {
 	if(req.method == "GET")
 		return handle_get(diskPath,req,loc,srv);
-// 	else if(req.method == "POST")
-// 		return handle_post(diskPath, req, loc,srv);
-// 	else if(req.method == "DELETE")
-// 	{
-// 
-// 	}
+	else if(req.method == "POST")
+		return handle_post(diskPath, path, req, loc,srv);
+	else if(req.method == "DELETE")
+		return handle_delete(diskPath, loc,srv);
 
-	//TODO B2/B3: fill the branches above; until then keep the build green
-	(void)loc;
-	(void)srv;
+	//bilinmeyen metot (PUT, PATCH...) -> 501
 	HttpResponse response;
 	response.status = 501;
 	return response;
 }
 
 
-HttpResponse ResponseHandler::handle_get(const std::string diskPath,const HttpRequest &req, const LocationConfig& loc,const ServerConfig& srv)
+HttpResponse ResponseHandler::handle_get(const std::string& diskPath,const HttpRequest &req, const LocationConfig& loc,const ServerConfig& srv)
 {
 	struct stat info;
 	if (::stat(diskPath.c_str(), &info) == -1) //stat() was not successful. The errno global variable is set to indicate the error.
@@ -83,7 +79,7 @@ HttpResponse ResponseHandler::handle_get(const std::string diskPath,const HttpRe
 			return RequestHandler::error(404,&srv);
 		else if(errno == EACCES) // Permission denied.
 			return RequestHandler::error(403,&srv);
-		else 
+		else
 			return RequestHandler::error(500,&srv); //  Internal Server Error:
 
 		//TODO maybe more if and elses this part for more status codes
@@ -119,25 +115,23 @@ HttpResponse ResponseHandler::handle_get(const std::string diskPath,const HttpRe
 }
 
 
-HttpResponse ResponseHandler::serveFile(const std::string diskPath,const ServerConfig& srv)
+HttpResponse ResponseHandler::serveFile(const std::string& diskPath,const ServerConfig& srv)
 {
 	HttpResponse x;
 	std::ifstream file(diskPath.c_str());
 	if (!file.is_open())
 		return RequestHandler::error(403,&srv);
 
-	char c;
-	while(file.get(c))
-	{
-		x.body += c;
-	}
+	std::istreambuf_iterator<char> first(file);
+	std::istreambuf_iterator<char> last;
+	x.body.assign(first, last);
 
 	x.status = 200;
 	x.headers["Content-Type"] = mimeType(diskPath);
 	return x;
 }
 
-HttpResponse ResponseHandler::listDirectory(const std::string diskPath,const ServerConfig& srv) //case for autoindex creating an html for indexing
+HttpResponse ResponseHandler::listDirectory(const std::string& diskPath,const ServerConfig& srv) //case for autoindex creating an html for indexing
 {
 	DIR* dir = opendir(diskPath.c_str());
 	if (dir == NULL)
@@ -161,7 +155,7 @@ HttpResponse ResponseHandler::listDirectory(const std::string diskPath,const Ser
 	closedir(dir);
 
 	std::sort(names.begin(), names.end());
-	
+
 	std::string f_path = diskPath.substr(srv.root.size(),diskPath.size()) + '/';
 
 	std::string body = "<html>\n<head><title>Index of " + f_path +
@@ -177,9 +171,74 @@ HttpResponse ResponseHandler::listDirectory(const std::string diskPath,const Ser
 	return x;
 }
 
-// HttpResponse ResponseHandler::handle_post(const std::string diskPath,const HttpRequest &req, const LocationConfig& loc,const ServerConfig& srv)
-// {
-// 	
-// }
+HttpResponse ResponseHandler::handle_post(const std::string& diskPath,const std::string& path,const HttpRequest &req, const LocationConfig& loc,const ServerConfig& srv) // A needs to give me bodylimit free body!!!
+{
+	HttpResponse x;
+	if(!loc.upload_enable)
+		return RequestHandler::error(403, &srv);
+	if(loc.upload_store.empty())
+		return RequestHandler::error(405, &srv); //ngnix returned 405 so i did it too
+
+	std::map<std::string, std::string>::const_iterator it = req.headers.find("content-type");
+	std::string type;
+	if(it != req.headers.end())
+		type = it->second;
+	for(size_t i = 0; i < type.size(); ++i)
+		type[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(type[i])));
+	if(type.find("multipart/") != std::string::npos)
+		return RequestHandler::error(415, &srv);
+
+	//diskPath hedef dosya; handle() onu upload_store'dan uretti.
+	//path ise temiz URL: location'in kendisiyse ya da '/' ile bitiyorsa
+	//ortada dosya adi yok, yazacak bir sey de yok.
+	if(path.size() <= loc.path.size() + 1 || path[path.size() - 1] == '/')
+		return RequestHandler::error(400, &srv);
+
+	std::ofstream outfile(diskPath.c_str(), std::ios::binary);
+	if(!outfile)
+		return RequestHandler::error(500, &srv);
+	outfile << req.body;
+	outfile.close();
+	if(!outfile)
+		return RequestHandler::error(500, &srv);
+
+	x.status = 201;
+	x.headers["Location"] = path;
+	return x;
+}
 
 
+HttpResponse ResponseHandler::handle_delete(const std::string& diskPath, const LocationConfig &loc, const ServerConfig &srv)
+{
+	HttpResponse x;
+	if(loc.upload_store.empty())
+		return RequestHandler::error(403, &srv);
+	struct stat info;
+	if (::stat(diskPath.c_str(), &info) == -1) //stat() was not successful. The errno global variable is set to indicate the error.
+	{
+		if (errno == ENOENT || errno == ENOTDIR) // No such path or directory.
+			return RequestHandler::error(404,&srv);
+		else if(errno == EACCES || errno == EPERM) // Permission denied.
+			return RequestHandler::error(403,&srv);
+		else
+			return RequestHandler::error(500,&srv); //  Internal Server Error:
+	}
+	if (S_ISDIR(info.st_mode) != 0)
+		return RequestHandler::error(403, &srv);
+	if (S_ISREG(info.st_mode) == 0)
+		return RequestHandler::error(403, &srv);
+	if (std::remove(diskPath.c_str()) != 0)
+	{
+		if(errno == ENOENT || errno == ENOTDIR)
+			return RequestHandler::error(404, &srv);
+		else if(errno == EACCES || errno == EPERM)
+			return RequestHandler::error(403, &srv);
+		else
+			return RequestHandler::error(500, &srv);
+	}
+
+	x.status = 204;
+
+
+	return x;
+}

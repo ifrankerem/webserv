@@ -47,7 +47,11 @@ const LocationConfig* RequestHandler::findLocation(const std::string& path)
 	for(size_t i = 0 ; i < server->locations.size(); i++)
 	{
 		const LocationConfig &loc = server->locations[i];
-		if (path.compare(0, loc.path.size(), loc.path) == 0)
+		bool pathMatch = path.compare(0, loc.path.size(), loc.path) == 0;
+		bool pathBoundary = loc.path == "/" || path.size() == loc.path.size()
+			|| (!loc.path.empty() && loc.path[loc.path.size() - 1] == '/')
+			|| (path.size() > loc.path.size() && path[loc.path.size()] == '/');
+		if (pathMatch && pathBoundary)
 		{
 			if(best == NULL || loc.path.size() >= best->path.size())
 				best = &loc;
@@ -108,6 +112,17 @@ std::string RequestHandler::resolveDiskPath(const LocationConfig& loc, const std
 	return root + rest;
 }
 
+std::string RequestHandler::resolveUploadPath(const LocationConfig& loc, const std::string& path)
+{
+	std::string root = loc.upload_store;
+	if (!root.empty() && root[root.size() - 1] == '/')
+		root.erase(root.size() - 1);
+	std::string rest = path.substr(loc.path.size());
+	if (rest.empty() || rest[0] != '/')
+		rest = "/" + rest;
+	return root + rest;
+}
+
 
 size_t RequestHandler::bodyLimit(const HttpRequest &req)
 {
@@ -147,10 +162,9 @@ HttpResponse RequestHandler::error(int status, const ServerConfig *server)
 	if (!file.is_open())
 		return defaultErrorPage(status);
 
-	char c;
-	while (file.get(c)) {
-		 x.body += c;
-	}
+	std::istreambuf_iterator<char> first(file);
+	std::istreambuf_iterator<char> last;
+	x.body.assign(first, last);
 
 	x.status = status;
 	x.headers["Content-Type"] = "text/html; charset=UTF-8";
@@ -216,10 +230,15 @@ Step RequestHandler::handle(const HttpRequest &req)
 		return x;
 	}
 	else {
-		std::string diskPath = resolveDiskPath(*best, path); // its final version of path root + req
+		std::string diskPath;
+		//POST ve DELETE ayni klasorle calisir: hedefi tek yerde hesapla
+		if ((req.method == "DELETE" || req.method == "POST") && !best->upload_store.empty())
+			diskPath = resolveUploadPath(*best, path);
+		else
+			diskPath = resolveDiskPath(*best, path); // its final version of path root + req
 		struct Step x = Step();
 		x.kind = Step::RESPOND;
-		x.response = ResponseHandler::handle(diskPath,req, *best, *server);
+		x.response = ResponseHandler::handle(diskPath, path, req, *best, *server);
 		return x;
 	}
 }

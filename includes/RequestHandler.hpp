@@ -32,6 +32,7 @@ private:
 	const LocationConfig* findLocation(const std::string& path);
 	bool            normalizePath(const std::string& path, std::string& out); //NOTE A decoded sekilde path vermeli bana!
 	std::string     resolveDiskPath(const LocationConfig& loc, const std::string& path);
+	std::string     resolveUploadPath(const LocationConfig& loc, const std::string& path);
 	RequestHandler(const RequestHandler& other);
 	RequestHandler& operator=(const RequestHandler& other);
 	
