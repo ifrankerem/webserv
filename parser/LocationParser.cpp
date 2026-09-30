@@ -33,6 +33,33 @@ void ConfigParser::parse_location(std::vector<std::string>& tokens, size_t& i, S
     server.locations.push_back(loc);
 }
 
+void ConfigParser::parse_autoindex(std::vector<std::string>& tokens, size_t& i, LocationConfig& location)
+{
+    i++;
+    if (tokens[i] == "on")
+        location.autoindex = true;
+    else if (tokens[i] == "off") 
+        location.autoindex = false;
+    else 
+        throw std::runtime_error("Config Error: 'autoindex' can only be 'on' or 'off'! Received value: " + tokens[i]);
+    i++;
+    if (tokens[i] != ";") throw std::runtime_error("Config Error: 'autoindex' must end with ';'");
+}
+
+void ConfigParser::parse_upload_enable(std::vector<std::string>& tokens, size_t& i, LocationConfig& location)
+{
+    i++;
+    location.upload_enable = (tokens[i] == "on");
+    if (tokens[i] == "on")
+        location.autoindex = true;
+    else if (tokens[i] == "off") 
+        location.autoindex = false;
+    else 
+        throw std::runtime_error("Config Error: 'upload_enable' can only be 'on' or 'off'! Received value: " + tokens[i]);
+    i++;
+    if (tokens[i] != ";") throw std::runtime_error("Config Error: 'upload_enable' must end with ';'");
+}
+
 void ConfigParser::parse_location_root(std::vector<std::string>& tokens, size_t& i, LocationConfig& location)
 {
     i++;
@@ -56,19 +83,25 @@ void ConfigParser::parse_allow_methods(std::vector<std::string>& tokens, size_t&
 {
     i++;
     while (i < tokens.size() && tokens[i] != ";") {
-        location.allowed_methods.push_back(tokens[i]);
+        if (tokens[i] == "GET" || tokens[i] == "POST" || tokens[i] == "DELETE")
+        {
+            for (size_t j = 0; j < location.allowed_methods.size(); j++)
+            {
+                if (location.allowed_methods[j] == tokens[i])
+                    throw std::runtime_error("Config Error: Duplicate method! '" + tokens[i] + "' is already added.");//break de atılabilir bilemedim
+            }
+            location.allowed_methods.push_back(tokens[i]);
+        }
+        else
+            throw std::runtime_error("Config Error: Invalid method or missing ';' -> '" + tokens[i] + "'");
         i++;
     }
-    if (tokens[i] != ";") throw std::runtime_error("Config Error: 'allow_methods' must end with ';'");
+    if (i >= tokens.size() || tokens[i] != ";") 
+        throw std::runtime_error("Config Error: 'allow_methods' directive must end with ';'");
 }
 
-void ConfigParser::parse_autoindex(std::vector<std::string>& tokens, size_t& i, LocationConfig& location)
-{
-    i++;
-    location.autoindex = (tokens[i] == "on");
-    i++;
-    if (tokens[i] != ";") throw std::runtime_error("Config Error: 'autoindex' must end with ';'");
-}
+
+
 
 void ConfigParser::parse_return(std::vector<std::string>& tokens, size_t& i, LocationConfig& location)
 {
@@ -80,14 +113,6 @@ void ConfigParser::parse_return(std::vector<std::string>& tokens, size_t& i, Loc
     if (tokens[i] != ";") throw std::runtime_error("Config Error: 'return' must end with ';'");
 }
 
-void ConfigParser::parse_upload_enable(std::vector<std::string>& tokens, size_t& i, LocationConfig& location)
-{
-    i++;
-    // Burada struct'ta upload_enable bool'unun olduğunu varsayıyoruz
-    location.upload_enable = (tokens[i] == "on");
-    i++;
-    if (tokens[i] != ";") throw std::runtime_error("Config Error: 'upload_enable' must end with ';'");
-}
 
 void ConfigParser::parse_upload_store(std::vector<std::string>& tokens, size_t& i, LocationConfig& location)
 {
