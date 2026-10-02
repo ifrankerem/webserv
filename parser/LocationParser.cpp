@@ -47,7 +47,7 @@ void ConfigParser::parse_autoindex(std::vector<std::string>& tokens, size_t& i, 
     else 
         throw std::runtime_error("Config Error: 'autoindex' can only be 'on' or 'off'! Received value: " + tokens[i]);
     i++;
-    if (tokens[i] != ";") throw std::runtime_error("Config Error: 'autoindex' must end with ';'");
+    if (i >= tokens.size() || tokens[i] != ";") throw std::runtime_error("Config Error: 'autoindex' must end with ';'");
 }
 
 void ConfigParser::parse_upload_enable(std::vector<std::string>& tokens, size_t& i, LocationConfig& location)
@@ -66,21 +66,17 @@ void ConfigParser::parse_upload_enable(std::vector<std::string>& tokens, size_t&
 void ConfigParser::parse_location_root(std::vector<std::string>& tokens, size_t& i, LocationConfig& location)
 {
     i++;
-    if (i >= tokens.size() || tokens[i] == ";" || tokens[i] == "{" || tokens[i] == "}")
-        throw std::runtime_error("Config Error: 'root' is expecting a directory path.");
     location.root = tokens[i];
     i++;
-    if (tokens[i] != ";") throw std::runtime_error("Config Error: location 'root' must end with ';'");
+    if (i >= tokens.size() || tokens[i] != ";") throw std::runtime_error("Config Error: location 'root' must end with ';'");
 }
 
 void ConfigParser::parse_upload_store(std::vector<std::string>& tokens, size_t& i, LocationConfig& location)
 {
     i++;
-    if (i >= tokens.size() || tokens[i] == ";" || tokens[i] == "{" || tokens[i] == "}")
-        throw std::runtime_error("Config Error: 'upload_store' is expecting a directory path.");
     location.upload_store = tokens[i];
     i++;
-    if (tokens[i] != ";") throw std::runtime_error("Config Error: 'upload_store' must end with ';'");
+    if (i >= tokens.size() || tokens[i] != ";") throw std::runtime_error("Config Error: 'upload_store' must end with ';'");
 }
 
 void ConfigParser::parse_cgi_path(std::vector<std::string>& tokens, size_t& i, LocationConfig& location)
@@ -88,16 +84,13 @@ void ConfigParser::parse_cgi_path(std::vector<std::string>& tokens, size_t& i, L
     i++;
     std::string path = tokens[i];
 
-    if (i >= tokens.size() || tokens[i] == ";" || tokens[i] == "{" || tokens[i] == "}")
-        throw std::runtime_error("Config Error: 'cgi_path' is expecting a directory path.");
-
     if (location.cgi_pass.size() > 0) { //bu kısımda opsiyon 1 seçeneğimiz ddaha var belki değiştiriebilir;
         location.cgi_pass.begin()->second = path;
     } else {
         location.cgi_pass[""] = path; 
     }
     i++;
-    if (tokens[i] != ";") throw std::runtime_error("Config Error: 'cgi_path' must end with ';'");
+    if (i >= tokens.size() || tokens[i] != ";") throw std::runtime_error("Config Error: 'cgi_path' must end with ';'");
 }
 
 void ConfigParser::parse_cgi_ext(std::vector<std::string>& tokens, size_t& i, LocationConfig& location)
@@ -105,8 +98,6 @@ void ConfigParser::parse_cgi_ext(std::vector<std::string>& tokens, size_t& i, Lo
     i++;
     std::string ext = tokens[i];
 
-    if (i >= tokens.size() || tokens[i] == ";" || tokens[i] == "{" || tokens[i] == "}")
-        throw std::runtime_error("Config Error: 'cgi_ext' is expecting a directory path.");
     if (location.cgi_pass.count("")) {
         location.cgi_pass[ext] = location.cgi_pass[""];
         location.cgi_pass.erase("");
@@ -114,7 +105,7 @@ void ConfigParser::parse_cgi_ext(std::vector<std::string>& tokens, size_t& i, Lo
         location.cgi_pass[ext] = "";
     }
     i++;
-    if (tokens[i] != ";") throw std::runtime_error("Config Error: 'cgi_ext' must end with ';'");
+    if (i >= tokens.size() || tokens[i] != ";") throw std::runtime_error("Config Error: 'cgi_ext' must end with ';'");
 }
 
 void ConfigParser::parse_location_index(std::vector<std::string>& tokens, size_t& i, LocationConfig& location)
@@ -122,9 +113,8 @@ void ConfigParser::parse_location_index(std::vector<std::string>& tokens, size_t
     i++;
     while (i < tokens.size() && tokens[i] != ";") {
 
-        if (tokens[i] == "{" || tokens[i] == "}") {
+        if (tokens[i] == "{" || tokens[i] == "}") 
             throw std::runtime_error("Config Error: 'index' komutunda ';' unutulmus olabilir.");
-        }
 
         if (!location.index.empty()) location.index += " ";
         location.index += tokens[i];
