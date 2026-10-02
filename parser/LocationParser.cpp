@@ -20,6 +20,10 @@ void ConfigParser::parse_location(std::vector<std::string>& tokens, size_t& i, S
         std::string cmd = tokens[i];
         
         if (location_command_map.find(cmd) != location_command_map.end()) {
+
+            if (i + 1 >= tokens.size() || tokens[i + 1] == ";" || tokens[i + 1] == "{" || tokens[i + 1] == "}") 
+                throw std::runtime_error("Config Error: Directive '" + cmd + "' requires at least one argument.");
+            
             (this->*location_command_map[cmd])(tokens, i, loc);
         } else {
             throw std::runtime_error("Config Error: Unknown location directive '" + cmd + "'");
@@ -49,11 +53,10 @@ void ConfigParser::parse_autoindex(std::vector<std::string>& tokens, size_t& i, 
 void ConfigParser::parse_upload_enable(std::vector<std::string>& tokens, size_t& i, LocationConfig& location)
 {
     i++;
-    location.upload_enable = (tokens[i] == "on");
     if (tokens[i] == "on")
-        location.autoindex = true;
+        location.upload_enable = true;
     else if (tokens[i] == "off") 
-        location.autoindex = false;
+        location.upload_enable = false;
     else 
         throw std::runtime_error("Config Error: 'upload_enable' can only be 'on' or 'off'! Received value: " + tokens[i]);
     i++;
@@ -63,20 +66,72 @@ void ConfigParser::parse_upload_enable(std::vector<std::string>& tokens, size_t&
 void ConfigParser::parse_location_root(std::vector<std::string>& tokens, size_t& i, LocationConfig& location)
 {
     i++;
+    if (i >= tokens.size() || tokens[i] == ";" || tokens[i] == "{" || tokens[i] == "}")
+        throw std::runtime_error("Config Error: 'root' is expecting a directory path.");
     location.root = tokens[i];
     i++;
     if (tokens[i] != ";") throw std::runtime_error("Config Error: location 'root' must end with ';'");
+}
+
+void ConfigParser::parse_upload_store(std::vector<std::string>& tokens, size_t& i, LocationConfig& location)
+{
+    i++;
+    if (i >= tokens.size() || tokens[i] == ";" || tokens[i] == "{" || tokens[i] == "}")
+        throw std::runtime_error("Config Error: 'upload_store' is expecting a directory path.");
+    location.upload_store = tokens[i];
+    i++;
+    if (tokens[i] != ";") throw std::runtime_error("Config Error: 'upload_store' must end with ';'");
+}
+
+void ConfigParser::parse_cgi_path(std::vector<std::string>& tokens, size_t& i, LocationConfig& location)
+{
+    i++;
+    std::string path = tokens[i];
+
+    if (i >= tokens.size() || tokens[i] == ";" || tokens[i] == "{" || tokens[i] == "}")
+        throw std::runtime_error("Config Error: 'cgi_path' is expecting a directory path.");
+
+    if (location.cgi_pass.size() > 0) { //bu kısımda opsiyon 1 seçeneğimiz ddaha var belki değiştiriebilir;
+        location.cgi_pass.begin()->second = path;
+    } else {
+        location.cgi_pass[""] = path; 
+    }
+    i++;
+    if (tokens[i] != ";") throw std::runtime_error("Config Error: 'cgi_path' must end with ';'");
+}
+
+void ConfigParser::parse_cgi_ext(std::vector<std::string>& tokens, size_t& i, LocationConfig& location)
+{
+    i++;
+    std::string ext = tokens[i];
+
+    if (i >= tokens.size() || tokens[i] == ";" || tokens[i] == "{" || tokens[i] == "}")
+        throw std::runtime_error("Config Error: 'cgi_ext' is expecting a directory path.");
+    if (location.cgi_pass.count("")) {
+        location.cgi_pass[ext] = location.cgi_pass[""];
+        location.cgi_pass.erase("");
+    } else {
+        location.cgi_pass[ext] = "";
+    }
+    i++;
+    if (tokens[i] != ";") throw std::runtime_error("Config Error: 'cgi_ext' must end with ';'");
 }
 
 void ConfigParser::parse_location_index(std::vector<std::string>& tokens, size_t& i, LocationConfig& location)
 {
     i++;
     while (i < tokens.size() && tokens[i] != ";") {
+
+        if (tokens[i] == "{" || tokens[i] == "}") {
+            throw std::runtime_error("Config Error: 'index' komutunda ';' unutulmus olabilir.");
+        }
+
         if (!location.index.empty()) location.index += " ";
         location.index += tokens[i];
         i++;
     }
-    if (tokens[i] != ";") throw std::runtime_error("Config Error: location 'index' must end with ';'");
+   if (i >= tokens.size() || tokens[i] != ";") 
+        throw std::runtime_error("Config Error: location 'index' must end with ';'");
 }
 
 void ConfigParser::parse_allow_methods(std::vector<std::string>& tokens, size_t& i, LocationConfig& location)
@@ -100,52 +155,17 @@ void ConfigParser::parse_allow_methods(std::vector<std::string>& tokens, size_t&
         throw std::runtime_error("Config Error: 'allow_methods' directive must end with ';'");
 }
 
-
-
-
 void ConfigParser::parse_return(std::vector<std::string>& tokens, size_t& i, LocationConfig& location)
 {
     i++;
-    location.redirect_code = std::atoi(tokens[i].c_str());
+    location.redirect_code = std::atoi(tokens[i].c_str());//kendi atoini yaz hatalı bura 301kamil
+    if (location.redirect_code < 100 || location.redirect_code > 599) //burayı sen düzeltirsin ben tam aralığını bilmiyorum zaten harf gelirse 0 olucak 0 diye durum kodu yok yine hata
+        throw std::runtime_error("Config Error: Status code 'return' must be a number only!Received:");
     i++;
+    if (i >= tokens.size() || tokens[i] == ";" || tokens[i] == "{" || tokens[i] == "}")
+        throw std::runtime_error("Config Error: 'return' is expecting a directory path.");
     location.redirect_target = tokens[i];
     i++;
-    if (tokens[i] != ";") throw std::runtime_error("Config Error: 'return' must end with ';'");
+    if (i >= tokens.size() || tokens[i] != ";") throw std::runtime_error("Config Error: 'return' must end with ';'");
 }
 
-
-void ConfigParser::parse_upload_store(std::vector<std::string>& tokens, size_t& i, LocationConfig& location)
-{
-    i++;
-    location.upload_store = tokens[i];
-    i++;
-    if (tokens[i] != ";") throw std::runtime_error("Config Error: 'upload_store' must end with ';'");
-}
-
-void ConfigParser::parse_cgi_path(std::vector<std::string>& tokens, size_t& i, LocationConfig& location)
-{
-    i++;
-    std::string path = tokens[i];
-    // Map'e ekleme yapıyoruz. Ext ve path sırasız gelebileceği için tekil CGI kurgusuna göre atandı.
-    if (location.cgi_pass.size() > 0) {
-        location.cgi_pass.begin()->second = path;
-    } else {
-        location.cgi_pass[""] = path; 
-    }
-    i++;
-    if (tokens[i] != ";") throw std::runtime_error("Config Error: 'cgi_path' must end with ';'");
-}
-
-void ConfigParser::parse_cgi_ext(std::vector<std::string>& tokens, size_t& i, LocationConfig& location)
-{
-    i++;
-    std::string ext = tokens[i];
-    if (location.cgi_pass.count("")) {
-        location.cgi_pass[ext] = location.cgi_pass[""];
-        location.cgi_pass.erase("");
-    } else {
-        location.cgi_pass[ext] = "";
-    }
-    i++;
-    if (tokens[i] != ";") throw std::runtime_error("Config Error: 'cgi_ext' must end with ';'");
-}
