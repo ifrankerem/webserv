@@ -2,22 +2,22 @@
 #include "Config.hpp"
 #include "HttpResponse.hpp"
 #include "ResponseHandler.hpp"
+#include "Utils.hpp"
+#include <csignal>
 #include <cstddef>
-#include <sstream>
-#include <cstddef>
-#include <vector>
-#include <cstdio>
-#include <dirent.h>
+#include <cstdlib>
+#include <fcntl.h>
 #include <fstream>
 #include <iostream>
+#include <map>
+#include <poll.h>
 #include <sys/stat.h>
-#include <fcntl.h>
+#include <sys/wait.h>
 #include <unistd.h>
-#include <dirent.h>
-#include <cstdio>
+#include <vector>
 
 
-RequestHandler::RequestHandler(const ServerConfig& server) : server(&server)
+RequestHandler::RequestHandler(const ServerConfig& server) : server(&server), cgiActive(false), cgiPid(-1), cgiPipeFd(-1)
 {
 }
 
@@ -38,6 +38,16 @@ RequestHandler& RequestHandler::operator=(const RequestHandler& other)
 
 RequestHandler::~RequestHandler()
 {
+	if (cgiActive)
+	{
+		if (cgiPipeFd != -1)
+			close(cgiPipeFd);
+		if (cgiPid != -1)
+		{
+			kill(cgiPid, SIGTERM);
+			waitpid(cgiPid, NULL, 0);
+		}
+	}
 }
 
 
@@ -123,6 +133,105 @@ std::string RequestHandler::resolveUploadPath(const LocationConfig& loc, const s
 	return root + rest;
 }
 
+static std::map<std::string, std::string> buildCgiEnv(const HttpRequest& req,
+	const LocationConfig& loc, const ServerConfig& srv, const std::string& scriptPath)
+{
+	std::map<std::string, std::string> env;
+	env["REQUEST_METHOD"] = req.method;
+	env["SCRIPT_NAME"] = req.path;
+	env["SCRIPT_FILENAME"] = scriptPath;
+	env["PATH_INFO"] = "";
+	env["PATH_TRANSLATED"] = "";
+	env["QUERY_STRING"] = req.query;
+
+	env["CONTENT_TYPE"] = utils::getHeader(req.headers, "Content-Type");
+	env["CONTENT_LENGTH"] = utils::toString(req.body.size());
+	env["SERVER_NAME"] = srv.server_name;
+	env["SERVER_PORT"] = utils::toString(static_cast<size_t>(req.server_port));
+	env["REMOTE_ADDR"] = req.remote_addr;
+
+	std::string userAgent = utils::getHeader(req.headers, "User-Agent");
+	if (!userAgent.empty())
+		env["HTTP_USER_AGENT"] = userAgent;
+
+	std::string host = utils::getHeader(req.headers, "Host");
+	if (!host.empty())
+		env["HTTP_HOST"] = host;
+
+	(void)loc;
+	return env;
+}
+
+static HttpResponse parseCgiOutput(const std::string& raw)
+{
+	HttpResponse response;
+	response.status = 200;
+
+	size_t blank = raw.find("\r\n\r\n");
+	size_t headerEndLen = 4;
+	if (blank == std::string::npos)
+	{
+		blank = raw.find("\n\n");
+		headerEndLen = 2;
+	}
+
+	std::string headersPart;
+	std::string bodyPart;
+	if (blank == std::string::npos)
+	{
+		bodyPart = raw;
+	}
+	else
+	{
+		headersPart = raw.substr(0, blank);
+		bodyPart = raw.substr(blank + headerEndLen);
+	}
+
+	std::string remaining = headersPart;
+	while (!remaining.empty())
+	{
+		size_t lineEnd = remaining.find("\r\n");
+		size_t skip = 2;
+		if (lineEnd == std::string::npos)
+		{
+			lineEnd = remaining.find('\n');
+			skip = 1;
+		}
+
+		std::string line;
+		if (lineEnd == std::string::npos)
+		{
+			line = remaining;
+			remaining.clear();
+		}
+		else
+		{
+			line = remaining.substr(0, lineEnd);
+			remaining = remaining.substr(lineEnd + skip);
+		}
+
+		size_t colon = line.find(':');
+		if (colon != std::string::npos)
+		{
+			std::string key = line.substr(0, colon);
+			std::string value = line.substr(colon + 1);
+			size_t first = value.find_first_not_of(" \t");
+			if (first != std::string::npos)
+				value = value.substr(first);
+
+			if (key == "Status")
+				response.status = std::atoi(value.c_str());
+			else
+				response.headers[key] = value;
+		}
+	}
+
+	if (response.headers.find("Content-Type") == response.headers.end())
+		response.headers["Content-Type"] = "text/html; charset=UTF-8";
+
+	response.body = bodyPart;
+	return response;
+}
 
 size_t RequestHandler::bodyLimit(const HttpRequest &req)
 {
@@ -132,38 +241,24 @@ size_t RequestHandler::bodyLimit(const HttpRequest &req)
 	return loc->client_max_body_size;
 }
 
-static HttpResponse defaultErrorPage(int status)
-{
-	std::ostringstream line;
-	line << status;
-
-	HttpResponse x;
-	x.status = status;
-	x.headers["Content-Type"] = "text/html; charset=UTF-8";
-	x.body =
-		"<html>\n<head><title>" + line.str() + "</title></head>\n"
-		"<body>\n<center><h1>" + line.str() + "</h1></center>\n"
-		"<hr><center>webserv</center>\n</body>\n</html>\n";
-	return x;
-}
-
-
 HttpResponse RequestHandler::error(int status, const ServerConfig *server)
 {
 	HttpResponse x;
 
 	std::map<int, std::string>::const_iterator it = server->error_pages.find(status);
 	if (it == server->error_pages.end())
-		return defaultErrorPage(status);
+		return utils::defaultErrorPage(status);
 
 	std::string path = server->root + it->second;
 	std::ifstream file(path.c_str());
 
 	if (!file.is_open())
-		return defaultErrorPage(status);
+		return utils::defaultErrorPage(status);
 
 	std::istreambuf_iterator<char> first(file);
 	std::istreambuf_iterator<char> last;
+	//For performance i use iterators while loop is so slow for these interections
+	// 
 	x.body.assign(first, last);
 
 	x.status = status;
@@ -229,6 +324,64 @@ Step RequestHandler::handle(const HttpRequest &req)
 		x.response = ResponseHandler::redirect_handler(best->redirect_code,best->redirect_target);
 		return x;
 	}
+
+	std::string ext = utils::getExtension(path);
+	std::map<std::string, std::string>::const_iterator cgi_it = best->cgi_pass.find(ext);
+	if(cgi_it != best->cgi_pass.end() && !cgi_it->second.empty())
+	{
+		struct Step x = Step();
+		std::string scriptPath = resolveDiskPath(*best, path);
+
+		if (access(scriptPath.c_str(), F_OK) != 0)
+		{
+			x.kind = Step::RESPOND;
+			x.response = error(404, server);
+			return x;
+		}
+
+		std::map<std::string, std::string> env_variables = buildCgiEnv(req, *best, *server, scriptPath);
+		int output_pipe[2];
+		int input_pipe[2];
+		if(pipe(output_pipe) == -1 || pipe(input_pipe) == -1)
+		{
+			x.kind = Step::RESPOND;
+			x.response = error(500, server);
+			return x;
+		}	
+		int id = fork();
+		if(id == -1)
+		{
+			x.kind = Step::RESPOND;
+			x.response = error(500, server);
+			return x;
+		}
+		else if(id == 0)
+		{
+			close(output_pipe[0]); //child will not read so close it !!!
+			close(input_pipe[1]); //child will not write anything so close it!!
+		 	ResponseHandler::handle_cgi_child(output_pipe[1], input_pipe[0], env_variables, cgi_it->second);
+		}
+		else //parent processs
+		{
+			close(output_pipe[1]); //parent will not write anything so close it!!
+			close(input_pipe[0]); //parent will not read anything so close it!!
+			write(input_pipe[1], req.body.c_str(), req.body.size()); // parent will write the body to input pipe
+			close(input_pipe[1]);
+
+			cgiActive = true;
+			cgiPid = id;
+			cgiPipeFd = output_pipe[0];
+			cgiBuffer.clear();
+
+			struct WatchFd y = WatchFd();
+			fcntl(output_pipe[0],F_SETFL, O_NONBLOCK); //nonblocking
+			y.fd = output_pipe[0];
+			y.events = POLLIN;
+			x.watch.push_back(y); 
+			x.kind = Step::WAIT;
+		}
+		return x;
+	}
 	else {
 		std::string diskPath;
 		//POST ve DELETE ayni klasorle calisir: hedefi tek yerde hesapla
@@ -241,4 +394,66 @@ Step RequestHandler::handle(const HttpRequest &req)
 		x.response = ResponseHandler::handle(diskPath, path, req, *best, *server);
 		return x;
 	}
+}
+
+
+Step RequestHandler::onReady(int fd, short revents)
+{
+	struct Step x;
+	x.kind = Step::WAIT;
+
+	if (!cgiActive || fd != cgiPipeFd)
+	{
+		x.kind = Step::RESPOND;
+		x.response = error(500, server);
+		return x;
+	}
+
+	if (revents & POLLIN)
+	{
+		char buf[4096];
+		ssize_t n = read(fd, buf, sizeof(buf));
+		if (n > 0)
+		{
+			cgiBuffer.append(buf, static_cast<size_t>(n));
+		}
+		else if (n == 0)
+		{
+			// Output pipe closed: CGI finished
+			close(fd);
+			cgiActive = false;
+			cgiPipeFd = -1;
+			if (cgiPid != -1)
+			{
+				waitpid(cgiPid, NULL, 0); // child process now dead, not a zombie
+				cgiPid = -1;
+			}
+			x.kind = Step::RESPOND;
+			if (cgiBuffer.empty())
+				x.response = error(502, server); // CGI produced no output (likely execve failed)
+			else
+				x.response = parseCgiOutput(cgiBuffer);
+		}
+		else
+		{
+			// read returned -1; without errno we cannot distinguish EAGAIN from a
+			// real error. We return WAIT and let the event loop tell us again.
+			return x;
+		}
+	}
+	else if (revents & (POLLERR | POLLHUP)) // fd error or pipe hang up (closed)
+	{
+		close(fd);
+		cgiActive = false;
+		cgiPipeFd = -1;
+		if (cgiPid != -1)
+		{
+			waitpid(cgiPid, NULL, 0);
+			cgiPid = -1;
+		}
+		x.kind = Step::RESPOND;
+		x.response = error(502, server);
+	}
+
+	return x;
 }

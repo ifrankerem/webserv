@@ -8,3 +8,4 @@ webserv_b2
 webserv_b3
 src/*.d
 tests/*.d
+*.d

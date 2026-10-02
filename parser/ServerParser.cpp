@@ -1,7 +1,7 @@
 #include "../includes/ConfigParser.hpp"
 #include <cstdlib> // std::atoi için
 
-ConfigParser::ConfigParser() 
+ConfigParser::ConfigParser()
 {
     command_map["listen"]               = &ConfigParser::parse_listen;
     command_map["server_name"]          = &ConfigParser::parse_server_name;
@@ -30,15 +30,15 @@ Config ConfigParser::parse_config_file(const std::string& filename)
     if (!file.is_open()) {
         throw std::runtime_error("Config Error: The file could not be opened or found: " + filename);
     }
-    
+
     std::vector<std::string> tokens = tokenize(file);
-    
+
     if (tokens.empty()) {
         throw std::runtime_error("Config Error: File is empty.");
     }
 
     ServerConfig current_server;
-    int in_server = 0; 
+    int in_server = 0;
 
     for (size_t i = 0; i < tokens.size(); i++)
     {
@@ -46,9 +46,9 @@ Config ConfigParser::parse_config_file(const std::string& filename)
 
         if (in_server == 0) {
             if (token == "server") {
-                in_server = 1; 
+                in_server = 1;
                 if (i + 1 < tokens.size() && tokens[i + 1] == "{") {
-                    i++; 
+                    i++;
                 } else {
                     throw std::runtime_error("Config Error: Expected '{' after 'server'.");
                 }
@@ -61,14 +61,14 @@ Config ConfigParser::parse_config_file(const std::string& filename)
         if (in_server == 1) {
             if (token == "}") {
                 config.servers.push_back(current_server);
-                current_server = ServerConfig(); 
+                current_server = ServerConfig();
                 in_server = 0;
                 continue;
             }
 
             if (command_map.find(token) != command_map.end()) {
                 (this->*command_map[token])(tokens, i, current_server);
-            } 
+            }
             else {
                 throw std::runtime_error("Config Error: Unknown or invalid directive '" + token + "'.");
             }
@@ -79,23 +79,23 @@ Config ConfigParser::parse_config_file(const std::string& filename)
         throw std::runtime_error("Config Error: Unexpected end of file (missing '}').");
     }
 
-    if (config.servers.empty()) 
+    if (config.servers.empty())
          throw std::runtime_error("Config Error: No valid server configuration found.");
-    
-    return config; 
+
+    return config;
 }
 
 void ConfigParser::parse_listen(std::vector<std::string>& tokens, size_t& i, ServerConfig& server)
 {
     i++;
     std::string value = tokens[i];
-    
+
     Listen new_listen;
     size_t colon = value.find(':');
-    if (colon != std::string::npos) { 
+    if (colon != std::string::npos) {
         new_listen.ip = value.substr(0, colon);
         new_listen.port = std::atoi(value.substr(colon + 1).c_str());
-    } else { 
+    } else {
         new_listen.ip = "127.0.0.1";
         new_listen.port = std::atoi(value.c_str());
     }
@@ -116,7 +116,7 @@ void ConfigParser::parse_server_name(std::vector<std::string>& tokens, size_t& i
     if (!server.server_name.empty()) throw std::runtime_error("Config Error: Duplicate 'server_name'");
     i++;
     server.server_name = tokens[i];
-    
+
     i++;
     if (i >= tokens.size() || tokens[i] != ";") throw std::runtime_error("Config Error: 'server_name' must end with ';'");
 }
@@ -126,7 +126,7 @@ void ConfigParser::parse_root(std::vector<std::string>& tokens, size_t& i, Serve
     if (!server.root.empty()) throw std::runtime_error("Config Error: Duplicate 'root'");
     i++;
     server.root = tokens[i];
-    
+
     i++;
     if (i >= tokens.size() || tokens[i] != ";") throw std::runtime_error("Config Error: 'root' must end with ';'");
 }
@@ -140,12 +140,12 @@ void ConfigParser::parse_error_page(std::vector<std::string>& tokens, size_t& i,
         codes.push_back(std::atoi(tokens[i].c_str()));
         i++;
     }
-    
+
     std::string page = tokens[i]; // Son argüman hedef sayfadır (/errors/50x.html)
-    
+
     i++;
     if (i >= tokens.size() || tokens[i] != ";") throw std::runtime_error("Config Error: 'error_page' must end with ';'");
-    
+
     for (size_t j = 0; j < codes.size(); j++) {
         server.error_pages[codes[j]] = page;
     }
@@ -156,7 +156,7 @@ void ConfigParser::parse_client_max_body_size(std::vector<std::string>& tokens, 
     i++;
     std::string val = tokens[i];
     size_t multiplier = 1;
-    
+
     if (val[val.length() - 1] == 'M') {
         multiplier = 1024 * 1024;
         val = val.substr(0, val.length() - 1);
@@ -164,9 +164,9 @@ void ConfigParser::parse_client_max_body_size(std::vector<std::string>& tokens, 
         multiplier = 1024;
         val = val.substr(0, val.length() - 1);
     }
-    
+
     server.client_max_body_size = std::atoi(val.c_str()) * multiplier;
-    
+
     i++;
     if (i >= tokens.size() || tokens[i] != ";") throw std::runtime_error("Config Error: 'client_max_body_size' must end with ';'");
 }
@@ -179,7 +179,7 @@ void ConfigParser::parse_index(std::vector<std::string>& tokens, size_t& i, Serv
         server.index += tokens[i];
         i++;
     }
-    
+
     if (i >= tokens.size() || tokens[i] != ";") throw std::runtime_error("Config Error: 'index' must end with ';'");
 }
 
@@ -196,30 +196,30 @@ std::vector<std::string> ConfigParser::tokenize(std::ifstream& file)
         if (c == '#') {
             while (c != '\n' && file.get(c)) {
             }
-            continue; 
+            continue;
         }
 
-        if (std::isspace(c)) 
+        if (std::isspace(c))
         {
-            if (!current_token.empty()) 
+            if (!current_token.empty())
             {
                 tokens.push_back(current_token);
                 current_token.clear();
             }
         }
-        
+
         else if (c == '{' || c == '}' || c == ';')
         {
-            if (!current_token.empty()) 
+            if (!current_token.empty())
             {
                 tokens.push_back(current_token);
                 current_token.clear();
             }
 
-            std::string special_char(1, c); 
+            std::string special_char(1, c);
             tokens.push_back(special_char);
         }
-        else 
+        else
             current_token += c;
     }
 

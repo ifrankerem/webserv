@@ -4,17 +4,19 @@
 #include "HttpResponse.hpp"
 #include "RequestHandler.hpp"
 #include "Mime.hpp"
+#include "Utils.hpp"
 #include <algorithm>
 #include <cctype>
 #include <cerrno>
 #include <cstddef>
+#include <unistd.h>
 #include <vector>
 #include <dirent.h>
 #include <cstdio>
+#include <cstdlib>
 #include <fstream>
 #include <iterator>
 #include <sys/stat.h>
-#include <dirent.h>
 
 ResponseHandler::ResponseHandler()
 {
@@ -25,21 +27,6 @@ ResponseHandler::ResponseHandler()
 
 
 
-
-ResponseHandler::ResponseHandler(const ResponseHandler& other)
-{
-    *this = other;
-}
-
-ResponseHandler& ResponseHandler::operator=(const ResponseHandler& other)
-{
-    if (this != &other)
-    {
-
-    }
-
-    return *this;
-}
 
 ResponseHandler::~ResponseHandler()
 {
@@ -179,12 +166,7 @@ HttpResponse ResponseHandler::handle_post(const std::string& diskPath,const std:
 	if(loc.upload_store.empty())
 		return RequestHandler::error(405, &srv); //ngnix returned 405 so i did it too
 
-	std::map<std::string, std::string>::const_iterator it = req.headers.find("content-type");
-	std::string type;
-	if(it != req.headers.end())
-		type = it->second;
-	for(size_t i = 0; i < type.size(); ++i)
-		type[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(type[i])));
+	std::string type = utils::toLower(utils::getHeader(req.headers, "Content-Type"));
 	if(type.find("multipart/") != std::string::npos)
 		return RequestHandler::error(415, &srv);
 
@@ -241,4 +223,46 @@ HttpResponse ResponseHandler::handle_delete(const std::string& diskPath, const L
 
 
 	return x;
+}
+
+
+void ResponseHandler::handle_cgi_child(const int output_fd,const int input_fd,std::map<std::string, std::string>& env_variables,const std::string& interpreter)
+{
+	// Script needs to read request body from STDIN, so body comes from parent through input pipe
+	dup2(input_fd, STDIN_FILENO);
+	close(input_fd); // there is no need for the twin, stdin now points to the pipe
+
+	// Scripts will use STDOUT, so redirect stdout to output pipe to give response back to parent
+	dup2(output_fd, STDOUT_FILENO);
+	close(output_fd); // stdout now points to the pipe
+
+	std::vector<char*> envp = utils::mapToEnv(env_variables);
+	std::string scriptPath;
+	std::map<std::string, std::string>::const_iterator it = env_variables.find("SCRIPT_FILENAME");
+	if (it != env_variables.end())
+		scriptPath = it->second;
+
+	// CGI should run in the script's own directory for relative path access.
+	// After chdir, execve argument must be the script basename only.
+	std::string scriptName = scriptPath;
+	size_t slash = scriptPath.rfind('/');
+	if (slash != std::string::npos)
+	{
+		chdir(scriptPath.substr(0, slash).c_str());
+		scriptName = scriptPath.substr(slash + 1);
+	}
+
+	char* argv[3];
+	argv[0] = const_cast<char*>(interpreter.c_str());
+	argv[1] = const_cast<char*>(scriptName.c_str());
+	argv[2] = NULL;
+
+	execve(interpreter.c_str(), argv, &envp[0]);
+
+	// if execve fails these lines of code will work
+
+	for (size_t i = 0; i < envp.size(); ++i) //freeing the envp just in case
+		free(envp[i]);
+
+	_exit(1); //kills child automatically
 }
