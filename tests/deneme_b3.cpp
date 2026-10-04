@@ -1,0 +1,251 @@
+// B3 upload / DELETE kontrolleri.
+//   make b3
+//
+// Her calistirmada html/upload/ icerigi sifirlanir, yoksa DELETE denemeleri
+// ikinci calistirmada 404 doner ve kod bozuk sanilir.
+
+#include <iostream>
+#include <fstream>
+#include <sys/stat.h>
+#include <cstdio>
+#include <unistd.h>
+#include "RequestHandler.hpp"
+
+static bool fileExists(const std::string& path)
+{
+	std::ifstream file(path.c_str());
+	return file.good();
+}
+
+static std::string fileContent(const std::string& path)
+{
+	std::ifstream file(path.c_str());
+	std::istreambuf_iterator<char> first(file);
+	std::istreambuf_iterator<char> last;
+	return std::string(first, last);
+}
+
+static ServerConfig makeServer()
+{
+	ServerConfig srv;
+	srv.root = "html";
+	srv.index = "index.html";
+	srv.client_max_body_size = 1000000;
+	srv.error_pages[404] = "/errors/404.html";
+	srv.error_pages[403] = "/errors/403.html";
+
+	LocationConfig root;
+	root.path = "/";
+	root.root = "html";
+	root.index = "index.html";
+	root.autoindex = true;
+	root.upload_enable = false;
+	root.client_max_body_size = 1000000;
+	root.redirect_code = 0;
+	root.allowed_methods.push_back("GET");
+	srv.locations.push_back(root);
+
+	// Upload alani: uc metoda da izinli, kucuk body siniri.
+	LocationConfig upload = root;
+	upload.path = "/upload";
+	upload.root = "html/upload";
+	upload.upload_store = "html/upload/klasor";
+	upload.upload_enable = true;
+	upload.allowed_methods.clear();
+	upload.allowed_methods.push_back("GET");
+	upload.allowed_methods.push_back("POST");
+	upload.allowed_methods.push_back("DELETE");
+	upload.client_max_body_size = 100;
+	srv.locations.push_back(upload);
+
+	return srv;
+}
+
+// Her calistirmada temiz baslangic
+static void resetFixtures()
+{
+	mkdir("html/upload", 0755);
+	mkdir("html/upload/klasor", 0755);
+	std::ofstream("html/upload/klasor/silinecek.txt").put('x');
+	mkdir("html/upload/klasor/altklasor", 0755);
+	std::ofstream("html/upload/klasor/altklasor/korunacak.txt").put('y');
+	std::ofstream("html/upload/klasor/2.txt").put('x');
+	mkdir("html/upload/klasor/step", 0755);
+	std::ofstream("html/upload/b3_escaped.txt").put('x');
+	mkdir("html/upload/b3_outside", 0755);
+	std::ofstream("html/upload/b3_outside/korunacak.txt").put('x');
+	std::remove("html/upload/klasor/b3_link");
+	symlink("../b3_outside", "html/upload/klasor/b3_link");
+}
+
+static int run(const ServerConfig& srv, const HttpRequest& req)
+{
+	RequestHandler handler(srv);
+	Step step = handler.handle(req);
+
+	std::cout << "\n>>> " << req.method << " " << req.path;
+	if (!req.body.empty())
+		std::cout << "   (body " << req.body.size() << " byte)";
+	std::cout << "\n";
+
+	if (step.kind == Step::WAIT)
+	{
+		std::cout << "(WAIT, " << step.watch.size() << " fd)\n";
+		return -1;
+	}
+	std::cout << step.response.serialize() << "\n";
+	return step.response.status;
+}
+
+int main()
+{
+	resetFixtures();
+	ServerConfig srv = makeServer();
+
+	HttpRequest req;
+	req.version = "HTTP/1.1";
+	req.headers["host"] = "localhost";
+	req.remote_addr = "127.0.0.1";
+	req.server_port = 8080;
+
+	// --- POST: duz govde (curl --data-binary gibi) ---
+	// Dosya adi URL'den geliyor, dosya upload_store altinda olusmali.
+	req.method = "POST";
+	req.path = "/upload/not.txt";
+	req.headers["content-type"] = "text/plain";
+	req.body = "merhaba dunya";
+	if (run(srv, req) != 201 || fileContent("html/upload/klasor/not.txt") != "merhaba dunya")
+		return 1;
+
+	// --- POST: ikili govde, ortasinda null byte ---
+	// Null byte'ta kesilirse boyut tutmaz.
+	req.path = "/upload/ikili.bin";
+	req.headers["content-type"] = "application/octet-stream";
+	req.body = std::string("AB\0CD", 5);
+	if (run(srv, req) != 201 || fileContent("html/upload/klasor/ikili.bin").size() != 5)
+		return 1;
+
+	// --- POST: alt klasore yukleme, POST ve DELETE ayni yolu gostermeli ---
+	req.path = "/upload/altklasor/yeni.txt";
+	req.headers["content-type"] = "text/plain";
+	req.body = "alt klasor";
+	if (run(srv, req) != 201 || !fileExists("html/upload/klasor/altklasor/yeni.txt"))
+		return 1;
+	req.method = "DELETE";
+	req.body = "";
+	if (run(srv, req) != 204 || fileExists("html/upload/klasor/altklasor/yeni.txt"))
+		return 1;
+
+	// --- POST: var olan dosyanin uzerine yazma ---
+	req.method = "POST";
+	req.path = "/upload/not.txt";
+	req.headers["content-type"] = "text/plain";
+	req.body = "yeni icerik";
+	if (run(srv, req) != 201 || fileContent("html/upload/klasor/not.txt") != "yeni icerik")
+		return 1;
+	std::remove("html/upload/klasor/not.txt");
+	std::remove("html/upload/klasor/ikili.bin");
+
+	// --- POST: multipart desteklenmiyor -> 415 ---
+	req.path = "/upload";
+	req.headers["content-type"] = "multipart/form-data; boundary=SINIR";
+	req.body = "--SINIR\r\nContent-Disposition: form-data; name=\"f\"; filename=\"k.txt\"\r\n\r\nveri\r\n--SINIR--\r\n";
+	if (run(srv, req) != 415)
+		return 1;
+
+	// --- POST: URL dosya adi vermiyor -> 400 ---
+	req.path = "/upload";
+	req.headers["content-type"] = "text/plain";
+	req.body = "veri";
+	if (run(srv, req) != 400)
+		return 1;
+
+	// --- POST: yukleme kapali location (/ sadece GET) -> 405 ---
+	req.path = "/index.html";
+	req.body = "veri";
+	if (run(srv, req) != 405 || fileContent("html/index.html").empty())
+		return 1;
+
+	// --- POST: ".." iceren yol upload_store disina yazmamali ---
+	// Yol normalize edilince "/upload/b3_post.txt" olur, yani dosya
+	// upload_store altinda olusmali; disarida duran ayni isimli dosyaya
+	// dokunulmamali.
+	std::ofstream("html/upload/b3_post.txt").put('x');
+	req.path = "/upload/../upload/b3_post.txt";
+	req.body = "EZILDI";
+	if (run(srv, req) != 201
+		|| !fileExists("html/upload/klasor/b3_post.txt")
+		|| fileContent("html/upload/b3_post.txt") != "x")
+		return 1;
+	std::remove("html/upload/klasor/b3_post.txt");
+	std::remove("html/upload/b3_post.txt");
+
+	req.headers.erase("content-type");
+	req.body = "";
+
+// 	req.method = "POST";
+// 	req.path = "/upload/yeni311111111.txt";
+// 	req.headers["content-type"] = "text/plain";
+// 	req.body = "merhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunya\n";
+// 	run(srv, req);
+//
+// //	--- POST: body siniri asiliyor (location siniri 100 byte) ---
+// 	//Not: 413'u A uretiyor; burada bodyLimit()'in dogru sayiyi verdigini gor.
+// 	RequestHandler h(srv);
+// 	std::cout << "bodyLimit(/upload/x) = " << h.bodyLimit(req) << "\n";
+
+//	--- DELETE: var olan dosya -> 204, govdesiz ---
+	req.method = "DELETE";
+	req.path = "/upload/silinecek.txt";
+	req.headers.erase("content-type");
+	req.body = "";
+	if (run(srv, req) != 204)
+		return 1;
+
+	// --- DELETE: ayni istek ikinci kez -> 404 ---
+	req.method = "DELETE";
+	req.path = "/upload/silinecek.txt";
+	req.body = "";
+	if (run(srv, req) != 404)
+		return 1;
+
+	// --- DELETE: dizin silme desteklenmiyor -> 403 ---
+	req.method = "DELETE";
+	req.path = "/upload/altklasor/";
+	req.body = "";
+	int directoryStatus = run(srv, req);
+	std::remove("html/upload/klasor/altklasor/korunacak.txt");
+	std::remove("html/upload/klasor/altklasor");
+	if (directoryStatus != 403)
+		return 1;
+
+	// --- DELETE: izin verilmeyen location (/ sadece GET) -> 405 ---
+	req.method = "DELETE";
+	req.path = "/index.html";
+	req.body = "";
+	if (run(srv, req) != 405)
+		return 1;
+
+	// /upload2, /upload location'ina girmemeli.
+	req.path = "/upload2.txt";
+	if (run(srv, req) != 405 || !fileExists("html/upload/klasor/2.txt"))
+		return 1;
+	std::remove("html/upload/klasor/2.txt");
+
+	// Normalize edilen yol upload_store disina cikmamali.
+	req.path = "/upload/step/../../upload/b3_escaped.txt";
+	if (run(srv, req) != 404 || !fileExists("html/upload/b3_escaped.txt"))
+		return 1;
+	std::remove("html/upload/b3_escaped.txt");
+	std::remove("html/upload/klasor/step");
+
+	// Dis klasore giden sembolik link takip edilmemeli.
+	req.path = "/upload/b3_link";
+	if (run(srv, req) != 403 || !fileExists("html/upload/b3_outside/korunacak.txt"))
+		return 1;
+	std::remove("html/upload/klasor/b3_link");
+	std::remove("html/upload/b3_outside/korunacak.txt");
+	std::remove("html/upload/b3_outside");
+
+	return 0;
+}

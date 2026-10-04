@@ -1,7 +1,11 @@
 webserv
 ./vscode
 compile_flags.txt
-webserv_test
 *.o
 docs/not_kerem.txt
-webserv_deneme
+webserv_router
+webserv_b2
+webserv_b3
+src/*.d
+tests/*.d
+*.d
