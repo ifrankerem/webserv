@@ -135,52 +135,41 @@ void ServerManager::acceptConnection(int server_fd)
     _clients[new_client_fd].setState(READING);
 }
 
-void HttpParser::printDebug() const { // bunu sil
-    std::cout << "\n========== [ PARSER DEBUG ] ==========" << std::endl;
-    std::cout << "Method  : [" << _request.method << "]" << std::endl;
-    std::cout << "Path    : [" << _request.path << "]" << std::endl;
-    std::cout << "Query   : [" << _request.query << "]" << std::endl;
-    std::cout << "Version : [" << _request.version << "]" << std::endl;
-    
-    std::cout << "--- Headers (" << _request.headers.size() << ") ---" << std::endl;
-    for (std::map<std::string, std::string>::const_iterator it = _request.headers.begin(); 
-         it != _request.headers.end(); ++it) {
-        std::cout << "  '" << it->first << "' : '" << it->second << "'" << std::endl;
-    }
-    
-    std::cout << "--- Body (" << _request.body.length() << " bytes) ---" << std::endl;
-    if (_request.body.empty())
-        std::cout << "  (Body Bos)" << std::endl;
-    else
-        std::cout << _request.body << std::endl;
-    std::cout << "======================================\n" << std::endl;
-}
+
 
 void ServerManager::handleClientRead(int client_fd)
 {
     char buffer[4096];
-    int byte;
-    byte = recv(client_fd,buffer,sizeof(buffer)-1, 0);
+    int byte = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
+
     if (byte > 0)
     {
-       _clients[client_fd].feedData(buffer,byte);
-       _clients[client_fd].parseData();
+        _clients[client_fd].feedData(buffer, byte);
+        _clients[client_fd].parseData();
 
-       if (_clients[client_fd].getParseState() == PARSE_DONE)
+        if (_clients[client_fd].getParseState() == PARSE_DONE)
         {
             _clients[client_fd].getParserObj().printDebug();
             _clients[client_fd].setState(WRITING);
 
             struct epoll_event event;
             std::memset(&event, 0, sizeof(event));
-            event.events = EPOLLOUT; 
+            event.events = EPOLLOUT;
             event.data.fd = client_fd;
             epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, client_fd, &event);
         }
-        else if (byte == 0)
+        else if (_clients[client_fd].getParseState() == PARSE_ERROR)
         {
             closeConnection(client_fd);
-        }       
+        }
+    }
+    else if (byte == 0)
+    {
+        closeConnection(client_fd);
+    }
+    else
+    {
+        closeConnection(client_fd);
     }
 }
 
@@ -214,7 +203,7 @@ void ServerManager::handleClientWrite(int client_fd)
 
 void ServerManager::closeConnection(int client_fd)
 {
-    _server_fds.erase(client_fd);
+    epoll_ctl(_epoll_fd, EPOLL_CTL_DEL, client_fd, NULL);
+    close(client_fd);
     _clients.erase(client_fd);
-    (void)client_fd;
 }
