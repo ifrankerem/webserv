@@ -26,11 +26,13 @@ private:
     std::map<int, int>              _server_fds; 
     
     std::map<int, Client>           _clients;
+    std::map<int, int>              _cgi_to_client; // cgi_pipe_fd -> client_fd
 
     void acceptConnection(int server_fd); 
     void handleClientRead(int client_fd);
     void handleClientWrite(int client_fd);
     void closeConnection(int client_fd);
+    void handleCgiEvent(int cgi_fd, uint32_t events);
 
 public:
     ServerManager(const Config& config);

@@ -5,6 +5,8 @@
     #include <netinet/in.h>
     #include "HttpParser.hpp"
 
+    class RequestHandler;
+
     enum ClientState {
         READING,
         PROCESSING,
@@ -23,6 +25,7 @@
         std::string         _writeBuffer;
         size_t              _bytesSent;
         int                 _serverPort;
+        RequestHandler*     _handler;
 
     public:
         Client();
@@ -45,6 +48,10 @@
         const char* sendPtr() const;
         size_t      sendSize() const;
         void        advanceSent(size_t n);
+
+        RequestHandler* getHandler() const;
+        void            setHandler(RequestHandler* handler);
+        void            clearHandler();
     };
 
     #endif

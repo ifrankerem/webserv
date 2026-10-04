@@ -1,5 +1,6 @@
 #include "../includes/ServerManager.hpp"
 #include "../includes/RequestHandler.hpp"
+#include <poll.h>
 
 ServerManager::ServerManager(const Config& config){
     _config = config;
@@ -113,6 +114,10 @@ void ServerManager::run()
             {
                 acceptConnection(current_fd);
             }
+            else if (_cgi_to_client.count(current_fd) > 0)
+            {
+                handleCgiEvent(current_fd, _events[i].events);
+            }
             else if (_events[i].events & (EPOLLERR | EPOLLHUP | EPOLLRDHUP))
             {
                 closeConnection(current_fd);
@@ -203,19 +208,41 @@ void ServerManager::handleClientWrite(int client_fd)
         if (req.headers.count("Host"))
             host = req.headers["Host"];
 
-        const ServerConfig* srv = findServerConfig(_config, client.getServerPort(), host);
-        if (srv == NULL) {
-            closeConnection(client_fd);
-            return;
+        if (client.getHandler() == NULL) {
+            const ServerConfig* srv = findServerConfig(_config, client.getServerPort(), host);
+            if (srv == NULL) {
+                closeConnection(client_fd);
+                return;
+            }
+            client.setHandler(new RequestHandler(*srv));
         }
 
-        RequestHandler handler(*srv);
-        Step result = handler.handle(req);
+        Step result = client.getHandler()->handle(req);
 
         if (result.kind == Step::RESPOND) {
             client.prepareResponse(result.response.serialize());
+            client.clearHandler();
         } else if (result.kind == Step::WAIT) {
-            // İleride CGI için poll/epoll fd ekleme işlemleri buraya gelecek
+            for (size_t i = 0; i < result.watch.size(); i++) {
+                struct epoll_event event;
+                std::memset(&event, 0, sizeof(event));
+                if (result.watch[i].events & POLLIN)
+                    event.events |= EPOLLIN;
+                if (result.watch[i].events & POLLOUT)
+                    event.events |= EPOLLOUT;
+                
+                event.data.fd = result.watch[i].fd;
+                epoll_ctl(_epoll_fd, EPOLL_CTL_ADD, result.watch[i].fd, &event);
+                
+                _cgi_to_client[result.watch[i].fd] = client_fd;
+            }
+            
+            client.setState(PROCESSING);
+            
+            struct epoll_event c_event;
+            std::memset(&c_event, 0, sizeof(c_event));
+            c_event.events = 0; // İstemciye dönene kadar bekle
+            epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, client_fd, &c_event);
             return;
         }
     }
@@ -254,7 +281,58 @@ void ServerManager::handleClientWrite(int client_fd)
 
 void ServerManager::closeConnection(int client_fd)
 {
+    if (_clients.find(client_fd) != _clients.end()) {
+        _clients[client_fd].clearHandler();
+    }
+
+    std::map<int, int>::iterator it = _cgi_to_client.begin();
+    while (it != _cgi_to_client.end()) {
+        if (it->second == client_fd) {
+            epoll_ctl(_epoll_fd, EPOLL_CTL_DEL, it->first, NULL);
+            _cgi_to_client.erase(it++);
+        } else {
+            ++it;
+        }
+    }
+
     epoll_ctl(_epoll_fd, EPOLL_CTL_DEL, client_fd, NULL);
     close(client_fd);
     _clients.erase(client_fd);
+}
+
+void ServerManager::handleCgiEvent(int cgi_fd, uint32_t events)
+{
+    int client_fd = _cgi_to_client[cgi_fd];
+    if (_clients.find(client_fd) == _clients.end()) {
+        epoll_ctl(_epoll_fd, EPOLL_CTL_DEL, cgi_fd, NULL);
+        close(cgi_fd);
+        _cgi_to_client.erase(cgi_fd);
+        return;
+    }
+
+    Client& client = _clients[client_fd];
+    if (client.getHandler() == NULL) return;
+
+    short poll_events = 0;
+    if (events & EPOLLIN) poll_events |= POLLIN;
+    if (events & EPOLLOUT) poll_events |= POLLOUT;
+    if (events & EPOLLERR) poll_events |= POLLERR;
+    if (events & EPOLLHUP) poll_events |= POLLHUP;
+
+    Step result = client.getHandler()->onReady(cgi_fd, poll_events);
+
+    if (result.kind == Step::RESPOND) {
+        epoll_ctl(_epoll_fd, EPOLL_CTL_DEL, cgi_fd, NULL);
+        _cgi_to_client.erase(cgi_fd);
+
+        client.prepareResponse(result.response.serialize());
+        client.clearHandler();
+
+        client.setState(WRITING);
+        struct epoll_event event;
+        std::memset(&event, 0, sizeof(event));
+        event.events = EPOLLOUT;
+        event.data.fd = client_fd;
+        epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, client_fd, &event);
+    }
 }

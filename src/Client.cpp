@@ -1,10 +1,11 @@
 #include "../includes/Client.hpp"
+#include "../includes/RequestHandler.hpp"
 
-Client::Client(){
+Client::Client(): _fd(-1), _state(READING), _bytesSent(0), _serverPort(0), _handler(NULL) {
 
 }
 
-Client::Client(int fd, sockaddr_in &address): _fd(fd), _address(address), _state(READING), _bytesSent(0), _serverPort(0)
+Client::Client(int fd, sockaddr_in &address): _fd(fd), _address(address), _state(READING), _bytesSent(0), _serverPort(0), _handler(NULL)
 {
 }
 
@@ -42,11 +43,12 @@ void Client::resetForNextRequest() {
     _writeBuffer.clear();
     _bytesSent = 0;
     _state = READING;
+    clearHandler();
 }
 
 Client::~Client()
 {
-
+    clearHandler();
 }
 
 void Client::setServerPort(int port) { _serverPort = port; }
@@ -71,4 +73,20 @@ size_t Client::sendSize() const {
 
 void Client::advanceSent(size_t n) { 
     _bytesSent += n; 
+}
+
+RequestHandler* Client::getHandler() const {
+    return _handler;
+}
+
+void Client::setHandler(RequestHandler* handler) {
+    clearHandler();
+    _handler = handler;
+}
+
+void Client::clearHandler() {
+    if (_handler != NULL) {
+        delete _handler;
+        _handler = NULL;
+    }
 }
