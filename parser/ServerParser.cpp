@@ -85,6 +85,23 @@ Config ConfigParser::parse_config_file(const std::string& filename)
     return config;
 }
 
+int ft_atoi(const std::string &str)
+{
+    int i = 0;
+    int val = 0;
+
+    while (str[i])
+    {
+        if (str[i] >= '0' && str[i] <= '9')
+            val = (str[i] - 48) + (10 * val);
+        else
+            return -1;
+        i++;
+    }
+    return val;
+}
+
+
 void ConfigParser::parse_listen(std::vector<std::string>& tokens, size_t& i, ServerConfig& server)
 {
     i++;
@@ -92,12 +109,40 @@ void ConfigParser::parse_listen(std::vector<std::string>& tokens, size_t& i, Ser
 
     Listen new_listen;
     size_t colon = value.find(':');
-    if (colon != std::string::npos) {
-        new_listen.ip = value.substr(0, colon);
-        new_listen.port = std::atoi(value.substr(colon + 1).c_str());
-    } else {
+    int dot = 0;
+    if (colon != std::string::npos) { 
+        // new_listen.ip = value.substr(0, colon);
+        int last = 0;
+        const std::string &ip = value.substr(0, colon + 1);
+        for (size_t j = 0; j < ip.size(); j++)
+        {
+            // std::cout << ip[i] << " == . && (" << i << " - " << last << ") <= 2    "<< i - last << std::endl;
+            if (ip[j] == '.' || ip[j] == ':')
+            {
+                if ((j - last) > 3)
+                    throw std::runtime_error("Config Error: 'parse_listen' 0");  
+                // std::cout << "last: "<< last << " i: " << i << "    " << ip[i] <<  std::endl;
+                if (ft_atoi(value.substr(last, j - last)) == -1)
+                    throw std::runtime_error("Config Error: 'parse_listen' 1");                 
+                last = j + 1;
+                dot++;
+            }
+        }
+        int port = ft_atoi(value.substr(colon + 1));//kendi atoimiz yazılacak harf görürse hata verecek
+        if (port == -1)
+        {
+            throw std::runtime_error("Config Error: 'parse_listen' 2 ");
+        }
+        
+        new_listen.ip = ip.substr(0,ip.size()-1);
+        new_listen.port = port;
+    } else { //burda hata vermesi gerekniyor mu? valuede belki askdfjalskdfja yazıyor port yapmaya mı uğraşıcaz onu
         new_listen.ip = "127.0.0.1";
-        new_listen.port = std::atoi(value.c_str());
+
+        int port = ft_atoi(value);//kendi atoimiz yazılacak harf görürse hata verecek
+        if (port == -1)
+            throw std::runtime_error("Config Error: 'parse_listen' 3");
+        new_listen.port = port;
     }
     for (size_t j = 0; j < server.listens.size(); j++) {
         if (server.listens[j].ip == new_listen.ip && server.listens[j].port == new_listen.port) {
@@ -115,6 +160,8 @@ void ConfigParser::parse_server_name(std::vector<std::string>& tokens, size_t& i
 {
     if (!server.server_name.empty()) throw std::runtime_error("Config Error: Duplicate 'server_name'");
     i++;
+    if (i >= tokens.size() || tokens[i] == ";" || tokens[i] == "{" || tokens[i] == "}") 
+        throw std::runtime_error("Config Error: Directive 'server_name' requires at least one argument.");
     server.server_name = tokens[i];
 
     i++;

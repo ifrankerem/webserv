@@ -1,7 +1,7 @@
 NAME=webserv
 
 CXX = c++
-CXXFLAGS = -g -std=c++98 -Wextra -Wall -Werror -Iincludes
+CXXFLAGS = -std=c++98 -Wall -Wextra -Werror -Iincludes -g
 # -MMD: her .o icin yanina .d dosyasi yazar, icinde o dosyanin dahil ettigi
 #       header'lar listelidir. -MP: silinen bir header make'i kilitlemesin diye
 #       her header icin bos kural ekler.

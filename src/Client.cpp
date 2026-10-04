@@ -4,7 +4,7 @@ Client::Client(){
 
 }
 
-Client::Client(int fd, sockaddr_in &address): _fd(fd), _address(address), _state(READING)
+Client::Client(int fd, sockaddr_in &address): _fd(fd), _address(address), _state(READING), _bytesSent(0), _serverPort(0)
 {
 }
 
@@ -39,10 +39,36 @@ HttpParser& Client::getParserObj() {
 
 void Client::resetForNextRequest() {
     _parser.reset();
+    _writeBuffer.clear();
+    _bytesSent = 0;
     _state = READING;
 }
 
 Client::~Client()
 {
 
+}
+
+void Client::setServerPort(int port) { _serverPort = port; }
+int Client::getServerPort() const { return _serverPort; }
+
+void Client::prepareResponse(const std::string& serialized) {
+    _writeBuffer = serialized;
+    _bytesSent = 0;
+}
+
+bool Client::hasPendingData() const { 
+    return !_writeBuffer.empty() && _bytesSent < _writeBuffer.length(); 
+}
+
+const char* Client::sendPtr() const { 
+    return _writeBuffer.c_str() + _bytesSent; 
+}
+
+size_t Client::sendSize() const { 
+    return _writeBuffer.length() - _bytesSent; 
+}
+
+void Client::advanceSent(size_t n) { 
+    _bytesSent += n; 
 }

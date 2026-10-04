@@ -1,4 +1,5 @@
 #include "../includes/ServerManager.hpp"
+#include "../includes/RequestHandler.hpp"
 
 ServerManager::ServerManager(const Config& config){
     _config = config;
@@ -6,6 +7,21 @@ ServerManager::ServerManager(const Config& config){
     
 ServerManager::~ServerManager(){
 
+}
+
+const ServerConfig* findServerConfig(const Config& config, int port, const std::string& host_header) {
+    const ServerConfig* default_server = NULL;
+    for (size_t i = 0; i < config.servers.size(); i++) {
+        for (size_t j = 0; j < config.servers[i].listens.size(); j++) {
+            if (config.servers[i].listens[j].port == port) {
+                if (default_server == NULL) default_server = &config.servers[i];
+                if (!config.servers[i].server_name.empty() && host_header.find(config.servers[i].server_name) != std::string::npos) {
+                    return &config.servers[i];
+                }
+            }
+        }
+    }
+    return default_server;
 }
 
 bool port_check(std::vector<int> &ports, int current)
@@ -43,7 +59,7 @@ void ServerManager::setupServers()
 
             std::memset(&address,0,sizeof(address));
             address.sin_family = AF_INET;
-            address.sin_addr.s_addr = inet_addr(_config.servers[i].listens[j].ip.c_str());
+            address.sin_addr.s_addr = inet_addr(_config.servers[i].listens[j].ip.c_str()); //kendi inetaddr ni yaz veya tip tanımla
             address.sin_port = htons(_config.servers[i].listens[j].port);
                     
             if(bind(socket_fd, (struct sockaddr*)&address, sizeof(address)) == -1)
@@ -131,90 +147,114 @@ void ServerManager::acceptConnection(int server_fd)
     epoll_ctl(_epoll_fd, EPOLL_CTL_ADD, new_client_fd, &event); 
     
     Client new_client(new_client_fd,cl);
+    new_client.setServerPort(_server_fds[server_fd]);
     _clients[new_client_fd] = new_client;
     _clients[new_client_fd].setState(READING);
 }
 
-void HttpParser::printDebug() const { // bunu sil
-    std::cout << "\n========== [ PARSER DEBUG ] ==========" << std::endl;
-    std::cout << "Method  : [" << _request.method << "]" << std::endl;
-    std::cout << "Path    : [" << _request.path << "]" << std::endl;
-    std::cout << "Query   : [" << _request.query << "]" << std::endl;
-    std::cout << "Version : [" << _request.version << "]" << std::endl;
-    
-    std::cout << "--- Headers (" << _request.headers.size() << ") ---" << std::endl;
-    for (std::map<std::string, std::string>::const_iterator it = _request.headers.begin(); 
-         it != _request.headers.end(); ++it) {
-        std::cout << "  '" << it->first << "' : '" << it->second << "'" << std::endl;
-    }
-    
-    std::cout << "--- Body (" << _request.body.length() << " bytes) ---" << std::endl;
-    if (_request.body.empty())
-        std::cout << "  (Body Bos)" << std::endl;
-    else
-        std::cout << _request.body << std::endl;
-    std::cout << "======================================\n" << std::endl;
-}
+
 
 void ServerManager::handleClientRead(int client_fd)
 {
     char buffer[4096];
-    int byte;
-    byte = recv(client_fd,buffer,sizeof(buffer)-1, 0);
+    int byte = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
+
     if (byte > 0)
     {
-       _clients[client_fd].feedData(buffer,byte);
-       _clients[client_fd].parseData();
+        _clients[client_fd].feedData(buffer, byte);
+        _clients[client_fd].parseData();
 
-       if (_clients[client_fd].getParseState() == PARSE_DONE)
+        if (_clients[client_fd].getParseState() == PARSE_DONE)
         {
             _clients[client_fd].getParserObj().printDebug();
             _clients[client_fd].setState(WRITING);
 
             struct epoll_event event;
             std::memset(&event, 0, sizeof(event));
-            event.events = EPOLLOUT; 
+            event.events = EPOLLOUT;
             event.data.fd = client_fd;
             epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, client_fd, &event);
         }
-        else if (byte == 0)
+        else if (_clients[client_fd].getParseState() == PARSE_ERROR)
         {
             closeConnection(client_fd);
-        }       
+        }
+    }
+    else if (byte == 0)
+    {
+        closeConnection(client_fd);
+    }
+    else
+    {
+        closeConnection(client_fd);
     }
 }
 
 void ServerManager::handleClientWrite(int client_fd)
 {
-    std::ifstream file("html/index.html");
-    
-    char c;
-    std::string test_site = 
-        "HTTP/1.1 200 OK\r\n"
-        "Content-Type: text/html\r\n"
-        "Content-Length: 1441\r\n"
-        "\r\n";
-    while (file.get(c))
+    Client& client = _clients[client_fd];
+
+    if (!client.hasPendingData())
     {
-        test_site += c;
+        HttpRequest req = client.getParserObj().getParsedRequest();
+        req.server_port = client.getServerPort();
+
+        std::string host = "";
+        if (req.headers.count("Host"))
+            host = req.headers["Host"];
+
+        const ServerConfig* srv = findServerConfig(_config, client.getServerPort(), host);
+        if (srv == NULL) {
+            closeConnection(client_fd);
+            return;
+        }
+
+        RequestHandler handler(*srv);
+        Step result = handler.handle(req);
+
+        if (result.kind == Step::RESPOND) {
+            client.prepareResponse(result.response.serialize());
+        } else if (result.kind == Step::WAIT) {
+            // İleride CGI için poll/epoll fd ekleme işlemleri buraya gelecek
+            return;
+        }
     }
-    int bytes_sent = send(client_fd, test_site.c_str(), test_site.length(), 0);
+
+    int bytes_sent = send(client_fd, client.sendPtr(), client.sendSize(), 0);
 
     if (bytes_sent > 0)
     {
-        std::cout << "Cevap gönderildi! (" << bytes_sent << " bayt)" << std::endl;
-                closeConnection(client_fd); 
+        client.advanceSent(bytes_sent);
+        if (!client.hasPendingData())
+        {
+            // Tüm veri gönderildi
+            bool keep_alive = true;
+            HttpRequest req = client.getParserObj().getParsedRequest();
+            if (req.headers.count("Connection") && req.headers["Connection"] == "close")
+                keep_alive = false;
+
+            if (keep_alive) {
+                client.resetForNextRequest();
+                struct epoll_event event;
+                std::memset(&event, 0, sizeof(event));
+                event.events = EPOLLIN;
+                event.data.fd = client_fd;
+                epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, client_fd, &event);
+            } else {
+                closeConnection(client_fd);
+            }
+        }
     }
     else
     {
-        std::cerr << "Gönderme işlemi başarısız!" << std::endl;
+        // 42 Subject kuralı: errno kontrolü yasak. -1 gelirse direkt kapatıyoruz.
         closeConnection(client_fd);
     }
 }
 
 void ServerManager::closeConnection(int client_fd)
 {
-    _server_fds.erase(client_fd);
+    epoll_ctl(_epoll_fd, EPOLL_CTL_DEL, client_fd, NULL);
+    close(client_fd);
     _clients.erase(client_fd);
-    (void)client_fd;
 }

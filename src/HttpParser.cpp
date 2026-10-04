@@ -1,5 +1,6 @@
 #include "../includes/HttpParser.hpp"
 #include <cstdlib>
+#include <iostream>
 
 // İlk yaratıldığında direkt okuma aşamasından başlatıyoruz
 HttpParser::HttpParser() : _state(PARSE_READING) {}
@@ -109,4 +110,25 @@ void HttpParser::reset() {
     _raw_data.clear();
     _request = HttpRequest(); // Struct'ı tamamen sıfırlar
     _state = PARSE_READING;
+}
+
+void HttpParser::printDebug() const {
+    std::cout << "\n========== [ PARSER DEBUG ] ==========" << std::endl;
+    std::cout << "Method  : [" << _request.method << "]" << std::endl;
+    std::cout << "Path    : [" << _request.path << "]" << std::endl;
+    std::cout << "Query   : [" << _request.query << "]" << std::endl;
+    std::cout << "Version : [" << _request.version << "]" << std::endl;
+    
+    std::cout << "--- Headers (" << _request.headers.size() << ") ---" << std::endl;
+    for (std::map<std::string, std::string>::const_iterator it = _request.headers.begin(); 
+         it != _request.headers.end(); ++it) {
+        std::cout << "  '" << it->first << "' : '" << it->second << "'" << std::endl;
+    }
+    
+    std::cout << "--- Body (" << _request.body.length() << " bytes) ---" << std::endl;
+    if (_request.body.empty())
+        std::cout << "  (Body Bos)" << std::endl;
+    else
+        std::cout << _request.body << std::endl;
+    std::cout << "======================================\n" << std::endl;
 }
