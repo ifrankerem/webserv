@@ -1,7 +1,7 @@
 NAME=webserv
 
 CXX = c++
-CXXFLAGS = -std=c++98 -Wall -Wextra -Werror -Iincludes
+CXXFLAGS = -std=c++98 -Wall -Wextra -Werror -Iincludes -g
 B_SRC = src/RequestHandler.cpp src/ResponseHandler.cpp src/Mime.cpp src/HttpResponse.cpp
 A_SRC = parser/LocationParser.cpp parser/ServerParser.cpp src/ServerManager.cpp src/Client.cpp src/HttpParser.cpp
 SRC = main.cpp $(B_SRC) $(A_SRC)

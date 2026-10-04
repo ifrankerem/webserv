@@ -43,7 +43,7 @@ void ServerManager::setupServers()
 
             std::memset(&address,0,sizeof(address));
             address.sin_family = AF_INET;
-            address.sin_addr.s_addr = inet_addr(_config.servers[i].listens[j].ip.c_str());
+            address.sin_addr.s_addr = inet_addr(_config.servers[i].listens[j].ip.c_str()); //kendi inetaddr ni yaz veya tip tanımla
             address.sin_port = htons(_config.servers[i].listens[j].port);
                     
             if(bind(socket_fd, (struct sockaddr*)&address, sizeof(address)) == -1)
