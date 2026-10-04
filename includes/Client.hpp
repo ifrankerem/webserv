@@ -18,7 +18,11 @@
         struct sockaddr_in  _address;
         ClientState         _state;
 
-        HttpParser          _parser;   
+        HttpParser          _parser;
+
+        std::string         _writeBuffer;
+        size_t              _bytesSent;
+        int                 _serverPort;
 
     public:
         Client();
@@ -33,6 +37,14 @@
         void feedData(const char* chunk, int size);
         HttpParser& getParserObj();
         void resetForNextRequest();
+
+        void        setServerPort(int port);
+        int         getServerPort() const;
+        void        prepareResponse(const std::string& serialized);
+        bool        hasPendingData() const;
+        const char* sendPtr() const;
+        size_t      sendSize() const;
+        void        advanceSent(size_t n);
     };
 
     #endif

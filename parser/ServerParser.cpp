@@ -109,10 +109,10 @@ void ConfigParser::parse_listen(std::vector<std::string>& tokens, size_t& i, Ser
     
     Listen new_listen;
     size_t colon = value.find(':');
+    int dot = 0;
     if (colon != std::string::npos) { 
         // new_listen.ip = value.substr(0, colon);
         int last = 0;
-        int dot = 0;
         const std::string &ip = value.substr(0, colon + 1);
         for (size_t j = 0; j < ip.size(); j++)
         {
@@ -129,7 +129,7 @@ void ConfigParser::parse_listen(std::vector<std::string>& tokens, size_t& i, Ser
             }
         }
         int port = ft_atoi(value.substr(colon + 1));//kendi atoimiz yazılacak harf görürse hata verecek
-        if (port == -1 || dot != 3)
+        if (port == -1)
         {
             throw std::runtime_error("Config Error: 'parse_listen' 2 ");
         }
