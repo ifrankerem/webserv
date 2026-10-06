@@ -88,17 +88,24 @@ Config ConfigParser::parse_config_file(const std::string& filename)
 int ft_atoi(const std::string &str)
 {
     int i = 0;
-    int val = 0;
+    long val = 0;
+
+    if (str.empty())
+        return -1;
 
     while (str[i])
     {
         if (str[i] >= '0' && str[i] <= '9')
+        {
+            if (val > 214748364 || (val == 214748364 && (str[i] - '0') > 7))
+                return -1;
             val = (str[i] - 48) + (10 * val);
+        }
         else
             return -1;
         i++;
     }
-    return val;
+    return (int)val;
 }
 
 
@@ -129,7 +136,7 @@ void ConfigParser::parse_listen(std::vector<std::string>& tokens, size_t& i, Ser
             }
         }
         int port = ft_atoi(value.substr(colon + 1));//kendi atoimiz yazılacak harf görürse hata verecek
-        if (port == -1)
+        if (port == -1 || (port > 65535 || port <= 0))
         {
             throw std::runtime_error("Config Error: 'parse_listen' 2 ");
         }
@@ -140,7 +147,7 @@ void ConfigParser::parse_listen(std::vector<std::string>& tokens, size_t& i, Ser
         new_listen.ip = "127.0.0.1";
 
         int port = ft_atoi(value);//kendi atoimiz yazılacak harf görürse hata verecek
-        if (port == -1)
+        if (port == -1 || (port > 65535 || port <= 0))
             throw std::runtime_error("Config Error: 'parse_listen' 3");
         new_listen.port = port;
     }
@@ -212,8 +219,10 @@ void ConfigParser::parse_client_max_body_size(std::vector<std::string>& tokens, 
         val = val.substr(0, val.length() - 1);
     }
 
-    server.client_max_body_size = std::atoi(val.c_str()) * multiplier;
-
+    int size = ft_atoi(val);
+    if (size <= 0)
+        throw std::runtime_error("Config Error: 'client_max_body_size' must be positive");
+    server.client_max_body_size = size * multiplier;
     i++;
     if (i >= tokens.size() || tokens[i] != ";") throw std::runtime_error("Config Error: 'client_max_body_size' must end with ';'");
 }
