@@ -1,11 +1,8 @@
 NAME=webserv
 
 CXX = c++
-CXXFLAGS = -std=c++98 -Wall -Wextra -Werror -Iincludes -g
-# -MMD: her .o icin yanina .d dosyasi yazar, icinde o dosyanin dahil ettigi
-#       header'lar listelidir. -MP: silinen bir header make'i kilitlemesin diye
-#       her header icin bos kural ekler.
-DEPFLAGS = -MMD -MP
+CXXFLAGS = -std=c++98 -Wall -Wextra -Werror -g
+
 B_SRC = src/RequestHandler.cpp src/ResponseHandler.cpp src/Mime.cpp src/HttpResponse.cpp src/Utils.cpp
 A_SRC = parser/LocationParser.cpp parser/ServerParser.cpp src/ServerManager.cpp src/Client.cpp src/HttpParser.cpp
 SRC = main.cpp $(B_SRC) $(A_SRC)
@@ -31,14 +28,18 @@ B4_NAME = webserv_b4
 B4_SRC = tests/deneme_b4.cpp $(B_SRC)
 B4_OBJS = $(B4_SRC:.cpp=.o)
 
-# Butun .o dosyalarinin bagimlilik listeleri
-DEPS = $(OBJS:.o=.d) $(ROUTER_OBJS:.o=.d) $(B2_OBJS:.o=.d) $(B3_OBJS:.o=.d) $(B4_OBJS:.o=.d)
+# make test -> Taraf A CI Testleri
+TEST_CONF_NAME = test_config
+TEST_CONF_SRC = tests/test_config.cpp parser/ServerParser.cpp parser/LocationParser.cpp src/Utils.cpp
+TEST_CONF_OBJS = $(TEST_CONF_SRC:.cpp=.o)
 
-all: $(NAME)
+TEST_SETUP_NAME = test_setup
+TEST_SETUP_SRC = tests/test_setup.cpp $(A_SRC) $(B_SRC)
+TEST_SETUP_OBJS = $(TEST_SETUP_SRC:.cpp=.o)
 
-# Kendi derleme kuralimiz: built-in kural .d uretmiyor.
-%.o: %.cpp
-	$(CXX) $(CXXFLAGS) $(DEPFLAGS) -c $< -o $@
+TEST_PARSER_NAME = test_parser
+TEST_PARSER_SRC = tests/test_parser.cpp src/HttpParser.cpp
+TEST_PARSER_OBJS = $(TEST_PARSER_SRC:.cpp=.o)
 
 $(NAME): $(OBJS)
 	$(CXX) -o $(NAME) $(CXXFLAGS) $(OBJS)
@@ -71,14 +72,25 @@ $(B3_NAME): $(B3_OBJS)
 $(B4_NAME): $(B4_OBJS)
 	$(CXX) -o $(B4_NAME) $(CXXFLAGS) $(B4_OBJS)
 
+test: $(TEST_CONF_NAME) $(TEST_SETUP_NAME) $(TEST_PARSER_NAME)
+
+$(TEST_CONF_NAME): $(TEST_CONF_OBJS)
+	$(CXX) -o $(TEST_CONF_NAME) $(CXXFLAGS) $(TEST_CONF_OBJS)
+
+$(TEST_SETUP_NAME): $(TEST_SETUP_OBJS)
+	$(CXX) -o $(TEST_SETUP_NAME) $(CXXFLAGS) $(TEST_SETUP_OBJS)
+
+$(TEST_PARSER_NAME): $(TEST_PARSER_OBJS)
+	$(CXX) -o $(TEST_PARSER_NAME) $(CXXFLAGS) $(TEST_PARSER_OBJS)
+
 leak:
 	valgrind ./$(NAME)
 
 clean:
-	rm -rf $(OBJS) $(ROUTER_OBJS) $(B2_OBJS) $(B3_OBJS) $(B4_OBJS) $(DEPS)
+	rm -rf $(OBJS) $(ROUTER_OBJS) $(B2_OBJS) $(B3_OBJS) $(B4_OBJS) $(TEST_CONF_OBJS) $(TEST_SETUP_OBJS) $(TEST_PARSER_OBJS) $(DEPS)
 
 fclean: clean
-	rm -rf $(NAME) $(ROUTER_NAME) $(B2_NAME) $(B3_NAME) $(B4_NAME)
+	rm -rf $(NAME) $(ROUTER_NAME) $(B2_NAME) $(B3_NAME) $(B4_NAME) $(TEST_CONF_NAME) $(TEST_SETUP_NAME) $(TEST_PARSER_NAME)
 
 re: fclean all
 
@@ -86,4 +98,4 @@ re: fclean all
 # Ilk derlemede .d dosyalari henuz yok, bu yuzden '-' ile hatayi yut.
 -include $(DEPS)
 
-.PHONY: all run leak router b2 b3 b4 clean fclean re
+.PHONY: all run leak router b2 b3 b4 test clean fclean re
