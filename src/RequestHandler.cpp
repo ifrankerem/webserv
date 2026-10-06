@@ -8,7 +8,6 @@
 #include <cstdlib>
 #include <fcntl.h>
 #include <fstream>
-#include <iostream>	
 #include <map>
 #include <poll.h>
 #include <sys/stat.h>
