@@ -1,0 +1,25 @@
+name: C/C++ CI
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  build_and_test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Build tests
+      run: make test
+
+    - name: 1. Config Parser Tests
+      run: ./test_config
+
+    - name: 2. Server Setup Tests
+      run: ./test_setup
+
+    - name: 4. HTTP Parser Tests
+      run: ./test_parser

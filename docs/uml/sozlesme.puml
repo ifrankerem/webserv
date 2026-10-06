@@ -1,0 +1,155 @@
+' A / B sözleşmesi: tek kapı
+' Sadece A ile B arasındaki sözleşme gösterilir; iki tarafın iç sınıfları ve fonksiyonları kasıtlı olarak yoktur.
+'   java -jar plantuml.jar -charset UTF-8 -tpng sozlesme.puml
+'   java -jar plantuml.jar -charset UTF-8 -DDARK=1 -tpng -o dark sozlesme.puml
+
+@startuml sozlesme-yapi
+!include tema.iuml
+title Webserv - A / B sözleşmesi: tek kapı (yapı)
+
+allowmixing
+skinparam linetype ortho
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam defaultFontName Monospaced
+skinparam packageStyle rectangle
+skinparam nodesep 40
+skinparam ranksep 60
+hide empty members
+
+skinparam package {
+  BorderThickness 2
+  FontSize 15
+  FontStyle bold
+}
+
+skinparam rectangle {
+  BorderThickness 2
+  FontSize 16
+  FontStyle bold
+  FontColor $FG
+  BorderColor $LINE
+}
+
+rectangle "TARAF A — Taşıma\n\nİçi A'ya ait.\nSoket, poll, bağlantı,\nparser, config parser,\nzaman aşımı." as A $A_BG
+rectangle "TARAF B — Executor\n\nİçi B'ye ait.\nYönlendirme, dosyalar,\nhata sayfaları, CGI.\n(A bunların hiçbirini görmez)" as B $B_BG
+
+package "ARAYÜZ SÖZLEŞMESİ\n(tek kapı)" as I $C_BG {
+
+  class RequestHandler <<B yazar, A kullanır>> {
+    + RequestHandler(const ServerConfig& server)
+    + ~RequestHandler()
+    --
+    + bodyLimit(const HttpRequest& req): size_t
+    + handle(const HttpRequest& req): Step
+    + onReady(int fd, short revents): Step
+    + {static} error(int status, const ServerConfig* server): HttpResponse
+  }
+
+  class Step <<B döndürür, A uygular>> {
+    + Kind kind
+    + HttpResponse response
+    + std::vector<WatchFd> watch
+  }
+
+  enum "Step::Kind" as Kind {
+    RESPOND
+    WAIT
+  }
+
+  class WatchFd {
+    + int fd
+    + short events
+  }
+}
+
+package "VERİ SÖZLEŞMESİ" as D $C_BG {
+
+  class HttpRequest <<A doldurur, B okur>> {
+    + std::string method
+    + std::string path
+    + std::string query
+    + std::string version
+    + std::map<std::string, std::string> headers
+    + std::string body
+    + std::string remote_addr
+    + int server_port
+  }
+
+  class HttpResponse <<B doldurur, A gönderir>> {
+    + int status
+    + std::map<std::string, std::string> headers
+    + std::string body
+    --
+    + serialize() const: std::string
+  }
+
+  class Config <<A üretir, B okur>> {
+    + std::vector<ServerConfig> servers
+  }
+
+  class ServerConfig {
+    + std::vector<Listen> listens
+    + std::string root
+    + std::string index
+    + size_t client_max_body_size
+    + std::map<int, std::string> error_pages
+    + std::vector<LocationConfig> locations
+  }
+
+  class LocationConfig {
+    + std::string path
+    + std::string root
+    + std::string index
+    + std::vector<std::string> allowed_methods
+    + bool autoindex
+    + size_t client_max_body_size
+    + std::string upload_store
+    + int redirect_code
+    + std::string redirect_target
+    + std::map<std::string, std::string> cgi_pass
+  }
+
+  class Listen {
+    + std::string ip
+    + int port
+  }
+}
+
+Step --> Kind
+Step *-- HttpResponse
+Step "1" *-- "*" WatchFd
+Config "1" *-- "*" ServerConfig
+ServerConfig "1" *-- "*" LocationConfig
+ServerConfig "1" *-- "*" Listen
+
+A ..> RequestHandler : **oluşturur, çağırır, siler**
+B ..|> RequestHandler : sağlar
+
+I -[hidden]down- D
+
+note right of RequestHandler
+  **Her istek için bir tane.**
+  A oluşturur, A siler.
+  --
+  1. bodyLimit()  header'lar bitince
+  2. handle()     istek tamamen okununca
+  3. onReady()    watch'taki bir fd hazır olunca
+  4. error()      A'nın kendi bulduğu hatalar
+     (static: nesne gerekmez,
+      A config'i kendi verir)
+  --
+  ~RequestHandler(): B'nin açtığı her şeyi
+  kapatır (dosya, pipe, süreç).
+end note
+
+note right of Step
+  **RESPOND** -> response gönderilir,
+               handler silinir
+  **WAIT**    -> watch'taki fd'ler poll'a eklenir,
+               response kullanılmaz
+  --
+  Her WAIT'teki watch listesi
+  bir öncekinin yerine geçer.
+end note
+@enduml

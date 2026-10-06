@@ -11,11 +11,14 @@ struct Listen {
 };
 
 struct LocationConfig {
+    LocationConfig(): autoindex(false), upload_enable(false), client_max_body_size(0),redirect_code(0) {}
+
     std::string path;
     std::string root;
     std::string index;
     std::vector<std::string> allowed_methods;
     bool autoindex;
+    bool upload_enable;
     size_t client_max_body_size;
     std::string upload_store;
     int redirect_code;
@@ -24,8 +27,11 @@ struct LocationConfig {
 };
 
 struct ServerConfig {
+    ServerConfig() : client_max_body_size(0) {}
+
     std::vector<Listen> listens;
     std::string root;
+    std::string server_name;
     std::string index;
     size_t client_max_body_size;
     std::map<int, std::string> error_pages;
@@ -35,5 +41,5 @@ struct ServerConfig {
 struct Config {
     std::vector<ServerConfig> servers;
 };
-
+    
 #endif
