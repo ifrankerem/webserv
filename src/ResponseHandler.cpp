@@ -1,10 +1,10 @@
-#include "ResponseHandler.hpp"
-#include "Config.hpp"
-#include "HttpRequest.hpp"
-#include "HttpResponse.hpp"
-#include "RequestHandler.hpp"
-#include "Mime.hpp"
-#include "Utils.hpp"
+#include "../includes/ResponseHandler.hpp"
+#include "../includes/Config.hpp"
+#include "../includes/HttpRequest.hpp"
+#include "../includes/HttpResponse.hpp"
+#include "../includes/RequestHandler.hpp"
+#include "../includes/Mime.hpp"
+#include "../includes/Utils.hpp"
 #include <algorithm>
 #include <cctype>
 #include <cerrno>
