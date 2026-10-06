@@ -145,6 +145,7 @@ void ConfigParser::parse_listen(std::vector<std::string>& tokens, size_t& i, Ser
         new_listen.port = port;
     } else { //burda hata vermesi gerekniyor mu? valuede belki askdfjalskdfja yazıyor port yapmaya mı uğraşıcaz onu
         new_listen.ip = "127.0.0.1";
+        
 
         int port = ft_atoi(value);//kendi atoimiz yazılacak harf görürse hata verecek
         if (port == -1 || (port > 65535 || port <= 0))
