@@ -6,6 +6,8 @@ docs/not_kerem.txt
 webserv_router
 webserv_b2
 webserv_b3
+webserv_manual
+webserv_b4
 src/*.d
 tests/*.d
 *.d

@@ -10,6 +10,7 @@
 #include <fstream>
 #include <map>
 #include <poll.h>
+#include <sys/poll.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -442,6 +443,10 @@ Step RequestHandler::onReady(int fd, short revents)
 	}
 	else if (revents & (POLLERR | POLLHUP)) // fd error or pipe hang up (closed)
 	{
+		if(!(cgiBuffer.empty())) //there is a tricky situation in this case POLLHUP means pipe closed but there will remain cgi buffer. But kernel sends POLLHUP instaead of PULLIN so there is valid data in there but we just did the error in this if. So i fixed it
+			x.response = parseCgiOutput(cgiBuffer);
+		else 
+			x.response = error(502, server);
 		close(fd);
 		cgiActive = false;
 		cgiPipeFd = -1;
@@ -451,7 +456,6 @@ Step RequestHandler::onReady(int fd, short revents)
 			cgiPid = -1;
 		}
 		x.kind = Step::RESPOND;
-		x.response = error(502, server);
 	}
 
 	return x;
