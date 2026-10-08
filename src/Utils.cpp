@@ -113,4 +113,26 @@ std::vector<char*> mapToEnv(const std::map<std::string, std::string>& env)
     return out;
 }
 
+int atoi(const std::string &str)
+{
+    int i = 0;
+    long val = 0;
+
+    if (str.empty())
+        return -1;
+
+    while (str[i])
+    {
+        if (str[i] >= '0' && str[i] <= '9')
+        {
+            if (val > 214748364 || (val == 214748364 && (str[i] - '0') > 7))
+                return -1;
+            val = (str[i] - 48) + (10 * val);
+        }
+        else
+            return -1;
+        i++;
+    }
+    return (int)val;
+}
 } // namespace utils

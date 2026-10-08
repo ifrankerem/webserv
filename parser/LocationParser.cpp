@@ -1,5 +1,5 @@
 #include "../includes/ConfigParser.hpp"
-#include <cstdlib> // std::atoi için
+#include "../includes/Utils.hpp"
 
 void ConfigParser::parse_location(std::vector<std::string>& tokens, size_t& i, ServerConfig& server)
 {
@@ -116,8 +116,7 @@ void ConfigParser::parse_location_index(std::vector<std::string>& tokens, size_t
         if (tokens[i] == "{" || tokens[i] == "}") 
             throw std::runtime_error("Config Error: 'index' komutunda ';' unutulmus olabilir.");
 
-        if (!location.index.empty()) location.index += " ";
-        location.index += tokens[i];
+        location.index.push_back(tokens[i]);
         i++;
     }
    if (i >= tokens.size() || tokens[i] != ";") 
@@ -148,7 +147,7 @@ void ConfigParser::parse_allow_methods(std::vector<std::string>& tokens, size_t&
 void ConfigParser::parse_return(std::vector<std::string>& tokens, size_t& i, LocationConfig& location)
 {
     i++;
-    location.redirect_code = std::atoi(tokens[i].c_str());//kendi atoini yaz hatalı bura 301kamil
+    location.redirect_code = utils::atoi(tokens[i].c_str());//kendi atoini yaz hatalı bura 301kamil
     if (location.redirect_code < 100 || location.redirect_code > 599) //burayı sen düzeltirsin ben tam aralığını bilmiyorum zaten harf gelirse 0 olucak 0 diye durum kodu yok yine hata
         throw std::runtime_error("Config Error: Status code 'return' must be a number only!Received:");
     i++;

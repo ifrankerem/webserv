@@ -15,6 +15,7 @@ namespace utils
     std::string getHeader(const std::map<std::string, std::string>& headers, const std::string& key);
     HttpResponse defaultErrorPage(int status);
     std::vector<char*> mapToEnv(const std::map<std::string, std::string>& env);
+    int atoi(const std::string &str);
 }
 
 #endif
