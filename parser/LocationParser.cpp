@@ -71,6 +71,14 @@ void ConfigParser::parse_location_root(std::vector<std::string>& tokens, size_t&
     if (i >= tokens.size() || tokens[i] != ";") throw std::runtime_error("Config Error: location 'root' must end with ';'");
 }
 
+void ConfigParser::parse_location_alias(std::vector<std::string>& tokens, size_t& i, LocationConfig& location)
+{
+    i++;
+    location.alias = tokens[i];
+    i++;
+    if (i >= tokens.size() || tokens[i] != ";") throw std::runtime_error("Config Error: location 'alias' must end with ';'");
+}
+
 void ConfigParser::parse_upload_store(std::vector<std::string>& tokens, size_t& i, LocationConfig& location)
 {
     i++;

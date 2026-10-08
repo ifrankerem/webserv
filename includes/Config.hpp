@@ -15,6 +15,7 @@ struct LocationConfig {
 
     std::string path;
     std::string root;
+    std::string alias;
     std::vector<std::string> index;
     std::vector<std::string> allowed_methods;
     bool autoindex;

@@ -110,8 +110,18 @@ bool RequestHandler::normalizePath(const std::string& path, std::string& out)
 
 std::string RequestHandler::resolveDiskPath(const LocationConfig& loc, const std::string& path)
 {
-	std::string root = loc.root;
+	if (!loc.alias.empty())
+	{
+		std::string alias = loc.alias;
+		if (!alias.empty() && alias[alias.size() - 1] == '/')
+			alias.erase(alias.size() - 1);
+		std::string rest = path.substr(loc.path.size());
+		if (rest.empty() || rest[0] != '/')
+			rest = "/" + rest;
+		return alias + rest;
+	}
 
+	std::string root = loc.root;
 	if (root.empty())
 		root = server->root;
 	if (!root.empty() && root[root.size() - 1] == '/')

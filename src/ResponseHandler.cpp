@@ -96,7 +96,7 @@ HttpResponse ResponseHandler::handle_get(const std::string& diskPath,const HttpR
 				indexPath = backup;
 		}
 		if(loc.autoindex)
-			return listDirectory(diskPath,srv);
+			return listDirectory(diskPath, loc, srv);
 		else
 			return RequestHandler::error(403,&srv);
 	}
@@ -124,7 +124,7 @@ HttpResponse ResponseHandler::serveFile(const std::string& diskPath,const Server
 	return x;
 }
 
-HttpResponse ResponseHandler::listDirectory(const std::string& diskPath,const ServerConfig& srv) //case for autoindex creating an html for indexing
+HttpResponse ResponseHandler::listDirectory(const std::string& diskPath, const LocationConfig& loc, const ServerConfig& srv) //case for autoindex creating an html for indexing
 {
 	DIR* dir = opendir(diskPath.c_str());
 	if (dir == NULL)
@@ -149,7 +149,15 @@ HttpResponse ResponseHandler::listDirectory(const std::string& diskPath,const Se
 
 	std::sort(names.begin(), names.end());
 
-	std::string f_path = diskPath.substr(srv.root.size(),diskPath.size()) + '/';
+	std::string base;
+	if (!loc.alias.empty())
+		base = loc.alias;
+	else if (!loc.root.empty())
+		base = loc.root;
+	else
+		base = srv.root;
+
+	std::string f_path = diskPath.substr(base.size(), diskPath.size()) + '/';
 
 	std::string body = "<html>\n<head><title>Index of " + f_path +
 		"</title></head>\n<body>\n<h1>Index of " + f_path + "</h1>\n<hr>\n<pre>\n";
