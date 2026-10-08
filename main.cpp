@@ -43,6 +43,7 @@ void debug_config(const Config& config) {
             const LocationConfig& loc = s.locations[j];
             std::cout << "  [" << i + 1 << "." << j + 1 << "] Path: " << loc.path << "\n";
             std::cout << "      Root             : " << (loc.root.empty() ? "(yok)" : loc.root) << "\n";
+            std::cout << "      Alias            : " << (loc.alias.empty() ? "(yok)" : loc.alias) << "\n";
             std::cout << "      Index            : ";
             if (loc.index.empty()) std::cout << "(yok)";
             else { for (size_t j = 0; j < loc.index.size(); j++) std::cout << loc.index[j] << " "; }

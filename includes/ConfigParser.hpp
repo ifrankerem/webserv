@@ -29,6 +29,7 @@ private:
     void parse_location(std::vector<std::string>& tokens, size_t& i, ServerConfig& server);
 
     void parse_location_root(std::vector<std::string>& tokens, size_t& i, LocationConfig& location);
+    void parse_location_alias(std::vector<std::string>& tokens, size_t& i, LocationConfig& location);
     void parse_location_index(std::vector<std::string>& tokens, size_t& i, LocationConfig& location);
     void parse_allow_methods(std::vector<std::string>& tokens, size_t& i, LocationConfig& location);
     void parse_autoindex(std::vector<std::string>& tokens, size_t& i, LocationConfig& location);
