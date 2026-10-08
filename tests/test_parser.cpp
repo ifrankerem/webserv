@@ -23,7 +23,7 @@ int main() {
         std::cerr << "FAIL: Ayiklanan HTTP degerleri yanlis!" << std::endl;
         errors++;
     } else {
-        std::cout << "PASS: Basit GET istegi sorunsuz ayiklandi." << std::endl;
+        //std::cout << "PASS: Basit GET istegi sorunsuz ayiklandi." << std::endl;
     }
 
     // Ekstra: Parcali veri (Chunk) feed testi eklenebilir.

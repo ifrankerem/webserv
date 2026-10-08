@@ -13,7 +13,7 @@ int main() {
         // Sadece socket bind işlemlerini yapıyoruz, run() cagrilmiyor!
         manager.setupServers();
         
-        std::cout << "PASS: Sunucu soketleri basariyla olusturuldu (bind edildi)." << std::endl;
+        //std::cout << "PASS: Sunucu soketleri basariyla olusturuldu (bind edildi)." << std::endl;
     } catch (const std::exception& e) {
         std::cerr << "FAIL: ServerManager hata firlatti: " << e.what() << std::endl;
         return 1;

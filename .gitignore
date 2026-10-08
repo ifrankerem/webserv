@@ -9,4 +9,6 @@ webserv_b3
 src/*.d
 tests/*.d
 *.d
-test_*
+test_config
+test_parser
+test_setup
