@@ -116,8 +116,7 @@ void ConfigParser::parse_location_index(std::vector<std::string>& tokens, size_t
         if (tokens[i] == "{" || tokens[i] == "}") 
             throw std::runtime_error("Config Error: 'index' komutunda ';' unutulmus olabilir.");
 
-        if (!location.index.empty()) location.index += " ";
-        location.index += tokens[i];
+        location.index.push_back(tokens[i]);
         i++;
     }
    if (i >= tokens.size() || tokens[i] != ";") 

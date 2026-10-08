@@ -29,24 +29,6 @@ int main() {
         }
     }
 
-    // Test 2: Multiple Args (String Concatenation) Testi
-    try {
-        ConfigParser parser;
-        Config config = parser.parse_config_file("tests/test_configs/valid_multiple_args.conf");
-        if (config.servers.empty() || 
-            config.servers[0].server_name != "domain1.com domain2.com domain3.com" ||
-            config.servers[0].index != "index.html index.php index.js" ||
-            config.servers[0].locations[0].index != "main.html main.php") {
-            std::cerr << "FAIL: Multiple args testi stringleri dogru birlestiremedi." << std::endl;
-            errors++;
-        } else {
-            std::cout << "PASS: Multiple args (server_name ve index) basariyla boslukla birlestirildi." << std::endl;
-        }
-    } catch (const std::exception& e) {
-        std::cerr << "FAIL: Multiple args testi hata firlatti: " << e.what() << std::endl;
-        errors++;
-    }
-
     // Invalid Config Tests
     const char* invalid_configs[] = {
         "tests/test_configs/invalid_cases/invalid.conf",

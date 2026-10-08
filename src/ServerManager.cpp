@@ -16,8 +16,15 @@ const ServerConfig* findServerConfig(const Config& config, int port, const std::
         for (size_t j = 0; j < config.servers[i].listens.size(); j++) {
             if (config.servers[i].listens[j].port == port) {
                 if (default_server == NULL) default_server = &config.servers[i];
-                if (!config.servers[i].server_name.empty() && host_header.find(config.servers[i].server_name) != std::string::npos) {
-                    return &config.servers[i];
+                if (!config.servers[i].server_name.empty()) {
+                    bool match = false;
+                    for (size_t k = 0; k < config.servers[i].server_name.size(); k++) {
+                        if (host_header.find(config.servers[i].server_name[k]) != std::string::npos) {
+                            match = true;
+                            break;
+                        }
+                    }
+                    if (match) return &config.servers[i];
                 }
             }
         }

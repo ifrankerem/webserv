@@ -150,14 +150,12 @@ void ConfigParser::parse_server_name(std::vector<std::string>& tokens, size_t& i
         if (tokens[i] == "{" || tokens[i] == "}")
             throw std::runtime_error("Config Error: 'server_name' komutunda ';' unutulmus olabilir.");
         
-        std::string spaced_server_name = " " + server.server_name + " ";
-        std::string spaced_token = " " + tokens[i] + " ";
-        if (!server.server_name.empty() && spaced_server_name.find(spaced_token) != std::string::npos)
-            throw std::runtime_error("Config Error: Duplicate server name '" + tokens[i] + "'");
+        for (size_t j = 0; j < server.server_name.size(); j++) {
+            if (server.server_name[j] == tokens[i])
+                throw std::runtime_error("Config Error: Duplicate server name '" + tokens[i] + "'");
+        }
 
-        if (!server.server_name.empty())
-            server.server_name += " ";
-        server.server_name += tokens[i];
+        server.server_name.push_back(tokens[i]);
         i++;
     }
     
@@ -232,8 +230,9 @@ void ConfigParser::parse_index(std::vector<std::string>& tokens, size_t& i, Serv
     while (i < tokens.size() && tokens[i] != ";") {
         if (tokens[i] == "{" || tokens[i] == "}")
             throw std::runtime_error("Config Error: 'index' komutunda ';' unutulmus olabilir.");
-        if (!server.index.empty()) server.index += " ";
-        server.index += tokens[i];
+        if (!server.index.empty())
+            throw std::runtime_error("Config Error: Duplicate 'index'");
+        server.index.push_back(tokens[i]);
         i++;
     }
 
