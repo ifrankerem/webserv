@@ -6,7 +6,6 @@
 #include "../includes/Mime.hpp"
 #include "../includes/Utils.hpp"
 #include <algorithm>
-#include <cctype>
 #include <cerrno>
 #include <cstddef>
 #include <unistd.h>
@@ -44,7 +43,9 @@ HttpResponse ResponseHandler::redirect_handler(int status_code,const std::string
 HttpResponse ResponseHandler::handle(const std::string& diskPath,const std::string& path,const HttpRequest &req, const LocationConfig& loc,const ServerConfig& srv)
 {
 	if(req.method == "GET")
-		return handle_get(diskPath,req,loc,srv);
+		return handle_get(diskPath,req,loc,srv,false);
+	else if(req.method == "HEAD")
+		return handle_get(diskPath,req,loc,srv,true);
 	else if(req.method == "POST")
 		return handle_post(diskPath, path, req, loc,srv);
 	else if(req.method == "DELETE")
@@ -57,7 +58,7 @@ HttpResponse ResponseHandler::handle(const std::string& diskPath,const std::stri
 }
 
 
-HttpResponse ResponseHandler::handle_get(const std::string& diskPath,const HttpRequest &req, const LocationConfig& loc,const ServerConfig& srv)
+HttpResponse ResponseHandler::handle_get(const std::string& diskPath,const HttpRequest &req, const LocationConfig& loc,const ServerConfig& srv,bool head_flag)
 {
 	struct stat info;
 	if (::stat(diskPath.c_str(), &info) == -1) //stat() was not successful. The errno global variable is set to indicate the error.
@@ -91,7 +92,7 @@ HttpResponse ResponseHandler::handle_get(const std::string& diskPath,const HttpR
 		{
 			indexPath += loc.index[i];
 			if (::stat(indexPath.c_str(), &info) == 0)
-				return serveFile(indexPath,srv);
+				return serveFile(indexPath,srv,head_flag);
 			else
 				indexPath = backup;
 		}
@@ -104,11 +105,11 @@ HttpResponse ResponseHandler::handle_get(const std::string& diskPath,const HttpR
 		if (req.path[req.path.size() - 1] == '/')
 			return RequestHandler::error(404, &srv);
 	}
-	return serveFile(diskPath,srv); //Its normal file on the directory
+	return serveFile(diskPath,srv,head_flag); //Its normal file on the directory
 }
 
 
-HttpResponse ResponseHandler::serveFile(const std::string& diskPath,const ServerConfig& srv)
+HttpResponse ResponseHandler::serveFile(const std::string& diskPath,const ServerConfig& srv,bool head_flag)
 {
 	HttpResponse x;
 	std::ifstream file(diskPath.c_str());
@@ -118,6 +119,9 @@ HttpResponse ResponseHandler::serveFile(const std::string& diskPath,const Server
 	std::istreambuf_iterator<char> first(file);
 	std::istreambuf_iterator<char> last;
 	x.body.assign(first, last);
+
+	if(head_flag)
+		x.body.clear();
 
 	x.status = 200;
 	x.headers["Content-Type"] = mimeType(diskPath);

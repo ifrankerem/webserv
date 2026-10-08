@@ -315,6 +315,11 @@ Step RequestHandler::handle(const HttpRequest &req)
 			allowed = true;
 			break;
 		}
+		if(req.method == "HEAD" && best->allowed_methods[i] == "GET")
+		{
+			allowed = true;
+			break;
+		}
 	}
 
 	if (allowed == false)

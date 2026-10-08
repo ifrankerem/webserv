@@ -8,7 +8,7 @@ struct HttpResponse {
     int status;
     std::map<std::string, std::string> headers;
     std::string body;
-    
+
     std::string serialize() const;
 };
 
