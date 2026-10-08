@@ -16,25 +16,56 @@ jobs:
       run: make
 
     - name: Build A-side tests
+      if: success() || failure()
       run: make test
 
     - name: 1. Config Parser Tests
+      if: success() || failure()
       run: ./test_config
 
     - name: 2. Server Setup Tests
+      if: success() || failure()
       run: ./test_setup
 
     - name: 3. HTTP Parser Tests
+      if: success() || failure()
       run: ./test_parser
 
     - name: B1 Router Tests
+      if: success() || failure()
       run: make router
 
     - name: B2 Static File Tests
+      if: success() || failure()
       run: make b2
 
     - name: B3 Upload / DELETE Tests
+      if: success() || failure()
       run: make b3
 
     - name: B4 CGI Tests
+      if: success() || failure()
       run: make b4
+
+    - name: Build manual server
+      if: success() || failure()
+      run: make manual
+
+    - name: Setup 42 tester environment
+      if: success() || failure()
+      run: |
+        mkdir -p YoupiBanane/nop YoupiBanane/Yeah
+        touch YoupiBanane/youpi.bad_extension
+        touch YoupiBanane/youpi.bla
+        touch YoupiBanane/nop/youpi.bad_extension
+        touch YoupiBanane/nop/other.pouic
+        touch YoupiBanane/Yeah/not_happy.bad_extension
+        chmod +x tester_42 cgi_tester_42
+
+    - name: Run 42 webserv tester
+      if: success() || failure()
+      run: |
+        ./webserv_manual conf/tester_42.conf &
+        sleep 1
+        echo '' | ./tester_42 http://127.0.0.1:8080
+        kill $(pidof webserv_manual) || true
