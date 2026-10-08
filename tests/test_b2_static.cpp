@@ -9,14 +9,14 @@
 #include <string>
 #include <sys/stat.h>
 #include <cstdio>
-#include "RequestHandler.hpp"
+#include "../includes/RequestHandler.hpp"
 
 // Kok dizin "html". Location'lar: "/" (GET POST, autoindex acik), "/gizli"
 static ServerConfig makeServer()
 {
 	ServerConfig srv;
 	srv.root = "html";
-	srv.index = "index.html";
+	srv.index.push_back("index.html");
 	srv.client_max_body_size = 1000000;
 
 	// Hata sayfalari URL bicimindedir; error() bunlari root ile birlestirir.
@@ -27,7 +27,7 @@ static ServerConfig makeServer()
 	LocationConfig root;
 	root.path = "/";
 	root.root = "html";
-	root.index = "index.html";
+	root.index.push_back("index.html");
 	root.autoindex = true;
 	root.upload_enable = false;
 	root.client_max_body_size = 1000000;
@@ -40,7 +40,7 @@ static ServerConfig makeServer()
 	LocationConfig gizli = root;
 	gizli.path = "/gizli";
 	gizli.autoindex = false;
-	gizli.index = "bulunmayan.html";
+	gizli.index.push_back("bulunmayan.html");
 	srv.locations.push_back(gizli);
 
 	// Yonlendirme

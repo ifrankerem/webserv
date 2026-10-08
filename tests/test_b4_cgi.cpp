@@ -11,27 +11,27 @@
 #include <cstdio>
 #include <unistd.h>
 #include <poll.h>
-#include "RequestHandler.hpp"
+#include "../includes/RequestHandler.hpp"
 
 static ServerConfig makeServer()
 {
 	ServerConfig srv;
 	srv.root = "html";
-	srv.index = "index.html";
+	srv.index.push_back("index.html");
 	srv.client_max_body_size = 1000000;
-	srv.server_name = "localhost";
+	srv.server_name.push_back("localhost");
 
 	LocationConfig root;
 	root.path = "/";
 	root.root = "html";
-	root.index = "index.html";
+	root.index.push_back("index.html");
 	root.allowed_methods.push_back("GET");
 	root.allowed_methods.push_back("POST");
 	srv.locations.push_back(root);
 
 	LocationConfig cgi = root;
 	cgi.path = "/cgi";
-	cgi.root = "html/cgi";
+	cgi.root = "html";
 	cgi.allowed_methods.clear();
 	cgi.allowed_methods.push_back("GET");
 	cgi.allowed_methods.push_back("POST");

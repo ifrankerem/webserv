@@ -2,9 +2,9 @@ name: C/C++ CI
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: [ "main", "master", "develop" ]
   pull_request:
-    branches: [ "main", "master" ]
+    branches: [ "main", "master", "develop" ]
 
 jobs:
   build_and_test:
@@ -12,7 +12,10 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - name: Build tests
+    - name: Build main server
+      run: make
+
+    - name: Build A-side tests
       run: make test
 
     - name: 1. Config Parser Tests
@@ -21,5 +24,17 @@ jobs:
     - name: 2. Server Setup Tests
       run: ./test_setup
 
-    - name: 4. HTTP Parser Tests
+    - name: 3. HTTP Parser Tests
       run: ./test_parser
+
+    - name: B1 Router Tests
+      run: make router
+
+    - name: B2 Static File Tests
+      run: make b2
+
+    - name: B3 Upload / DELETE Tests
+      run: make b3
+
+    - name: B4 CGI Tests
+      run: make b4

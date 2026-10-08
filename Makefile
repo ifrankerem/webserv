@@ -10,22 +10,22 @@ OBJS = $(SRC:.cpp=.o)
 
 # make router -> B1 otomatik testleri (gecti/kaldi sayisi basar)
 ROUTER_NAME = webserv_router
-ROUTER_SRC = tests/test_router.cpp $(B_SRC)
+ROUTER_SRC = tests/test_b1_router.cpp $(B_SRC)
 ROUTER_OBJS = $(ROUTER_SRC:.cpp=.o)
 
 # make b2 -> statik dosya oyun alani (ciplak cevabi basar)
 B2_NAME = webserv_b2
-B2_SRC = tests/deneme_b2.cpp $(B_SRC)
+B2_SRC = tests/test_b2_static.cpp $(B_SRC)
 B2_OBJS = $(B2_SRC:.cpp=.o)
 
 # make b3 -> upload/DELETE oyun alani
 B3_NAME = webserv_b3
-B3_SRC = tests/deneme_b3.cpp $(B_SRC)
+B3_SRC = tests/test_b3_upload_delete.cpp $(B_SRC)
 B3_OBJS = $(B3_SRC:.cpp=.o)
 
 # make b4 -> CGI oyun alani
 B4_NAME = webserv_b4
-B4_SRC = tests/deneme_b4.cpp $(B_SRC)
+B4_SRC = tests/test_b4_cgi.cpp $(B_SRC)
 B4_OBJS = $(B4_SRC:.cpp=.o)
 
 # make test -> Taraf A CI Testleri
@@ -41,8 +41,21 @@ TEST_PARSER_NAME = test_parser
 TEST_PARSER_SRC = tests/test_parser.cpp src/HttpParser.cpp
 TEST_PARSER_OBJS = $(TEST_PARSER_SRC:.cpp=.o)
 
+# make manual -> Manuel test sunucusu (tarayici paneli icin)
+# Kullanim: ./webserv_manual conf/manual_test.conf
+MANUAL_NAME = webserv_manual
+MANUAL_SRC = tests/manual_server_main.cpp $(B_SRC) $(A_SRC)
+MANUAL_OBJS = $(MANUAL_SRC:.cpp=.o)
+
+all: $(NAME)
+
 $(NAME): $(OBJS)
 	$(CXX) -o $(NAME) $(CXXFLAGS) $(OBJS)
+
+manual: $(MANUAL_NAME)
+
+$(MANUAL_NAME): $(MANUAL_OBJS)
+	$(CXX) -o $(MANUAL_NAME) $(CXXFLAGS) $(MANUAL_OBJS)
 
 run: $(NAME)
 	clear
@@ -87,15 +100,11 @@ leak:
 	valgrind ./$(NAME)
 
 clean:
-	rm -rf $(OBJS) $(ROUTER_OBJS) $(B2_OBJS) $(B3_OBJS) $(B4_OBJS) $(TEST_CONF_OBJS) $(TEST_SETUP_OBJS) $(TEST_PARSER_OBJS) $(DEPS)
+	rm -rf $(OBJS) $(ROUTER_OBJS) $(B2_OBJS) $(B3_OBJS) $(B4_OBJS) $(MANUAL_OBJS) $(TEST_CONF_OBJS) $(TEST_SETUP_OBJS) $(TEST_PARSER_OBJS)
 
 fclean: clean
-	rm -rf $(NAME) $(ROUTER_NAME) $(B2_NAME) $(B3_NAME) $(B4_NAME) $(TEST_CONF_NAME) $(TEST_SETUP_NAME) $(TEST_PARSER_NAME)
+	rm -rf $(NAME) $(ROUTER_NAME) $(B2_NAME) $(B3_NAME) $(B4_NAME) $(MANUAL_NAME) $(TEST_CONF_NAME) $(TEST_SETUP_NAME) $(TEST_PARSER_NAME)
 
 re: fclean all
 
-# Header degisince ilgili .o yeniden derlensin diye bagimlilik listelerini oku.
-# Ilk derlemede .d dosyalari henuz yok, bu yuzden '-' ile hatayi yut.
--include $(DEPS)
-
-.PHONY: all run leak router b2 b3 b4 test clean fclean re
+.PHONY: all run leak router b2 b3 b4 manual test clean fclean re

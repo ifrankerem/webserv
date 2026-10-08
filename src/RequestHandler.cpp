@@ -12,6 +12,7 @@
 #include <poll.h>
 #include <sys/poll.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #include <vector>
@@ -109,17 +110,13 @@ bool RequestHandler::normalizePath(const std::string& path, std::string& out)
 
 std::string RequestHandler::resolveDiskPath(const LocationConfig& loc, const std::string& path)
 {
-	std::string rest = path.substr(loc.path.size());
 	std::string root = loc.root;
 
 	if (root.empty())
 		root = server->root;
 	if (!root.empty() && root[root.size() - 1] == '/')
 		root.erase(root.size() - 1);
-	if (rest.empty() || rest[0] != '/')
-		rest = "/" + rest;
-
-	return root + rest;
+	return root + path;
 }
 
 std::string RequestHandler::resolveUploadPath(const LocationConfig& loc, const std::string& path)
@@ -146,7 +143,17 @@ static std::map<std::string, std::string> buildCgiEnv(const HttpRequest& req,
 
 	env["CONTENT_TYPE"] = utils::getHeader(req.headers, "Content-Type");
 	env["CONTENT_LENGTH"] = utils::toString(req.body.size());
-	env["SERVER_NAME"] = srv.server_name;
+	std::string host_name = utils::getHeader(req.headers, "Host");
+	env["SERVER_NAME"] = srv.server_name[0]; //default is the first one
+	for(size_t i = 0; i < srv.server_name.size();i++)
+	{
+		if(host_name == srv.server_name[i])
+		{
+			env["SERVER_NAME"] = host_name;
+			break;
+		}
+	}
+	
 	env["SERVER_PORT"] = utils::toString(static_cast<size_t>(req.server_port));
 	env["REMOTE_ADDR"] = req.remote_addr;
 

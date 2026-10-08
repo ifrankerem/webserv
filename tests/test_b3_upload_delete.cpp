@@ -9,7 +9,7 @@
 #include <sys/stat.h>
 #include <cstdio>
 #include <unistd.h>
-#include "RequestHandler.hpp"
+#include "../includes/RequestHandler.hpp"
 
 static bool fileExists(const std::string& path)
 {
@@ -29,7 +29,7 @@ static ServerConfig makeServer()
 {
 	ServerConfig srv;
 	srv.root = "html";
-	srv.index = "index.html";
+	srv.index.push_back("index.html");
 	srv.client_max_body_size = 1000000;
 	srv.error_pages[404] = "/errors/404.html";
 	srv.error_pages[403] = "/errors/403.html";
@@ -37,7 +37,7 @@ static ServerConfig makeServer()
 	LocationConfig root;
 	root.path = "/";
 	root.root = "html";
-	root.index = "index.html";
+	root.index.push_back("index.html");
 	root.autoindex = true;
 	root.upload_enable = false;
 	root.client_max_body_size = 1000000;
@@ -48,7 +48,7 @@ static ServerConfig makeServer()
 	// Upload alani: uc metoda da izinli, kucuk body siniri.
 	LocationConfig upload = root;
 	upload.path = "/upload";
-	upload.root = "html/upload";
+	upload.root = "html";
 	upload.upload_store = "html/upload/klasor";
 	upload.upload_enable = true;
 	upload.allowed_methods.clear();

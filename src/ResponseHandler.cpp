@@ -86,10 +86,16 @@ HttpResponse ResponseHandler::handle_get(const std::string& diskPath,const HttpR
 		}
 		else if(indexPath[indexPath.size() - 1] != '/')
 			indexPath += '/';
-		indexPath += loc.index;
-		if (::stat(indexPath.c_str(), &info) == 0)
-			return serveFile(indexPath,srv);
-		else if(loc.autoindex)
+		std::string backup = indexPath;
+		for (size_t i = 0; i < loc.index.size(); i++) 
+		{
+			indexPath += loc.index[i];
+			if (::stat(indexPath.c_str(), &info) == 0)
+				return serveFile(indexPath,srv);
+			else
+				indexPath = backup;
+		}
+		if(loc.autoindex)
 			return listDirectory(diskPath,srv);
 		else
 			return RequestHandler::error(403,&srv);
