@@ -5,6 +5,7 @@
 #include "../includes/RequestHandler.hpp"
 #include "../includes/Mime.hpp"
 #include "../includes/Utils.hpp"
+#include "../includes/MultipartParser.hpp"
 #include <algorithm>
 #include <cerrno>
 #include <cstddef>
@@ -186,7 +187,45 @@ HttpResponse ResponseHandler::handle_post(const std::string& diskPath,const std:
 
 	std::string type = utils::toLower(utils::getHeader(req.headers, "Content-Type"));
 	if(type.find("multipart/") != std::string::npos)
-		return RequestHandler::error(415, &srv);
+	{
+		// Dosya adi URL'den degil part'in Content-Disposition'indan gelir
+		std::vector<MultipartPart> parts;
+		// boundary case-sensitive: ham header gerekli (type lowercase edilmis olan)
+		if(!parseMultipart(req.body, utils::getHeader(req.headers, "Content-Type"), parts))
+			return RequestHandler::error(400, &srv);
+
+		std::string store = loc.upload_store;
+		if(!store.empty() && store[store.size() - 1] == '/')
+			store.erase(store.size() - 1);
+
+		bool wrote = false;
+		for(size_t i = 0; i < parts.size(); i++)
+		{
+			const std::string &filename = parts[i].filename;
+			if(filename.empty())
+				continue; // filename'siz: duz metin field, dosya degil
+			// upload_store disina yazma (path traversal) riski
+			if(filename.find('/') != std::string::npos
+				|| filename.find('\\') != std::string::npos
+				|| filename.find("..") != std::string::npos)
+				return RequestHandler::error(400, &srv);
+
+			std::ofstream outfile((store + "/" + filename).c_str(), std::ios::binary);
+			if(!outfile)
+				return RequestHandler::error(500, &srv);
+			outfile << parts[i].content;
+			outfile.close();
+			if(!outfile)
+				return RequestHandler::error(500, &srv);
+			wrote = true;
+		}
+		if(!wrote)
+			return RequestHandler::error(400, &srv);
+
+		x.status = 201;
+		x.headers["Location"] = path;
+		return x;
+	}
 
 	//diskPath hedef dosya; handle() onu upload_store'dan uretti.
 	//path ise temiz URL: location'in kendisiyse ya da '/' ile bitiyorsa
