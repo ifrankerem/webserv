@@ -166,7 +166,7 @@ static std::map<std::string, std::string> buildCgiEnv(const HttpRequest& req,
 	
 	env["SERVER_PORT"] = utils::toString(static_cast<size_t>(req.server_port));
 	env["REMOTE_ADDR"] = req.remote_addr;
-
+	env["REDIRECT_STATUS"] = "200";
 	std::string userAgent = utils::getHeader(req.headers, "User-Agent");
 	if (!userAgent.empty())
 		env["HTTP_USER_AGENT"] = userAgent;
