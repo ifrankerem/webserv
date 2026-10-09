@@ -228,15 +228,20 @@ void ConfigParser::parse_client_max_body_size(std::vector<std::string>& tokens, 
 void ConfigParser::parse_index(std::vector<std::string>& tokens, size_t& i, ServerConfig& server)
 {
     i++;
+    if (!server.index.empty())
+        throw std::runtime_error("Config Error: Duplicate 'index'");
     while (i < tokens.size() && tokens[i] != ";") {
         if (tokens[i] == "{" || tokens[i] == "}")
             throw std::runtime_error("Config Error: 'index' komutunda ';' unutulmus olabilir.");
-        if (!server.index.empty())
-            throw std::runtime_error("Config Error: Duplicate 'index'");
+        
+        for (size_t j = 0; j < server.index.size(); j++) {
+            if (server.index[j] == tokens[i])
+                throw std::runtime_error("Config Error: Duplicate index '" + tokens[i] + "'");
+        }
+        
         server.index.push_back(tokens[i]);
         i++;
     }
-
     if (i >= tokens.size() || tokens[i] != ";") throw std::runtime_error("Config Error: 'index' must end with ';'");
 }
 

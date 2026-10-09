@@ -100,7 +100,7 @@ void ServerManager::setupServers()
 
             ports.push_back(_config.servers[i].listens[j].port);
 
-            std::cout << "Port " << _config.servers[i].listens[j].port << std::endl;
+            std::cout << "127.0.0.1:" << _config.servers[i].listens[j].port << std::endl;
         }     
     }
 }

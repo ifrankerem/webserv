@@ -119,10 +119,17 @@ void ConfigParser::parse_cgi_ext(std::vector<std::string>& tokens, size_t& i, Lo
 void ConfigParser::parse_location_index(std::vector<std::string>& tokens, size_t& i, LocationConfig& location)
 {
     i++;
+    if (!location.index.empty())
+        throw std::runtime_error("Config Error: Duplicate 'index' in location");
     while (i < tokens.size() && tokens[i] != ";") {
 
         if (tokens[i] == "{" || tokens[i] == "}") 
             throw std::runtime_error("Config Error: 'index' komutunda ';' unutulmus olabilir.");
+
+        for (size_t j = 0; j < location.index.size(); j++) {
+            if (location.index[j] == tokens[i])
+                throw std::runtime_error("Config Error: Duplicate index '" + tokens[i] + "' in location");
+        }
 
         location.index.push_back(tokens[i]);
         i++;

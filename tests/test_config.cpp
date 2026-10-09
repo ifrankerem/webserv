@@ -61,6 +61,8 @@ int main() {
         "tests/test_configs/invalid_cases/body/invalid_body_size_middle_letter.conf",
         "tests/test_configs/invalid_cases/directives/invalid_server_name_duplicate.conf",
         "tests/test_configs/invalid_cases/directives/invalid_server_name_same_args.conf",
+        "tests/test_configs/invalid_cases/directives/invalid_index_same_args.conf",
+        "tests/test_configs/invalid_cases/directives/invalid_location_index_same_args.conf",
         "tests/test_configs/invalid_cases/directives/invalid_root_duplicate.conf",
         "tests/test_configs/invalid_cases/directives/invalid_autoindex_value.conf",
         "tests/test_configs/invalid_cases/directives/invalid_upload_enable_value.conf",
