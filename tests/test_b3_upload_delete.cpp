@@ -183,16 +183,17 @@ int main()
 	req.headers.erase("content-type");
 	req.body = "";
 
-// 	req.method = "POST";
-// 	req.path = "/upload/yeni311111111.txt";
-// 	req.headers["content-type"] = "text/plain";
-// 	req.body = "merhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunya\n";
-// 	run(srv, req);
-//
-// //	--- POST: body siniri asiliyor (location siniri 100 byte) ---
-// 	//Not: 413'u A uretiyor; burada bodyLimit()'in dogru sayiyi verdigini gor.
-// 	RequestHandler h(srv);
-// 	std::cout << "bodyLimit(/upload/x) = " << h.bodyLimit(req) << "\n";
+	// --- POST: body siniri asiliyor (location siniri 10 byte) -> 413 ---
+	// Fixture'in kucuk limitli kopyasi: kalan testleri etkilemesin.
+	// bodyLimit() artik handle() icinde calisiyor; govde diske yazilmamali.
+	ServerConfig kucuk = srv;
+	kucuk.locations[1].client_max_body_size = 10;
+	req.method = "POST";
+	req.path = "/upload/not.txt";
+	req.headers["content-type"] = "text/plain";
+	req.body = "bu govde siniri asiyor";
+	if (run(kucuk, req) != 413 || fileExists("html/upload/klasor/not.txt"))
+		return 1;
 
 //	--- DELETE: var olan dosya -> 204, govdesiz ---
 	req.method = "DELETE";

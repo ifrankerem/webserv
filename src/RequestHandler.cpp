@@ -286,6 +286,16 @@ HttpResponse RequestHandler::error(int status, const ServerConfig *server)
 
 Step RequestHandler::handle(const HttpRequest &req)
 {
+	// Govde limiti conf'tan; direktif verilmemisse (0) sinirsiz sayilir
+	size_t limit = bodyLimit(req);
+	if(limit != 0 && req.body.size() > limit)
+	{
+		Step x;
+		x.kind = Step::RESPOND;
+		x.response = error(413, server);
+		return x;
+	}
+
 	std::string path;
 	if (!normalizePath(req.path, path))
 	{
