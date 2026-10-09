@@ -47,6 +47,10 @@ jobs:
       if: success() || failure()
       run: make b4
 
+    - name: Multi-CGI Parser Tests
+      if: success() || failure()
+      run: make multi_cgi
+
     - name: Build manual server
       if: success() || failure()
       run: make manual
