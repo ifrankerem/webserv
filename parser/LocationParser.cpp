@@ -92,11 +92,16 @@ void ConfigParser::parse_cgi_path(std::vector<std::string>& tokens, size_t& i, L
     i++;
     std::string path = tokens[i];
 
-    if (location.cgi_pass.size() > 0) { //bu kısımda opsiyon 1 seçeneğimiz ddaha var belki değiştiriebilir;
-        location.cgi_pass.begin()->second = path;
-    } else {
-        location.cgi_pass[""] = path; 
-    }
+    // Birden fazla CGI cifti (ext/path, ext/path, ...) destegi icin:
+    // interpreter'i bos degerli ilk slotu doldur; yoksa gecici " park yeri ac.
+    std::map<std::string, std::string>::iterator it = location.cgi_pass.begin();
+    while (it != location.cgi_pass.end() && !it->second.empty())
+        ++it;
+    if (it != location.cgi_pass.end())
+        it->second = path;
+    else
+        location.cgi_pass[""] = path;
+
     i++;
     if (i >= tokens.size() || tokens[i] != ";") throw std::runtime_error("Config Error: 'cgi_path' must end with ';'");
 }
