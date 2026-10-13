@@ -86,17 +86,60 @@ void HttpParser::parse() {
             }
             // Veri yetersizse hiçbir şey yapma, sonraki recv() çağrısında tamamlanır.
         } 
-        // Chunked encoding kuralı kontrolü (Basitlik için error'a düşürdük)
-        else if (_request.headers.find("Transfer-Encoding") != _request.headers.end() && 
+        // Chunked Transfer Encoding decode
+        else if (_request.headers.find("Transfer-Encoding") != _request.headers.end() &&
                  _request.headers["Transfer-Encoding"] == "chunked") {
-            _state = PARSE_ERROR; 
+            _state = PARSE_CHUNKED;
         }
         // GET/DELETE gibi gövdesi olmayan istekler direkt bitmiştir
         else {
             _state = PARSE_DONE;
         }
     }
+
+    // --- 3. AŞAMA: CHUNKED BODY OKUMA ---
+    while (_state == PARSE_CHUNKED) {
+        // Chunk boyutu satırını bul (\r\n ile biter)
+        size_t crlf_pos = _raw_data.find("\r\n");
+        if (crlf_pos == std::string::npos)
+            return; // Boyut satiri henuz tam gelmediyse bekle
+
+        // Hex boyutu al
+        std::string size_str = _raw_data.substr(0, crlf_pos);
+        // Chunk extension varsa (boyut;name=value) sadece boyutu al
+        size_t semi_pos = size_str.find(';');
+        if (semi_pos != std::string::npos)
+            size_str = size_str.substr(0, semi_pos);
+
+        size_t chunk_size = 0;
+        for (size_t k = 0; k < size_str.size(); k++) {
+            char c = size_str[k];
+            chunk_size *= 16;
+            if (c >= '0' && c <= '9')      chunk_size += c - '0';
+            else if (c >= 'a' && c <= 'f') chunk_size += c - 'a' + 10;
+            else if (c >= 'A' && c <= 'F') chunk_size += c - 'A' + 10;
+            else { _state = PARSE_ERROR; return; } // Geçersiz hex karakter
+        }
+
+        // Son chunk (0\r\n\r\n) -> okuma bitti
+        if (chunk_size == 0) {
+            _state = PARSE_DONE;
+            return;
+        }
+
+        // Boyut satiri + \r\n + veri + \r\n kadar veri geldi mi?
+        size_t needed = crlf_pos + 2 + chunk_size + 2;
+        if (_raw_data.size() < needed)
+            return; // Chunk'in tamami henuz gelmedi, bekle
+
+        // Chunk verisini body'e ekle
+        _request.body.append(_raw_data, crlf_pos + 2, chunk_size);
+
+        // Okunan chunk'i (boyut satiri + veri + \r\n) buffer'dan sil
+        _raw_data.erase(0, needed);
+    }
 }
+
 
 const HttpRequest& HttpParser::getParsedRequest() const {
     return _request;

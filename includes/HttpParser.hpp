@@ -6,6 +6,7 @@
 enum ParseState {
     PARSE_READING,      // Veri hala parça parça geliyor
     PARSE_HEADERS_DONE, // Başlıklar bitti, gövde okunuyor
+    PARSE_CHUNKED,      // Transfer-Encoding: chunked, chunk'lar okunuyor
     PARSE_DONE,         // Her şey kusursuz bitti
     PARSE_ERROR         // Syntax hatası var
 };
