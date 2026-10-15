@@ -10,7 +10,6 @@
 #include <fstream>
 #include <map>
 #include <poll.h>
-#include <sys/poll.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -18,23 +17,8 @@
 #include <vector>
 
 
-RequestHandler::RequestHandler(const ServerConfig& server) : server(&server), cgiActive(false), cgiPid(-1), cgiPipeFd(-1)
+RequestHandler::RequestHandler(const ServerConfig& server) : server(&server), cgiActive(false), cgiPid(-1), cgiPipeFd(-1), cgiStdinFd(-1), cgiInOffset(0)
 {
-}
-
-RequestHandler::RequestHandler(const RequestHandler& other)
-{
-    *this = other;
-}
-
-RequestHandler& RequestHandler::operator=(const RequestHandler& other)
-{
-    if (this != &other)
-    {
-
-    }
-
-    return *this;
 }
 
 RequestHandler::~RequestHandler()
@@ -43,6 +27,8 @@ RequestHandler::~RequestHandler()
 	{
 		if (cgiPipeFd != -1)
 			close(cgiPipeFd);
+		if (cgiStdinFd != -1)
+			close(cgiStdinFd);
 		if (cgiPid != -1)
 		{
 			kill(cgiPid, SIGTERM);
@@ -147,9 +133,11 @@ static std::map<std::string, std::string> buildCgiEnv(const HttpRequest& req,
 	env["REQUEST_METHOD"] = req.method;
 	env["SCRIPT_NAME"] = req.path;
 	env["SCRIPT_FILENAME"] = scriptPath;
-	env["PATH_INFO"] = "";
+	env["PATH_INFO"] = req.path;
+	env["REQUEST_URI"] = req.path;
 	env["PATH_TRANSLATED"] = "";
 	env["QUERY_STRING"] = req.query;
+	env["SERVER_PROTOCOL"] = req.version;
 
 	env["CONTENT_TYPE"] = utils::getHeader(req.headers, "Content-Type");
 	env["CONTENT_LENGTH"] = utils::toString(req.body.size());
@@ -283,8 +271,17 @@ HttpResponse RequestHandler::error(int status, const ServerConfig *server)
 	return x;
 }
 
+void RequestHandler::closeCgiStdin(Step& x)
+{
+	if (cgiStdinFd != -1)
+	{
+		x.unwatch.push_back(cgiStdinFd);
+		close(cgiStdinFd);
+		cgiStdinFd = -1;
+	}
+}
 
-Step RequestHandler::handle(const HttpRequest &req)
+Step RequestHandler::handle(HttpRequest &req)
 {
 	// Govde limiti conf'tan; direktif verilmemisse (0) sinirsiz sayilir
 	size_t limit = bodyLimit(req);
@@ -364,7 +361,9 @@ Step RequestHandler::handle(const HttpRequest &req)
 		struct Step x = Step();
 		std::string scriptPath = resolveDiskPath(*best, path);
 
-		if (access(scriptPath.c_str(), F_OK) != 0)
+		// resmi tester: POST'ta .bla, dosya diskte olmasa da CGI'ya gider.
+		// GET'te olmayan script 404 kalir (b4 beklentisi).
+		if (req.method != "POST" && access(scriptPath.c_str(), F_OK) != 0)
 		{
 			x.kind = Step::RESPOND;
 			x.response = error(404, server);
@@ -374,12 +373,20 @@ Step RequestHandler::handle(const HttpRequest &req)
 		std::map<std::string, std::string> env_variables = buildCgiEnv(req, *best, *server, scriptPath);
 		int output_pipe[2];
 		int input_pipe[2];
-		if(pipe(output_pipe) == -1 || pipe(input_pipe) == -1)
+		if (pipe(output_pipe) == -1)
 		{
 			x.kind = Step::RESPOND;
 			x.response = error(500, server);
 			return x;
-		}	
+		}
+		if (pipe(input_pipe) == -1)
+		{
+			close(output_pipe[0]);
+			close(output_pipe[1]);
+			x.kind = Step::RESPOND;
+			x.response = error(500, server);
+			return x;
+		}
 		int id = fork();
 		if(id == -1)
 		{
@@ -397,19 +404,32 @@ Step RequestHandler::handle(const HttpRequest &req)
 		{
 			close(output_pipe[1]); //parent will not write anything so close it!!
 			close(input_pipe[0]); //parent will not read anything so close it!!
-			write(input_pipe[1], req.body.c_str(), req.body.size()); // parent will write the body to input pipe
-			close(input_pipe[1]);
+			int fl = fcntl(input_pipe[1], F_GETFL);
+			if (fl != -1)
+				fcntl(input_pipe[1], F_SETFL, fl | O_NONBLOCK);
 
 			cgiActive = true;
 			cgiPid = id;
 			cgiPipeFd = output_pipe[0];
+			cgiStdinFd = input_pipe[1];
+			cgiBody.swap(req.body);
+			cgiInOffset = 0;
 			cgiBuffer.clear();
 
 			struct WatchFd y = WatchFd();
-			fcntl(output_pipe[0],F_SETFL, O_NONBLOCK); //nonblocking
+			fl = fcntl(output_pipe[0], F_GETFL);
+			if (fl != -1)
+				fcntl(output_pipe[0], F_SETFL, fl | O_NONBLOCK);
 			y.fd = output_pipe[0];
 			y.events = POLLIN;
-			x.watch.push_back(y); 
+			x.watch.push_back(y);
+
+			// govde olay dongusunde yazilir; ayni anda CGI ciktisi okunabilsin ki
+			// buyuk govdelerde iki boru birbirini kilitlemesin
+			struct WatchFd in = WatchFd();
+			in.fd = input_pipe[1];
+			in.events = POLLOUT;
+			x.watch.push_back(in);
 			x.kind = Step::WAIT;
 		}
 		return x;
@@ -434,12 +454,31 @@ Step RequestHandler::onReady(int fd, short revents)
 	struct Step x;
 	x.kind = Step::WAIT;
 
-	if (!cgiActive || fd != cgiPipeFd)
+	if (fd == cgiStdinFd)
 	{
-		x.kind = Step::RESPOND;
-		x.response = error(500, server);
+		if (revents & (POLLERR | POLLHUP)) // CGI artik okumuyor (öldü/çikti)
+		{
+			closeCgiStdin(x);
+			return x;
+		}
+		if (revents & POLLOUT)
+		{
+			size_t remaining = cgiBody.size() - cgiInOffset;
+			if (remaining > 0)
+			{
+				ssize_t n = write(cgiStdinFd, cgiBody.data() + cgiInOffset, remaining);
+				if (n > 0)
+					cgiInOffset += static_cast<size_t>(n);
+			}
+			if (cgiInOffset >= cgiBody.size()) // gövde bitti: CGI EOF görecek
+				closeCgiStdin(x);
+		}
 		return x;
 	}
+
+	// ayni epoll turunda gelebilen bayat (kapanmis) fd olaylari: yok say
+	if (!cgiActive || fd != cgiPipeFd)
+		return x;
 
 	if (revents & POLLIN)
 	{
@@ -453,6 +492,7 @@ Step RequestHandler::onReady(int fd, short revents)
 		{
 			// Output pipe closed: CGI finished
 			close(fd);
+			closeCgiStdin(x);
 			cgiActive = false;
 			cgiPipeFd = -1;
 			if (cgiPid != -1)
@@ -480,6 +520,7 @@ Step RequestHandler::onReady(int fd, short revents)
 		else 
 			x.response = error(502, server);
 		close(fd);
+		closeCgiStdin(x);
 		cgiActive = false;
 		cgiPipeFd = -1;
 		if (cgiPid != -1)

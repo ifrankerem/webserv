@@ -24,6 +24,7 @@ struct Step {
     Kind                 kind;
     HttpResponse         response;
     std::vector<WatchFd> watch;
+    std::vector<int>     unwatch; // epoll'den cikarilacak fd'ler (kapanan CGI stdin)
 };
 
 class RequestHandler {
@@ -35,7 +36,10 @@ private:
 	// CGI state
 	bool        cgiActive;
 	pid_t       cgiPid;
-	int         cgiPipeFd;
+	int         cgiPipeFd;   // CGI stdout (parent okur)
+	int         cgiStdinFd;  // CGI stdin (parent yazar), -1 = kapali
+	std::string cgiBody;     // gövde, olay döngüsünde parça parça yazilir
+	size_t      cgiInOffset;
 	std::string cgiBuffer;
 
 	const LocationConfig* findLocation(const std::string& path);
@@ -50,7 +54,8 @@ public:
     RequestHandler(const ServerConfig& server);
     ~RequestHandler();
     size_t       bodyLimit(const HttpRequest& req);
-    Step         handle(const HttpRequest& req);
+    Step         handle(HttpRequest& req);
+    void         closeCgiStdin(Step& x);
     Step         onReady(int fd, short revents);
     static HttpResponse error(int status,const ServerConfig *server);
 

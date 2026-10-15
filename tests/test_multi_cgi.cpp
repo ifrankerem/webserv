@@ -36,7 +36,7 @@ static void resetFixtures()
 		"?>\n");
 }
 
-static HttpResponse runCgi(const ServerConfig& srv, const HttpRequest& req)
+static HttpResponse runCgi(const ServerConfig& srv, HttpRequest& req)
 {
 	RequestHandler handler(srv);
 	Step step = handler.handle(req);

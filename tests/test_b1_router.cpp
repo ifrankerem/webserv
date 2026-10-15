@@ -94,7 +94,8 @@ static HttpRequest makeRequest(const std::string& method, const std::string& pat
 static Step run(const ServerConfig& srv, const std::string& method, const std::string& path)
 {
     RequestHandler h(srv);
-    return h.handle(makeRequest(method, path));
+    HttpRequest req = makeRequest(method, path);
+    return h.handle(req);
 }
 
 static std::string header(const Step& s, const std::string& name)

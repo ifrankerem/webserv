@@ -18,6 +18,25 @@
 #include <iterator>
 #include <sys/stat.h>
 
+static std::string htmlEscape(const std::string& s)
+{
+	std::string out;
+	out.reserve(s.size());
+	for (size_t i = 0; i < s.size(); i++)
+	{
+		switch (s[i])
+		{
+			case '&': out += "&amp;"; break;
+			case '<': out += "&lt;"; break;
+			case '>': out += "&gt;"; break;
+			case '"': out += "&quot;"; break;
+			case '\'': out += "&#39;"; break;
+			default: out += s[i]; break;
+		}
+	}
+	return out;
+}
+
 ResponseHandler::ResponseHandler()
 {
 
@@ -62,16 +81,14 @@ HttpResponse ResponseHandler::handle(const std::string& diskPath,const std::stri
 HttpResponse ResponseHandler::handle_get(const std::string& diskPath,const HttpRequest &req, const LocationConfig& loc,const ServerConfig& srv,bool head_flag)
 {
 	struct stat info;
-	if (::stat(diskPath.c_str(), &info) == -1) //stat() was not successful. The errno global variable is set to indicate the error.
+	if (::stat(diskPath.c_str(), &info) == -1)
 	{
-		if (errno == ENOENT) // No such path or directory.
-			return RequestHandler::error(404,&srv);
-		else if(errno == EACCES) // Permission denied.
-			return RequestHandler::error(403,&srv);
-		else
-			return RequestHandler::error(500,&srv); //  Internal Server Error:
-
-		//TODO maybe more if and elses this part for more status codes
+		// errno kullanmak yasak; access() ile varlik/yetki ayirt et
+		if (::access(diskPath.c_str(), F_OK) == -1)
+			return RequestHandler::error(404, &srv);
+		if (::access(diskPath.c_str(), R_OK) == -1)
+			return RequestHandler::error(403, &srv);
+		return RequestHandler::error(500, &srv);
 	}
 
 	if(S_ISDIR(info.st_mode) != 0)
@@ -100,7 +117,7 @@ HttpResponse ResponseHandler::handle_get(const std::string& diskPath,const HttpR
 		if(loc.autoindex)
 			return listDirectory(diskPath, loc, srv);
 		else
-			return RequestHandler::error(403,&srv);
+			return RequestHandler::error(404,&srv);
 	}
 	else {
 		if (req.path[req.path.size() - 1] == '/')
@@ -113,9 +130,24 @@ HttpResponse ResponseHandler::handle_get(const std::string& diskPath,const HttpR
 HttpResponse ResponseHandler::serveFile(const std::string& diskPath,const ServerConfig& srv,bool head_flag)
 {
 	HttpResponse x;
-	std::ifstream file(diskPath.c_str());
+	struct stat info;
+	if (::stat(diskPath.c_str(), &info) == -1)
+	{
+		if (::access(diskPath.c_str(), F_OK) == -1)
+			return RequestHandler::error(404, &srv);
+		return RequestHandler::error(403, &srv);
+	}
+	if (!S_ISREG(info.st_mode))
+		return RequestHandler::error(403, &srv);
+
+	// Cok buyuk dosyalari bellege yukleyip OOM yapmamak icin sınır
+	const size_t MAX_FILE_SIZE = 10 * 1024 * 1024;
+	if (static_cast<size_t>(info.st_size) > MAX_FILE_SIZE)
+		return RequestHandler::error(413, &srv);
+
+	std::ifstream file(diskPath.c_str(), std::ios::binary);
 	if (!file.is_open())
-		return RequestHandler::error(403,&srv);
+		return RequestHandler::error(403, &srv);
 
 	std::istreambuf_iterator<char> first(file);
 	std::istreambuf_iterator<char> last;
@@ -167,7 +199,10 @@ HttpResponse ResponseHandler::listDirectory(const std::string& diskPath, const L
 	std::string body = "<html>\n<head><title>Index of " + f_path +
 		"</title></head>\n<body>\n<h1>Index of " + f_path + "</h1>\n<hr>\n<pre>\n";
 	for (size_t i = 0; i < names.size(); i++)
-		body += "<a href=\"" + names[i] + "\">" + names[i] + "</a>\n";
+	{
+		std::string safe = htmlEscape(names[i]);
+		body += "<a href=\"" + safe + "\">" + safe + "</a>\n";
+	}
 	body += "</pre>\n<hr>\n</body>\n</html>\n";
 
 	HttpResponse x;
@@ -201,19 +236,20 @@ HttpResponse ResponseHandler::handle_post(const std::string& diskPath,const std:
 		bool wrote = false;
 		for(size_t i = 0; i < parts.size(); i++)
 		{
-			const std::string &filename = parts[i].filename;
+			std::string filename = utils::urlDecode(parts[i].filename);
 			if(filename.empty())
 				continue; // filename'siz: duz metin field, dosya degil
 			// upload_store disina yazma (path traversal) riski
 			if(filename.find('/') != std::string::npos
 				|| filename.find('\\') != std::string::npos
-				|| filename.find("..") != std::string::npos)
+				|| filename.find("..") != std::string::npos
+				|| filename.find('\0') != std::string::npos)
 				return RequestHandler::error(400, &srv);
 
 			std::ofstream outfile((store + "/" + filename).c_str(), std::ios::binary);
 			if(!outfile)
 				return RequestHandler::error(500, &srv);
-			outfile << parts[i].content;
+			outfile.write(parts[i].content.data(), parts[i].content.size());
 			outfile.close();
 			if(!outfile)
 				return RequestHandler::error(500, &srv);
@@ -236,7 +272,7 @@ HttpResponse ResponseHandler::handle_post(const std::string& diskPath,const std:
 	std::ofstream outfile(diskPath.c_str(), std::ios::binary);
 	if(!outfile)
 		return RequestHandler::error(500, &srv);
-	outfile << req.body;
+	outfile.write(req.body.data(), req.body.size());
 	outfile.close();
 	if(!outfile)
 		return RequestHandler::error(500, &srv);
@@ -253,14 +289,11 @@ HttpResponse ResponseHandler::handle_delete(const std::string& diskPath, const L
 	if(loc.upload_store.empty())
 		return RequestHandler::error(403, &srv);
 	struct stat info;
-	if (::stat(diskPath.c_str(), &info) == -1) //stat() was not successful. The errno global variable is set to indicate the error.
+	if (::stat(diskPath.c_str(), &info) == -1)
 	{
-		if (errno == ENOENT || errno == ENOTDIR) // No such path or directory.
-			return RequestHandler::error(404,&srv);
-		else if(errno == EACCES || errno == EPERM) // Permission denied.
-			return RequestHandler::error(403,&srv);
-		else
-			return RequestHandler::error(500,&srv); //  Internal Server Error:
+		if (::access(diskPath.c_str(), F_OK) == -1)
+			return RequestHandler::error(404, &srv);
+		return RequestHandler::error(403, &srv);
 	}
 	if (S_ISDIR(info.st_mode) != 0)
 		return RequestHandler::error(403, &srv);
@@ -268,12 +301,9 @@ HttpResponse ResponseHandler::handle_delete(const std::string& diskPath, const L
 		return RequestHandler::error(403, &srv);
 	if (std::remove(diskPath.c_str()) != 0)
 	{
-		if(errno == ENOENT || errno == ENOTDIR)
+		if (::access(diskPath.c_str(), F_OK) == -1)
 			return RequestHandler::error(404, &srv);
-		else if(errno == EACCES || errno == EPERM)
-			return RequestHandler::error(403, &srv);
-		else
-			return RequestHandler::error(500, &srv);
+		return RequestHandler::error(403, &srv);
 	}
 
 	x.status = 204;
@@ -302,19 +332,46 @@ void ResponseHandler::handle_cgi_child(const int output_fd,const int input_fd,st
 	// CGI should run in the script's own directory for relative path access.
 	// After chdir, execve argument must be the script basename only.
 	std::string scriptName = scriptPath;
+	std::string scriptDir;
 	size_t slash = scriptPath.rfind('/');
 	if (slash != std::string::npos)
 	{
-		chdir(scriptPath.substr(0, slash).c_str());
+		scriptDir = scriptPath.substr(0, slash);
 		scriptName = scriptPath.substr(slash + 1);
+		chdir(scriptDir.c_str());
+	}
+
+	// cgi_path conf'ta goreli olabilir (ör. ./cgi_tester). chdir script dizinine
+	// gittigi icin ayni noktaya donen goreli bir yol kurulur; getcwd izinli degil.
+	// shortcut: script yolu mutlak verilirse goreli yorumlayici cozulemez
+	std::string interp = interpreter;
+	if (!interp.empty() && interp[0] != '/' && !scriptDir.empty() && scriptDir[0] != '/')
+	{
+		// scriptDir'in gercek dizin bileseni sayisini say; bas/son bosluklari, ./ ve // gibi durumlari atla
+		size_t components = 0;
+		size_t i = 0;
+		while (i < scriptDir.size())
+		{
+			while (i < scriptDir.size() && scriptDir[i] == '/')
+				i++;
+			if (i >= scriptDir.size())
+				break;
+			components++;
+			while (i < scriptDir.size() && scriptDir[i] != '/')
+				i++;
+		}
+		std::string prefix;
+		for (size_t j = 0; j < components; j++)
+			prefix += "../";
+		interp = prefix + interp;
 	}
 
 	char* argv[3];
-	argv[0] = const_cast<char*>(interpreter.c_str());
+	argv[0] = const_cast<char*>(interp.c_str());
 	argv[1] = const_cast<char*>(scriptName.c_str());
 	argv[2] = NULL;
 
-	execve(interpreter.c_str(), argv, &envp[0]);
+	execve(interp.c_str(), argv, &envp[0]);
 
 	// if execve fails these lines of code will work
 

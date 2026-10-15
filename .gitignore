@@ -14,3 +14,5 @@ tests/*.d
 test_config
 test_parser
 test_setup
+webserv_multi_cgi
+YoupiBanane/

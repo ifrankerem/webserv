@@ -78,7 +78,7 @@ static void resetFixtures()
 	symlink("../b3_outside", "html/upload/klasor/b3_link");
 }
 
-static int run(const ServerConfig& srv, const HttpRequest& req)
+static int run(const ServerConfig& srv, HttpRequest& req)
 {
 	RequestHandler handler(srv);
 	Step step = handler.handle(req);

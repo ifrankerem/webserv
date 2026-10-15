@@ -1,5 +1,6 @@
 #include "../includes/ServerManager.hpp"
 #include "../includes/RequestHandler.hpp"
+#include <csignal>
 #include <poll.h>
 
 ServerManager::ServerManager(const Config& config){
@@ -44,6 +45,8 @@ bool port_check(std::vector<int> &ports, int current)
 
 void ServerManager::setupServers()
 {
+    // CGI borusu koptugunda write() SIGPIPE ile sunucuyu öldürmesin
+    signal(SIGPIPE, SIG_IGN);
     _epoll_fd = epoll_create1(0);
 
     std::vector<int> ports;
@@ -309,7 +312,11 @@ void ServerManager::closeConnection(int client_fd)
 
 void ServerManager::handleCgiEvent(int cgi_fd, uint32_t events)
 {
-    int client_fd = _cgi_to_client[cgi_fd];
+    std::map<int, int>::iterator mapped = _cgi_to_client.find(cgi_fd);
+    if (mapped == _cgi_to_client.end()) // bayat olay: bu fd artik bizim degil
+        return;
+
+    int client_fd = mapped->second;
     if (_clients.find(client_fd) == _clients.end()) {
         epoll_ctl(_epoll_fd, EPOLL_CTL_DEL, cgi_fd, NULL);
         close(cgi_fd);
@@ -327,6 +334,11 @@ void ServerManager::handleCgiEvent(int cgi_fd, uint32_t events)
     if (events & EPOLLHUP) poll_events |= POLLHUP;
 
     Step result = client.getHandler()->onReady(cgi_fd, poll_events);
+
+    for (size_t i = 0; i < result.unwatch.size(); i++) {
+        epoll_ctl(_epoll_fd, EPOLL_CTL_DEL, result.unwatch[i], NULL);
+        _cgi_to_client.erase(result.unwatch[i]);
+    }
 
     if (result.kind == Step::RESPOND) {
         epoll_ctl(_epoll_fd, EPOLL_CTL_DEL, cgi_fd, NULL);
