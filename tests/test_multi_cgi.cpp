@@ -121,9 +121,9 @@ static std::string makeConf(const std::string& order)
 
 static ServerConfig parseConf(const std::string& content)
 {
-	writeFile("/tmp/opencode/multi_cgi_test.conf", content);
+	writeFile("multi_cgi_test.conf", content);
 	ConfigParser parser;
-	Config cfg = parser.parse_config_file("/tmp/opencode/multi_cgi_test.conf");
+	Config cfg = parser.parse_config_file("multi_cgi_test.conf");
 	if (cfg.servers.empty())
 	{
 		std::cerr << "No server parsed\n";
