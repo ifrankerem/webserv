@@ -121,12 +121,15 @@ void HttpParser::parse() {
             else { _state = PARSE_ERROR; return; } // Geçersiz hex karakter
         }
 
-        // Son chunk (0\r\n\r\n) -> okuma bitti
         if (chunk_size == 0) {
-            _state = PARSE_DONE;
-            return;
+            if (_raw_data.size() >= 5 && _raw_data.substr(0, 5) == "0\r\n\r\n") {
+                _state = PARSE_DONE;
+                _raw_data.erase(0, 5); 
+                return;
+            } else {
+                return; 
+            }
         }
-
         // Boyut satiri + \r\n + veri + \r\n kadar veri geldi mi?
         size_t needed = crlf_pos + 2 + chunk_size + 2;
         if (_raw_data.size() < needed)
