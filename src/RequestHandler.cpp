@@ -163,6 +163,21 @@ static std::map<std::string, std::string> buildCgiEnv(const HttpRequest& req,
 	if (!host.empty())
 		env["HTTP_HOST"] = host;
 
+	for (std::map<std::string, std::string>::const_iterator it = req.headers.begin(); it != req.headers.end(); ++it) 
+    {
+        std::string key = it->first;
+        std::string env_key = "HTTP_";
+        for (size_t i = 0; i < key.size(); i++) 
+        {
+            if (key[i] == '-')
+                env_key += '_';
+            else
+                env_key += std::toupper(key[i]);
+        }
+        if (env.find(env_key) == env.end()) {
+            env[env_key] = it->second;
+        }
+    }
 	(void)loc;
 	return env;
 }
@@ -314,21 +329,18 @@ Step RequestHandler::handle(HttpRequest &req)
 	}
 
 	bool allowed = false;
-
-	for(size_t i = 0 ; i < best->allowed_methods.size(); i++)
-	{
-		if(best->allowed_methods[i].compare(req.method) == 0)
-		{
-			allowed = true;
-			break;
-		}
-		if(req.method == "HEAD" && best->allowed_methods[i] == "GET")
-		{
-			allowed = true;
-			break;
-		}
-	}
-
+	if (best->allowed_methods.empty()) {
+        allowed = true;
+    } else {
+        for(size_t i = 0 ; i < best->allowed_methods.size(); i++)
+        {
+            if(best->allowed_methods[i] == req.method)
+            {
+                allowed = true;
+                break;
+            }
+        }
+    }
 	if (allowed == false)
 	{
 	    std::string allow;
