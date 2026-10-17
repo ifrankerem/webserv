@@ -2,6 +2,7 @@
 #include "../includes/RequestHandler.hpp"
 #include <csignal>
 #include <poll.h>
+#include <cerrno>
 
 ServerManager::ServerManager(const Config& config){
     _config = config;
@@ -115,6 +116,8 @@ void ServerManager::run()
         int count_fd = epoll_wait(_epoll_fd, _events, MAX_EVENTS, -1);
         if(count_fd == -1)
         {
+            if (errno == EINTR)
+                continue;
             std::cout << "Error: Ctrl + c";
             break;
         }
@@ -151,7 +154,7 @@ void ServerManager::acceptConnection(int server_fd)
     int new_client_fd = accept(server_fd, (struct sockaddr *)&cl, &cl_len);
     if( new_client_fd == -1)
     {
-        std::cout << "error1";
+        return;
     }
     fcntl(new_client_fd, F_SETFL, O_NONBLOCK);          
     
@@ -181,7 +184,7 @@ void ServerManager::handleClientRead(int client_fd)
 
         if (_clients[client_fd].getParseState() == PARSE_DONE)
         {
-            _clients[client_fd].getParserObj().printDebug();
+            // _clients[client_fd].getParserObj().printDebug();
             _clients[client_fd].setState(WRITING);
 
             struct epoll_event event;
@@ -195,8 +198,10 @@ void ServerManager::handleClientRead(int client_fd)
             closeConnection(client_fd);
         }
     }
-    else if (byte == 0)
+    else if (byte == -1)
     {
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
+            return;
         closeConnection(client_fd);
     }
     else
@@ -282,9 +287,14 @@ void ServerManager::handleClientWrite(int client_fd)
             }
         }
     }
+    else if (bytes_sent == -1)
+    {
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
+            return; 
+        closeConnection(client_fd);
+    }
     else
     {
-        // 42 Subject kuralı: errno kontrolü yasak. -1 gelirse direkt kapatıyoruz.
         closeConnection(client_fd);
     }
 }
