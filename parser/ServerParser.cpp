@@ -14,6 +14,7 @@ ConfigParser::ConfigParser()
     location_command_map["root"]          = &ConfigParser::parse_location_root;
     location_command_map["alias"]         = &ConfigParser::parse_location_alias;
     location_command_map["index"]         = &ConfigParser::parse_location_index;
+    location_command_map["client_max_body_size"] = &ConfigParser::parse_location_client_max_body_size;
     location_command_map["allow_methods"] = &ConfigParser::parse_allow_methods;
     location_command_map["autoindex"]     = &ConfigParser::parse_autoindex;
     location_command_map["return"]        = &ConfigParser::parse_return;

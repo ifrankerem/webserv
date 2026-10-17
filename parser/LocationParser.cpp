@@ -178,3 +178,30 @@ void ConfigParser::parse_return(std::vector<std::string>& tokens, size_t& i, Loc
     if (i >= tokens.size() || tokens[i] != ";") throw std::runtime_error("Config Error: 'return' must end with ';'");
 }
 
+void ConfigParser::parse_location_client_max_body_size(std::vector<std::string>& tokens, size_t& i, LocationConfig& location)
+{
+    i++;
+    std::string val = tokens[i];
+    size_t multiplier = 1;
+    char last_char = val[val.length() - 1];
+
+    if (last_char == 'M' || last_char == 'm') {
+        multiplier = 1024 * 1024;
+        val = val.substr(0, val.length() - 1);
+    } else if (last_char == 'K' || last_char == 'k') {
+        multiplier = 1024;
+        val = val.substr(0, val.length() - 1);
+    } else if (last_char == 'G' || last_char == 'g') {
+        multiplier = 1024 * 1024 * 1024;
+        val = val.substr(0, val.length() - 1);
+    }
+
+    int size = utils::atoi(val);
+    if (size < 0)
+        throw std::runtime_error("Config Error: 'client_max_body_size' must be positive or 0");
+    
+    location.client_max_body_size = size * multiplier;
+    i++;
+    if (i >= tokens.size() || tokens[i] != ";") 
+        throw std::runtime_error("Config Error: 'client_max_body_size' must end with ';'");
+}
