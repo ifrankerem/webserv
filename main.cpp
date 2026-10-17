@@ -90,7 +90,7 @@ int main(int argc, char** argv) {
 
         ConfigParser Conf;
         Config serv;
-        serv = Conf.parse_config_file("conf/default.conf");
+        serv = Conf.parse_config_file(argv[1]);
         ServerManager manage(serv);
         
         manage.setupServers();
