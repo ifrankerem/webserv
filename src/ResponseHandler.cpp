@@ -62,10 +62,9 @@ HttpResponse ResponseHandler::redirect_handler(int status_code,const std::string
 
 HttpResponse ResponseHandler::handle(const std::string& diskPath,const std::string& path,const HttpRequest &req, const LocationConfig& loc,const ServerConfig& srv)
 {
-	if(req.method == "GET")
-		return handle_get(diskPath,req,loc,srv,false);
-	else if(req.method == "HEAD")
-		return handle_get(diskPath,req,loc,srv,true);
+	// HEAD de GET gibi hazirlanir; govdeyi serialize() atar ki Content-Length dogru kalsin
+	if(req.method == "GET" || req.method == "HEAD")
+		return handle_get(diskPath,req,loc,srv);
 	else if(req.method == "POST")
 		return handle_post(diskPath, path, req, loc,srv);
 	else if(req.method == "DELETE")
@@ -78,7 +77,7 @@ HttpResponse ResponseHandler::handle(const std::string& diskPath,const std::stri
 }
 
 
-HttpResponse ResponseHandler::handle_get(const std::string& diskPath,const HttpRequest &req, const LocationConfig& loc,const ServerConfig& srv,bool head_flag)
+HttpResponse ResponseHandler::handle_get(const std::string& diskPath,const HttpRequest &req, const LocationConfig& loc,const ServerConfig& srv)
 {
 	struct stat info;
 	if (::stat(diskPath.c_str(), &info) == -1)
@@ -110,7 +109,7 @@ HttpResponse ResponseHandler::handle_get(const std::string& diskPath,const HttpR
 		{
 			indexPath += loc.index[i];
 			if (::stat(indexPath.c_str(), &info) == 0)
-				return serveFile(indexPath,srv,head_flag);
+				return serveFile(indexPath,srv);
 			else
 				indexPath = backup;
 		}
@@ -123,11 +122,11 @@ HttpResponse ResponseHandler::handle_get(const std::string& diskPath,const HttpR
 		if (req.path[req.path.size() - 1] == '/')
 			return RequestHandler::error(404, &srv);
 	}
-	return serveFile(diskPath,srv,head_flag); //Its normal file on the directory
+	return serveFile(diskPath,srv); //Its normal file on the directory
 }
 
 
-HttpResponse ResponseHandler::serveFile(const std::string& diskPath,const ServerConfig& srv,bool head_flag)
+HttpResponse ResponseHandler::serveFile(const std::string& diskPath,const ServerConfig& srv)
 {
 	HttpResponse x;
 	struct stat info;
@@ -140,10 +139,12 @@ HttpResponse ResponseHandler::serveFile(const std::string& diskPath,const Server
 	if (!S_ISREG(info.st_mode))
 		return RequestHandler::error(403, &srv);
 
-	// Cok buyuk dosyalari bellege yukleyip OOM yapmamak icin sınır
+	// shortcut: dosya bellege tamamen okunuyor, OOM olmasin diye 10 MB siniri var;
+	// buyuk dosya servis etmek gerekirse parca parca gonderme (streaming) yazilmali.
+	// 413 istemcinin govdesi icindir; burada sorun sunucunun siniri, o yuzden 500.
 	const size_t MAX_FILE_SIZE = 10 * 1024 * 1024;
 	if (static_cast<size_t>(info.st_size) > MAX_FILE_SIZE)
-		return RequestHandler::error(413, &srv);
+		return RequestHandler::error(500, &srv);
 
 	std::ifstream file(diskPath.c_str(), std::ios::binary);
 	if (!file.is_open())
@@ -152,9 +153,6 @@ HttpResponse ResponseHandler::serveFile(const std::string& diskPath,const Server
 	std::istreambuf_iterator<char> first(file);
 	std::istreambuf_iterator<char> last;
 	x.body.assign(first, last);
-
-	if(head_flag)
-		x.body.clear();
 
 	x.status = 200;
 	x.headers["Content-Type"] = mimeType(diskPath);
@@ -264,17 +262,33 @@ HttpResponse ResponseHandler::handle_post(const std::string& diskPath,const std:
 	}
 
 	//diskPath hedef dosya; handle() onu upload_store'dan uretti.
-	//path ise temiz URL: location'in kendisiyse ya da '/' ile bitiyorsa
-	//ortada dosya adi yok, yazacak bir sey de yok.
-	if(path == loc.path || path == loc.path + "/" || path[path.size() - 1] == '/')
-    {
-        x.status = 200;
-        x.headers["Content-Type"] = "text/plain";
-        x.body = "POST OK";
-        return x;
-    }
+	//path normalize edilmis, sondaki '/' silinmis olur; '/' kontrolu ham req.path'te.
+	//Dosya adi yoksa (location'in kendisi, '/' ile biten URL ya da hedef dizin)
+	//adi sunucu uretir. Hedef dizin yoksa 404: klasor yerine dosya olusmasin.
+	std::string target = diskPath;
+	std::string url = path;
+	struct stat st;
+	bool isDir = ::stat(diskPath.c_str(), &st) == 0 && S_ISDIR(st.st_mode);
+	if(path == loc.path || req.path[req.path.size() - 1] == '/' || isDir)
+	{
+		if(!isDir)
+			return RequestHandler::error(404, &srv);
+		std::string dir = diskPath;
+		if(dir[dir.size() - 1] != '/')
+			dir += "/";
+		if(url[url.size() - 1] != '/')
+			url += "/";
+		// sayac yeniden baslatmada sifirlanir; access() dolu adlari atlar
+		static size_t counter = 0;
+		std::string name;
+		do
+			name = "upload_" + utils::toString(counter++);
+		while(::access((dir + name).c_str(), F_OK) == 0);
+		target = dir + name;
+		url += name;
+	}
 
-	std::ofstream outfile(diskPath.c_str(), std::ios::binary);
+	std::ofstream outfile(target.c_str(), std::ios::binary);
 	if(!outfile)
 		return RequestHandler::error(500, &srv);
 	outfile.write(req.body.data(), req.body.size());
@@ -283,7 +297,7 @@ HttpResponse ResponseHandler::handle_post(const std::string& diskPath,const std:
 		return RequestHandler::error(500, &srv);
 
 	x.status = 201;
-	x.headers["Location"] = path;
+	x.headers["Location"] = url;
 	return x;
 }
 

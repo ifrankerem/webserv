@@ -17,3 +17,7 @@ test_setup
 webserv_multi_cgi
 multi_cgi_test.conf
 YoupiBanane/
+html/upload/upload_*
+html/cgi/sink.py
+html/cgi/multi_test.py
+html/cgi/multi_test.php

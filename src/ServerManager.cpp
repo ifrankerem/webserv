@@ -235,7 +235,7 @@ void ServerManager::handleClientWrite(int client_fd)
         Step result = client.getHandler()->handle(req);
 
         if (result.kind == Step::RESPOND) {
-            client.prepareResponse(result.response.serialize());
+            client.prepareResponse(result.response.serialize(req.method == "HEAD"));
             client.clearHandler();
         } else if (result.kind == Step::WAIT) {
             for (size_t i = 0; i < result.watch.size(); i++) {
@@ -354,7 +354,8 @@ void ServerManager::handleCgiEvent(int cgi_fd, uint32_t events)
         epoll_ctl(_epoll_fd, EPOLL_CTL_DEL, cgi_fd, NULL);
         _cgi_to_client.erase(cgi_fd);
 
-        client.prepareResponse(result.response.serialize());
+        client.prepareResponse(result.response.serialize(
+            client.getParserObj().getParsedRequest().method == "HEAD"));
         client.clearHandler();
 
         client.setState(WRITING);

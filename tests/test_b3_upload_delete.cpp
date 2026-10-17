@@ -180,12 +180,47 @@ int main()
 	if (run(srv, req) != 400 || fileExists("html/upload/evil.txt"))
 		return 1;
 
-	// --- POST: URL dosya adi vermiyor -> 400 ---
+	// --- POST: URL dosya adi vermiyor -> 201, adi sunucu uretir ---
+	// Location'daki URL'nin gosterdigi dosyada govde olmali; iki POST iki ayri dosya
 	req.path = "/upload";
 	req.headers["content-type"] = "text/plain";
 	req.body = "veri";
-	if (run(srv, req) != 400)
-		return 1;
+	{
+		RequestHandler h1(srv);
+		HttpResponse r1 = h1.handle(req).response;
+		RequestHandler h2(srv);
+		HttpResponse r2 = h2.handle(req).response;
+		std::string loc1 = r1.headers["Location"];
+		std::string loc2 = r2.headers["Location"];
+		std::cout << "\n>>> POST /upload (adsiz x2) -> " << r1.status << " " << loc1
+			<< " | " << r2.status << " " << loc2 << "\n";
+		if (r1.status != 201 || r2.status != 201 || loc1 == loc2
+			|| loc1.compare(0, 8, "/upload/") != 0
+			|| fileContent("html/upload/klasor/" + loc1.substr(8)) != "veri"
+			|| fileContent("html/upload/klasor/" + loc2.substr(8)) != "veri")
+			return 1;
+		std::remove(("html/upload/klasor/" + loc1.substr(8)).c_str());
+		std::remove(("html/upload/klasor/" + loc2.substr(8)).c_str());
+
+		// '/' ile biten alt dizin: ad o dizinin icinde uretilir
+		req.path = "/upload/altklasor/";
+		RequestHandler h3(srv);
+		HttpResponse r3 = h3.handle(req).response;
+		std::string loc3 = r3.headers["Location"];
+		std::cout << ">>> POST /upload/altklasor/ -> " << r3.status << " " << loc3 << "\n";
+		if (r3.status != 201 || loc3.compare(0, 18, "/upload/altklasor/") != 0
+			|| fileContent("html/upload/klasor/" + loc3.substr(8)) != "veri")
+			return 1;
+		std::remove(("html/upload/klasor/" + loc3.substr(8)).c_str());
+
+		// '/' ile biten ama olmayan dizin: 404, "yok" adinda dosya olusmamali
+		req.path = "/upload/yok/";
+		RequestHandler h4(srv);
+		int s4 = h4.handle(req).response.status;
+		std::cout << ">>> POST /upload/yok/ -> " << s4 << "\n";
+		if (s4 != 404 || fileExists("html/upload/klasor/yok"))
+			return 1;
+	}
 
 	// --- POST: yukleme kapali location (/ sadece GET) -> 405 ---
 	req.path = "/index.html";

@@ -230,6 +230,12 @@ int main()
 		|| !contains(raw, "\r\n\r\nmerhaba"))
 		return 1;
 
+	// --- HEAD: Content-Length GET'teki gibi, govde yok ---
+	raw = res.serialize(true);
+	if (!contains(raw, "Content-Length: 7\r\n")
+		|| raw.compare(raw.size() - 4, 4, "\r\n\r\n") != 0)
+		return 1;
+
 	cleanFixtures();
 	return 0;
 }

@@ -182,9 +182,9 @@ static std::map<std::string, std::string> buildCgiEnv(const HttpRequest& req,
 	return env;
 }
 
-static HttpResponse parseCgiOutput(const std::string& raw)
+// raw tuketilir: govde kopyalanmadan response.body'ye swap edilir (100 MB cikti = 0 ek kopya)
+static void parseCgiOutput(std::string& raw, HttpResponse& response)
 {
-	HttpResponse response;
 	response.status = 200;
 
 	size_t blank = raw.find("\r\n\r\n");
@@ -196,16 +196,12 @@ static HttpResponse parseCgiOutput(const std::string& raw)
 	}
 
 	std::string headersPart;
-	std::string bodyPart;
-	if (blank == std::string::npos)
-	{
-		bodyPart = raw;
-	}
-	else
+	if (blank != std::string::npos)
 	{
 		headersPart = raw.substr(0, blank);
-		bodyPart = raw.substr(blank + headerEndLen);
+		raw.erase(0, blank + headerEndLen);
 	}
+	response.body.swap(raw);
 
 	std::string remaining = headersPart;
 	while (!remaining.empty())
@@ -249,14 +245,13 @@ static HttpResponse parseCgiOutput(const std::string& raw)
 	if (response.headers.find("Content-Type") == response.headers.end())
 		response.headers["Content-Type"] = "text/html; charset=UTF-8";
 
-	response.body = bodyPart;
-	return response;
 }
 
 size_t RequestHandler::bodyLimit(const HttpRequest &req)
 {
 	const LocationConfig *loc = findLocation(req.path);
-	if(loc == NULL)
+	// location limit yazmadiysa (0) server limitini miras alir, nginx gibi
+	if(loc == NULL || loc->client_max_body_size == 0)
 		return server->client_max_body_size;
 	return loc->client_max_body_size;
 }
@@ -269,7 +264,10 @@ HttpResponse RequestHandler::error(int status, const ServerConfig *server)
 	if (it == server->error_pages.end())
 		return utils::defaultErrorPage(status);
 
-	std::string path = server->root + it->second;
+	// sayfa URI'si normal istek gibi cozulur: eslesen location'in root/alias'i
+	RequestHandler tmp(*server);
+	const LocationConfig* loc = tmp.findLocation(it->second);
+	std::string path = loc ? tmp.resolveDiskPath(*loc, it->second) : server->root + it->second;
 	std::ifstream file(path.c_str());
 
 	if (!file.is_open())
@@ -293,6 +291,7 @@ void RequestHandler::closeCgiStdin(Step& x)
 		x.unwatch.push_back(cgiStdinFd);
 		close(cgiStdinFd);
 		cgiStdinFd = -1;
+		std::string().swap(cgiBody); // CGI artik okumuyor: govdenin bellegini birak
 	}
 }
 
@@ -334,6 +333,7 @@ Step RequestHandler::handle(HttpRequest &req)
     } else {
         for(size_t i = 0 ; i < best->allowed_methods.size(); i++)
         {
+            // HEAD bilerek GET'e baglanmadi: tester_42 "/ sadece GET"te HEAD icin 405 bekliyor
             if(best->allowed_methods[i] == req.method)
             {
                 allowed = true;
@@ -402,6 +402,10 @@ Step RequestHandler::handle(HttpRequest &req)
 		int id = fork();
 		if(id == -1)
 		{
+			close(output_pipe[0]);
+			close(output_pipe[1]);
+			close(input_pipe[0]);
+			close(input_pipe[1]);
 			x.kind = Step::RESPOND;
 			x.response = error(500, server);
 			return x;
@@ -516,7 +520,7 @@ Step RequestHandler::onReady(int fd, short revents)
 			if (cgiBuffer.empty())
 				x.response = error(502, server); // CGI produced no output (likely execve failed)
 			else
-				x.response = parseCgiOutput(cgiBuffer);
+				parseCgiOutput(cgiBuffer, x.response);
 		}
 		else
 		{
@@ -528,7 +532,7 @@ Step RequestHandler::onReady(int fd, short revents)
 	else if (revents & (POLLERR | POLLHUP)) // fd error or pipe hang up (closed)
 	{
 		if(!(cgiBuffer.empty())) //there is a tricky situation in this case POLLHUP means pipe closed but there will remain cgi buffer. But kernel sends POLLHUP instaead of PULLIN so there is valid data in there but we just did the error in this if. So i fixed it
-			x.response = parseCgiOutput(cgiBuffer);
+			parseCgiOutput(cgiBuffer, x.response);
 		else 
 			x.response = error(502, server);
 		close(fd);

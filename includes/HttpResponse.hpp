@@ -9,7 +9,7 @@ struct HttpResponse {
     std::map<std::string, std::string> headers;
     std::string body;
 
-    std::string serialize() const;
+    std::string serialize(bool headOnly = false) const;
 };
 
 #endif
