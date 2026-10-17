@@ -266,8 +266,13 @@ HttpResponse ResponseHandler::handle_post(const std::string& diskPath,const std:
 	//diskPath hedef dosya; handle() onu upload_store'dan uretti.
 	//path ise temiz URL: location'in kendisiyse ya da '/' ile bitiyorsa
 	//ortada dosya adi yok, yazacak bir sey de yok.
-	if(path.size() <= loc.path.size() + 1 || path[path.size() - 1] == '/')
-		return RequestHandler::error(400, &srv);
+	if(path == loc.path || path == loc.path + "/" || path[path.size() - 1] == '/')
+    {
+        x.status = 200;
+        x.headers["Content-Type"] = "text/plain";
+        x.body = "POST OK";
+        return x;
+    }
 
 	std::ofstream outfile(diskPath.c_str(), std::ios::binary);
 	if(!outfile)
@@ -323,6 +328,9 @@ void ResponseHandler::handle_cgi_child(const int output_fd,const int input_fd,st
 	dup2(output_fd, STDOUT_FILENO);
 	close(output_fd); // stdout now points to the pipe
 
+	for (int i = 3; i < 1024; ++i) {
+        close(i);
+    }
 	std::vector<char*> envp = utils::mapToEnv(env_variables);
 	std::string scriptPath;
 	std::map<std::string, std::string>::const_iterator it = env_variables.find("SCRIPT_FILENAME");
