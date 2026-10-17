@@ -33,27 +33,23 @@ jobs:
 
     - name: B1 Router Tests
       if: success() || failure()
-      run: make router
+      run: ./webserv_router
 
     - name: B2 Static File Tests
       if: success() || failure()
-      run: make b2
+      run: ./webserv_b2
 
     - name: B3 Upload / DELETE Tests
       if: success() || failure()
-      run: make b3
+      run: ./webserv_b3
 
     - name: B4 CGI Tests
       if: success() || failure()
-      run: make b4
+      run: ./webserv_b4
 
     - name: Multi-CGI Parser Tests
       if: success() || failure()
-      run: make multi_cgi
-
-    - name: Build manual server
-      if: success() || failure()
-      run: make manual
+      run: ./webserv_multi_cgi
 
     - name: Setup 42 tester environment
       if: success() || failure()
@@ -69,7 +65,7 @@ jobs:
     - name: Run 42 webserv tester
       if: success() || failure()
       run: |
-        ./webserv_manual conf/tester_42.conf &
+        ./webserv conf/tester_42.conf &
         sleep 1
         echo '' | ./tester_42 http://127.0.0.1:8080
-        kill $(pidof webserv_manual) || true
+        kill $(pidof webserv) || true

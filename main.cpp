@@ -80,8 +80,14 @@ void debug_config(const Config& config) {
 #include <unistd.h>
 #include <dirent.h>
 
-int main() {
+int main(int argc, char** argv) {
     try {
+        if (argc < 2)
+        {
+            std::cerr << "Kullanim: " << argv[0] << " <config_dosyasi>\n";
+            return 1;
+        }
+
         ConfigParser Conf;
         Config serv;
         serv = Conf.parse_config_file("conf/default.conf");
