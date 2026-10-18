@@ -64,8 +64,23 @@ jobs:
 
     - name: Run 42 webserv tester
       if: success() || failure()
+      # normal run is ~5 min; without this a hung test burns the 6 h default
+      timeout-minutes: 20
       run: |
-        ./webserv conf/tester_42.conf &
+        ./webserv conf/tester_42.conf > /dev/null 2>&1 &
+        WS=$!
         sleep 1
+        # every 30 s: memory and process state, so a hang shows where it stopped
+        ( while sleep 30; do
+            echo "[mon] $(free -m | awk '/Mem/{print "used="$3"MB avail="$7"MB"}') webserv_rss=$(ps -o rss= -p $WS 2>/dev/null)KB cgi=$(pgrep -c cgi_tester || true)"
+          done ) &
+        MON=$!
+        set +e
         echo '' | ./tester_42 http://127.0.0.1:8080
-        kill $(pidof webserv) || true
+        RC=$?
+        kill $MON
+        echo "tester exit code: $RC"
+        if ! kill -0 $WS 2>/dev/null; then echo "webserv died during the test"; RC=1; fi
+        sudo dmesg 2>/dev/null | grep -iE "out of memory|killed process" | tail -5
+        kill $WS 2>/dev/null
+        exit $RC
