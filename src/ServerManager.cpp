@@ -170,7 +170,7 @@ void ServerManager::acceptConnection(int server_fd)
     _clients[new_client_fd].setState(READING);
 }
 
-
+#include "../includes/Utils.hpp"
 
 void ServerManager::handleClientRead(int client_fd)
 {
@@ -184,7 +184,7 @@ void ServerManager::handleClientRead(int client_fd)
 
         if (_clients[client_fd].getParseState() == PARSE_DONE)
         {
-            // _clients[client_fd].getParserObj().printDebug();
+            
             _clients[client_fd].setState(WRITING);
 
             struct epoll_event event;

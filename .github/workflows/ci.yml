@@ -76,7 +76,7 @@ jobs:
           done ) &
         MON=$!
         set +e
-        echo '' | ./tester_42 http://127.0.0.1:8080
+        echo '' | ./tester_42 http://127.0.0.1:9000
         RC=$?
         kill $MON
         echo "tester exit code: $RC"

@@ -16,6 +16,7 @@ class HttpParser {
         std::string _raw_data; // recv'den gelen verilerin biriktiği havuz
         HttpRequest _request;  // Dolduracağımız struct kutusu              
         ParseState  _state;    // Parser'ın anlık durumu
+        size_t      _total_body_read;
 
     public:
         HttpParser();
@@ -26,6 +27,7 @@ class HttpParser {
         const HttpRequest& getParsedRequest() const;
         ParseState getState() const;
         void reset(); // Yeni istek gelirse motoru temizlemek 
+        size_t getTotalBodyRead() const;
         void printDebug() const;//bunu sil
 };
 

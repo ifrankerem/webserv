@@ -84,6 +84,9 @@ clean:
 fclean: clean
 	rm -rf $(NAME) $(ROUTER_NAME) $(B2_NAME) $(B3_NAME) $(B4_NAME) $(MULTI_CGI_NAME) $(MANUAL_NAME) $(TEST_CONF_NAME) $(TEST_SETUP_NAME) $(TEST_PARSER_NAME)
 
+42:
+	kill -9 $WS 2>/dev/null; clear && make && ./webserv conf/tester_42.conf > /dev/null 2>&1 & WS=$!; echo '' | /usr/bin/time -p ./tester_42 http://127.0.0.1:9000 
+
 re: fclean all
 
 .PHONY: all run leak router b2 b3 b4 multi_cgi manual test clean fclean re
