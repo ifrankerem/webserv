@@ -16,9 +16,15 @@ void debug_config(const Config& config) {
     for (size_t i = 0; i < config.servers.size(); i++) {
         const ServerConfig& s = config.servers[i];
         std::cout << "\n[SERVER " << i + 1 << "]\n";
-        std::cout << "  Server Name          : " << (s.server_name.empty() ? "(yok)" : s.server_name) << "\n";
+        std::cout << "  Server Name          : ";
+        if (s.server_name.empty()) std::cout << "(yok)";
+        else { for (size_t j = 0; j < s.server_name.size(); j++) std::cout << s.server_name[j] << " "; }
+        std::cout << "\n";
         std::cout << "  Root                 : " << (s.root.empty() ? "(yok)" : s.root) << "\n";
-        std::cout << "  Index                : " << (s.index.empty() ? "(yok)" : s.index) << "\n";
+        std::cout << "  Index                : ";
+        if (s.index.empty()) std::cout << "(yok)";
+        else { for (size_t j = 0; j < s.index.size(); j++) std::cout << s.index[j] << " "; }
+        std::cout << "\n";
         std::cout << "  Client Max Body Size : " << s.client_max_body_size << " bytes\n";
 
         std::cout << "  Listens:\n";
@@ -37,7 +43,11 @@ void debug_config(const Config& config) {
             const LocationConfig& loc = s.locations[j];
             std::cout << "  [" << i + 1 << "." << j + 1 << "] Path: " << loc.path << "\n";
             std::cout << "      Root             : " << (loc.root.empty() ? "(yok)" : loc.root) << "\n";
-            std::cout << "      Index            : " << (loc.index.empty() ? "(yok)" : loc.index) << "\n";
+            std::cout << "      Alias            : " << (loc.alias.empty() ? "(yok)" : loc.alias) << "\n";
+            std::cout << "      Index            : ";
+            if (loc.index.empty()) std::cout << "(yok)";
+            else { for (size_t j = 0; j < loc.index.size(); j++) std::cout << loc.index[j] << " "; }
+            std::cout << "\n";
             std::cout << "      Autoindex        : " << (loc.autoindex ? "on" : "off") << "\n";
             std::cout << "      Upload Enable    : " << (loc.upload_enable ? "on" : "off") << "\n";
             std::cout << "      Upload Store     : " << (loc.upload_store.empty() ? "(yok)" : loc.upload_store) << "\n";
@@ -70,11 +80,17 @@ void debug_config(const Config& config) {
 #include <unistd.h>
 #include <dirent.h>
 
-int main() {
+int main(int argc, char** argv) {
     try {
+        if (argc < 2)
+        {
+            std::cerr << "Kullanim: " << argv[0] << " <config_dosyasi>\n";
+            return 1;
+        }
+
         ConfigParser Conf;
         Config serv;
-        serv = Conf.parse_config_file("conf/default.conf");
+        serv = Conf.parse_config_file(argv[1]);
         ServerManager manage(serv);
         
         manage.setupServers();

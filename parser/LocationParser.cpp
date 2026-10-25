@@ -1,5 +1,5 @@
 #include "../includes/ConfigParser.hpp"
-#include <cstdlib> // std::atoi için
+#include "../includes/Utils.hpp"
 
 void ConfigParser::parse_location(std::vector<std::string>& tokens, size_t& i, ServerConfig& server)
 {
@@ -71,6 +71,14 @@ void ConfigParser::parse_location_root(std::vector<std::string>& tokens, size_t&
     if (i >= tokens.size() || tokens[i] != ";") throw std::runtime_error("Config Error: location 'root' must end with ';'");
 }
 
+void ConfigParser::parse_location_alias(std::vector<std::string>& tokens, size_t& i, LocationConfig& location)
+{
+    i++;
+    location.alias = tokens[i];
+    i++;
+    if (i >= tokens.size() || tokens[i] != ";") throw std::runtime_error("Config Error: location 'alias' must end with ';'");
+}
+
 void ConfigParser::parse_upload_store(std::vector<std::string>& tokens, size_t& i, LocationConfig& location)
 {
     i++;
@@ -84,11 +92,16 @@ void ConfigParser::parse_cgi_path(std::vector<std::string>& tokens, size_t& i, L
     i++;
     std::string path = tokens[i];
 
-    if (location.cgi_pass.size() > 0) { //bu kısımda opsiyon 1 seçeneğimiz ddaha var belki değiştiriebilir;
-        location.cgi_pass.begin()->second = path;
-    } else {
-        location.cgi_pass[""] = path; 
-    }
+    // Birden fazla CGI cifti (ext/path, ext/path, ...) destegi icin:
+    // interpreter'i bos degerli ilk slotu doldur; yoksa gecici " park yeri ac.
+    std::map<std::string, std::string>::iterator it = location.cgi_pass.begin();
+    while (it != location.cgi_pass.end() && !it->second.empty())
+        ++it;
+    if (it != location.cgi_pass.end())
+        it->second = path;
+    else
+        location.cgi_pass[""] = path;
+
     i++;
     if (i >= tokens.size() || tokens[i] != ";") throw std::runtime_error("Config Error: 'cgi_path' must end with ';'");
 }
@@ -111,13 +124,19 @@ void ConfigParser::parse_cgi_ext(std::vector<std::string>& tokens, size_t& i, Lo
 void ConfigParser::parse_location_index(std::vector<std::string>& tokens, size_t& i, LocationConfig& location)
 {
     i++;
+    if (!location.index.empty())
+        throw std::runtime_error("Config Error: Duplicate 'index' in location");
     while (i < tokens.size() && tokens[i] != ";") {
 
         if (tokens[i] == "{" || tokens[i] == "}") 
             throw std::runtime_error("Config Error: 'index' komutunda ';' unutulmus olabilir.");
 
-        if (!location.index.empty()) location.index += " ";
-        location.index += tokens[i];
+        for (size_t j = 0; j < location.index.size(); j++) {
+            if (location.index[j] == tokens[i])
+                throw std::runtime_error("Config Error: Duplicate index '" + tokens[i] + "' in location");
+        }
+
+        location.index.push_back(tokens[i]);
         i++;
     }
    if (i >= tokens.size() || tokens[i] != ";") 
@@ -148,7 +167,7 @@ void ConfigParser::parse_allow_methods(std::vector<std::string>& tokens, size_t&
 void ConfigParser::parse_return(std::vector<std::string>& tokens, size_t& i, LocationConfig& location)
 {
     i++;
-    location.redirect_code = std::atoi(tokens[i].c_str());//kendi atoini yaz hatalı bura 301kamil
+    location.redirect_code = utils::atoi(tokens[i].c_str());//kendi atoini yaz hatalı bura 301kamil
     if (location.redirect_code < 100 || location.redirect_code > 599) //burayı sen düzeltirsin ben tam aralığını bilmiyorum zaten harf gelirse 0 olucak 0 diye durum kodu yok yine hata
         throw std::runtime_error("Config Error: Status code 'return' must be a number only!Received:");
     i++;
@@ -159,3 +178,30 @@ void ConfigParser::parse_return(std::vector<std::string>& tokens, size_t& i, Loc
     if (i >= tokens.size() || tokens[i] != ";") throw std::runtime_error("Config Error: 'return' must end with ';'");
 }
 
+void ConfigParser::parse_location_client_max_body_size(std::vector<std::string>& tokens, size_t& i, LocationConfig& location)
+{
+    i++;
+    std::string val = tokens[i];
+    size_t multiplier = 1;
+    char last_char = val[val.length() - 1];
+
+    if (last_char == 'M' || last_char == 'm') {
+        multiplier = 1024 * 1024;
+        val = val.substr(0, val.length() - 1);
+    } else if (last_char == 'K' || last_char == 'k') {
+        multiplier = 1024;
+        val = val.substr(0, val.length() - 1);
+    } else if (last_char == 'G' || last_char == 'g') {
+        multiplier = 1024 * 1024 * 1024;
+        val = val.substr(0, val.length() - 1);
+    }
+
+    int size = utils::atoi(val);
+    if (size < 0)
+        throw std::runtime_error("Config Error: 'client_max_body_size' must be positive or 0");
+    
+    location.client_max_body_size = size * multiplier;
+    i++;
+    if (i >= tokens.size() || tokens[i] != ";") 
+        throw std::runtime_error("Config Error: 'client_max_body_size' must end with ';'");
+}

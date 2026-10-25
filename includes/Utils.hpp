@@ -12,9 +12,11 @@ namespace utils
     std::string httpReason(int status);
     std::string getExtension(const std::string& path);
     std::string toLower(const std::string& s);
+    std::string urlDecode(const std::string& s);
     std::string getHeader(const std::map<std::string, std::string>& headers, const std::string& key);
     HttpResponse defaultErrorPage(int status);
     std::vector<char*> mapToEnv(const std::map<std::string, std::string>& env);
+    int atoi(const std::string &str);
 }
 
 #endif

@@ -1,5 +1,5 @@
 #include "../includes/ConfigParser.hpp"
-#include <cstdlib> // std::atoi için
+#include "../includes/Utils.hpp"      
 
 ConfigParser::ConfigParser()
 {
@@ -12,7 +12,9 @@ ConfigParser::ConfigParser()
     command_map["location"]             = &ConfigParser::parse_location;
 
     location_command_map["root"]          = &ConfigParser::parse_location_root;
+    location_command_map["alias"]         = &ConfigParser::parse_location_alias;
     location_command_map["index"]         = &ConfigParser::parse_location_index;
+    location_command_map["client_max_body_size"] = &ConfigParser::parse_location_client_max_body_size;
     location_command_map["allow_methods"] = &ConfigParser::parse_allow_methods;
     location_command_map["autoindex"]     = &ConfigParser::parse_autoindex;
     location_command_map["return"]        = &ConfigParser::parse_return;
@@ -85,30 +87,6 @@ Config ConfigParser::parse_config_file(const std::string& filename)
     return config;
 }
 
-int ft_atoi(const std::string &str)
-{
-    int i = 0;
-    long val = 0;
-
-    if (str.empty())
-        return -1;
-
-    while (str[i])
-    {
-        if (str[i] >= '0' && str[i] <= '9')
-        {
-            if (val > 214748364 || (val == 214748364 && (str[i] - '0') > 7))
-                return -1;
-            val = (str[i] - 48) + (10 * val);
-        }
-        else
-            return -1;
-        i++;
-    }
-    return (int)val;
-}
-
-
 void ConfigParser::parse_listen(std::vector<std::string>& tokens, size_t& i, ServerConfig& server)
 {
     i++;
@@ -118,24 +96,25 @@ void ConfigParser::parse_listen(std::vector<std::string>& tokens, size_t& i, Ser
     size_t colon = value.find(':');
     int dot = 0;
     if (colon != std::string::npos) { 
-        // new_listen.ip = value.substr(0, colon);
         int last = 0;
         const std::string &ip = value.substr(0, colon + 1);
         for (size_t j = 0; j < ip.size(); j++)
         {
-            // std::cout << ip[i] << " == . && (" << i << " - " << last << ") <= 2    "<< i - last << std::endl;
             if (ip[j] == '.' || ip[j] == ':')
             {
                 if ((j - last) > 3)
                     throw std::runtime_error("Config Error: 'parse_listen' 0");  
-                // std::cout << "last: "<< last << " i: " << i << "    " << ip[i] <<  std::endl;
-                if (ft_atoi(value.substr(last, j - last)) == -1)
+                int ip_octet = utils::atoi(value.substr(last, j - last));
+                if (ip_octet == -1 || ip_octet > 255 || ip_octet < 0)
                     throw std::runtime_error("Config Error: 'parse_listen' 1");                 
                 last = j + 1;
-                dot++;
+                if(ip[j] == '.')
+                  dot++;
             }
         }
-        int port = ft_atoi(value.substr(colon + 1));//kendi atoimiz yazılacak harf görürse hata verecek
+        if(dot != 3)
+          throw std::runtime_error("Config Error: 'parse_listen' invalid ip format");
+        int port = utils::atoi(value.substr(colon + 1));//kendi atoimiz yazılacak harf görürse hata verecek
         if (port == -1 || (port > 65535 || port <= 0))
         {
             throw std::runtime_error("Config Error: 'parse_listen' 2 ");
@@ -147,7 +126,7 @@ void ConfigParser::parse_listen(std::vector<std::string>& tokens, size_t& i, Ser
         new_listen.ip = "127.0.0.1";
         
 
-        int port = ft_atoi(value);//kendi atoimiz yazılacak harf görürse hata verecek
+        int port = utils::atoi(value);//kendi atoimiz yazılacak harf görürse hata verecek
         if (port == -1 || (port > 65535 || port <= 0))
             throw std::runtime_error("Config Error: 'parse_listen' 3");
         new_listen.port = port;
@@ -167,12 +146,24 @@ void ConfigParser::parse_listen(std::vector<std::string>& tokens, size_t& i, Ser
 void ConfigParser::parse_server_name(std::vector<std::string>& tokens, size_t& i, ServerConfig& server)
 {
     if (!server.server_name.empty()) throw std::runtime_error("Config Error: Duplicate 'server_name'");
+    
     i++;
-    if (i >= tokens.size() || tokens[i] == ";" || tokens[i] == "{" || tokens[i] == "}") 
-        throw std::runtime_error("Config Error: Directive 'server_name' requires at least one argument.");
-    server.server_name = tokens[i];
+    while (i < tokens.size() && tokens[i] != ";") {
+        if (tokens[i] == "{" || tokens[i] == "}")
+            throw std::runtime_error("Config Error: 'server_name' komutunda ';' unutulmus olabilir.");
+        
+        for (size_t j = 0; j < server.server_name.size(); j++) {
+            if (server.server_name[j] == tokens[i])
+                throw std::runtime_error("Config Error: Duplicate server name '" + tokens[i] + "'");
+        }
 
-    i++;
+        server.server_name.push_back(tokens[i]);
+        i++;
+    }
+    
+    if (server.server_name.empty())
+        throw std::runtime_error("Config Error: Directive 'server_name' requires at least one argument.");
+
     if (i >= tokens.size() || tokens[i] != ";") throw std::runtime_error("Config Error: 'server_name' must end with ';'");
 }
 
@@ -192,7 +183,10 @@ void ConfigParser::parse_error_page(std::vector<std::string>& tokens, size_t& i,
     std::vector<int> codes;
     // Hata kodlarını oku (örneğin: 500 502 503)
     while (i < tokens.size() && tokens[i] != ";" && isdigit(tokens[i][0])) {
-        codes.push_back(std::atoi(tokens[i].c_str()));
+        int code = utils::atoi(tokens[i]);
+        if(code == -1)
+            throw std::runtime_error("Config Error: 'error_page' 1");
+        codes.push_back(code);
         i++;
     }
 
@@ -211,16 +205,20 @@ void ConfigParser::parse_client_max_body_size(std::vector<std::string>& tokens, 
     i++;
     std::string val = tokens[i];
     size_t multiplier = 1;
+    char last_char = val[val.length() - 1];
 
-    if (val[val.length() - 1] == 'M') {
+    if (last_char == 'M' || last_char == 'm') {
         multiplier = 1024 * 1024;
         val = val.substr(0, val.length() - 1);
-    } else if (val[val.length() - 1] == 'K') {
+    } else if (last_char == 'K' || last_char == 'k') {
         multiplier = 1024;
+        val = val.substr(0, val.length() - 1);
+    } else if (last_char == 'G' || last_char == 'g') {
+        multiplier = 1024 * 1024 * 1024;
         val = val.substr(0, val.length() - 1);
     }
 
-    int size = ft_atoi(val);
+    int size = utils::atoi(val);
     if (size <= 0)
         throw std::runtime_error("Config Error: 'client_max_body_size' must be positive");
     server.client_max_body_size = size * multiplier;
@@ -231,12 +229,20 @@ void ConfigParser::parse_client_max_body_size(std::vector<std::string>& tokens, 
 void ConfigParser::parse_index(std::vector<std::string>& tokens, size_t& i, ServerConfig& server)
 {
     i++;
+    if (!server.index.empty())
+        throw std::runtime_error("Config Error: Duplicate 'index'");
     while (i < tokens.size() && tokens[i] != ";") {
-        if (!server.index.empty()) server.index += " ";
-        server.index += tokens[i];
+        if (tokens[i] == "{" || tokens[i] == "}")
+            throw std::runtime_error("Config Error: 'index' komutunda ';' unutulmus olabilir.");
+        
+        for (size_t j = 0; j < server.index.size(); j++) {
+            if (server.index[j] == tokens[i])
+                throw std::runtime_error("Config Error: Duplicate index '" + tokens[i] + "'");
+        }
+        
+        server.index.push_back(tokens[i]);
         i++;
     }
-
     if (i >= tokens.size() || tokens[i] != ";") throw std::runtime_error("Config Error: 'index' must end with ';'");
 }
 

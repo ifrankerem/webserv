@@ -5,10 +5,8 @@
 #include <string>
 #include <vector>
 #include <map>
-#include <stdexcept>
 #include <fstream>
 #include <cctype> 
-#include <iostream>
 
 class ConfigParser {
 private:
@@ -29,7 +27,9 @@ private:
     void parse_location(std::vector<std::string>& tokens, size_t& i, ServerConfig& server);
 
     void parse_location_root(std::vector<std::string>& tokens, size_t& i, LocationConfig& location);
+    void parse_location_alias(std::vector<std::string>& tokens, size_t& i, LocationConfig& location);
     void parse_location_index(std::vector<std::string>& tokens, size_t& i, LocationConfig& location);
+    void parse_location_client_max_body_size(std::vector<std::string>& tokens, size_t& i, LocationConfig& location);
     void parse_allow_methods(std::vector<std::string>& tokens, size_t& i, LocationConfig& location);
     void parse_autoindex(std::vector<std::string>& tokens, size_t& i, LocationConfig& location);
     void parse_return(std::vector<std::string>& tokens, size_t& i, LocationConfig& location);

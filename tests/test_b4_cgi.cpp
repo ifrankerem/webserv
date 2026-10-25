@@ -11,27 +11,27 @@
 #include <cstdio>
 #include <unistd.h>
 #include <poll.h>
-#include "RequestHandler.hpp"
+#include "../includes/RequestHandler.hpp"
 
 static ServerConfig makeServer()
 {
 	ServerConfig srv;
 	srv.root = "html";
-	srv.index = "index.html";
+	srv.index.push_back("index.html");
 	srv.client_max_body_size = 1000000;
-	srv.server_name = "localhost";
+	srv.server_name.push_back("localhost");
 
 	LocationConfig root;
 	root.path = "/";
 	root.root = "html";
-	root.index = "index.html";
+	root.index.push_back("index.html");
 	root.allowed_methods.push_back("GET");
 	root.allowed_methods.push_back("POST");
 	srv.locations.push_back(root);
 
 	LocationConfig cgi = root;
 	cgi.path = "/cgi";
-	cgi.root = "html/cgi";
+	cgi.root = "html";
 	cgi.allowed_methods.clear();
 	cgi.allowed_methods.push_back("GET");
 	cgi.allowed_methods.push_back("POST");
@@ -121,6 +121,16 @@ static void resetFixtures()
 		"print()\n"
 		"print(\"x\" * 10000)\n");
 
+	// Buyuk POST govdesini stdin'den okuyup uzunlugunu donen script
+	writeFile("html/cgi/sink.py",
+		"#!/usr/bin/env python3\n"
+		"import os, sys\n"
+		"length = int(os.environ.get('CONTENT_LENGTH', '0'))\n"
+		"body = sys.stdin.read(length)\n"
+		"print(\"Content-Type: text/plain\")\n"
+		"print()\n"
+		"print('len=' + str(len(body)))\n");
+
 	// Hicbir sey basmayip execve sonrasi hemen cikan script (502 beklenir)
 	writeFile("html/cgi/empty.py",
 		"#!/usr/bin/env python3\n"
@@ -140,7 +150,15 @@ static void resetFixtures()
 		"<html><body>static file under cgi</body></html>\n");
 }
 
-static HttpResponse runCgi(const ServerConfig& srv, const HttpRequest& req)
+static bool stdinClosed(const Step& s, int fd)
+{
+	for (size_t i = 0; i < s.unwatch.size(); i++)
+		if (s.unwatch[i] == fd)
+			return true;
+	return false;
+}
+
+static HttpResponse runCgi(const ServerConfig& srv, HttpRequest& req)
 {
 	std::cout << "\n>>> " << req.method << " " << req.path << "\n";
 
@@ -156,15 +174,36 @@ static HttpResponse runCgi(const ServerConfig& srv, const HttpRequest& req)
 		return err;
 	}
 
-	int fd = step.watch[0].fd;
+	int outFd = -1;
+	int inFd = -1;
+	for (size_t i = 0; i < step.watch.size(); i++)
+	{
+		if (step.watch[i].events & POLLIN)
+			outFd = step.watch[i].fd;
+		if (step.watch[i].events & POLLOUT)
+			inFd = step.watch[i].fd;
+	}
+
 	Step ready;
 	int tries = 0;
+	bool writing = (inFd != -1);
 	do
 	{
-		ready = handler.onReady(fd, POLLIN);
-		if (ready.kind == Step::WAIT)
-			usleep(10000);
-	} while (ready.kind == Step::WAIT && ++tries < 100);
+		if (writing)
+		{
+			ready = handler.onReady(inFd, POLLOUT);
+			if (stdinClosed(ready, inFd))
+				writing = false;
+			else if (ready.kind == Step::WAIT)
+				usleep(1000);
+		}
+		else
+		{
+			ready = handler.onReady(outFd, POLLIN);
+			if (ready.kind == Step::WAIT)
+				usleep(10000);
+		}
+	} while (ready.kind == Step::WAIT && ++tries < 1000);
 
 	if (ready.kind != Step::RESPOND)
 	{
@@ -178,7 +217,7 @@ static HttpResponse runCgi(const ServerConfig& srv, const HttpRequest& req)
 	return ready.response;
 }
 
-static HttpResponse runStatic(const ServerConfig& srv, const HttpRequest& req)
+static HttpResponse runStatic(const ServerConfig& srv, HttpRequest& req)
 {
 	std::cout << "\n>>> " << req.method << " " << req.path << " (static)\n";
 
@@ -282,6 +321,20 @@ int main()
 		if (res.status != 200 || res.body.size() != 10001)
 			return 1;
 	}
+
+	// --- Buyuk POST govdesi (boru tamponundan fazla, kismi yazma) ---
+	req.method = "POST";
+	req.path = "/cgi/sink.py";
+	req.query = "";
+	req.headers["Content-Type"] = "text/plain";
+	req.body = std::string(200000, 'a');
+	{
+		HttpResponse res = runCgi(srv, req);
+		if (res.status != 200 || !contains(res.body, "len=200000"))
+			return 1;
+	}
+	req.headers.erase("Content-Type");
+	req.body.clear();
 
 	// --- Hic cikti uretmeyen script -> 502 ---
 	req.method = "GET";

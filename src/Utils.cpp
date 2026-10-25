@@ -74,6 +74,37 @@ std::string toLower(const std::string& s)
     return out;
 }
 
+std::string urlDecode(const std::string& s)
+{
+    std::string out;
+    out.reserve(s.size());
+    for (size_t i = 0; i < s.size(); i++)
+    {
+        if (s[i] == '%' && i + 2 < s.size())
+        {
+            int hi = 0;
+            if (s[i + 1] >= '0' && s[i + 1] <= '9') hi = s[i + 1] - '0';
+            else if (s[i + 1] >= 'a' && s[i + 1] <= 'f') hi = s[i + 1] - 'a' + 10;
+            else if (s[i + 1] >= 'A' && s[i + 1] <= 'F') hi = s[i + 1] - 'A' + 10;
+            else { out += s[i]; continue; }
+
+            int lo = 0;
+            if (s[i + 2] >= '0' && s[i + 2] <= '9') lo = s[i + 2] - '0';
+            else if (s[i + 2] >= 'a' && s[i + 2] <= 'f') lo = s[i + 2] - 'a' + 10;
+            else if (s[i + 2] >= 'A' && s[i + 2] <= 'F') lo = s[i + 2] - 'A' + 10;
+            else { out += s[i]; continue; }
+
+            out += static_cast<char>((hi << 4) | lo);
+            i += 2;
+        }
+        else if (s[i] == '+')
+            out += ' ';
+        else
+            out += s[i];
+    }
+    return out;
+}
+
 std::string getHeader(const std::map<std::string, std::string>& headers, const std::string& key)
 {
     std::string lowerKey = toLower(key);
@@ -113,4 +144,26 @@ std::vector<char*> mapToEnv(const std::map<std::string, std::string>& env)
     return out;
 }
 
+int atoi(const std::string &str)
+{
+    int i = 0;
+    long val = 0;
+
+    if (str.empty())
+        return -1;
+
+    while (str[i])
+    {
+        if (str[i] >= '0' && str[i] <= '9')
+        {
+            if (val > 214748364 || (val == 214748364 && (str[i] - '0') > 7))
+                return -1;
+            val = (str[i] - 48) + (10 * val);
+        }
+        else
+            return -1;
+        i++;
+    }
+    return (int)val;
+}
 } // namespace utils

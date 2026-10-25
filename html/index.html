@@ -1,11 +1,21 @@
+<!DOCTYPE html>
 <html lang="tr">
 <head>
 	<meta charset="UTF-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-	<title>42 Webserv</title>
+	<title>42 Webserv — Manuel Test Paneli</title>
 	<style>
 		:root {
 			color-scheme: dark;
+			--bg: #111318;
+			--surface: rgba(255, 255, 255, 0.06);
+			--border: rgba(255, 255, 255, 0.12);
+			--text: #f4f7ff;
+			--muted: #a0aac7;
+			--accent: #7aa2f7;
+			--accent-2: #bb9af7;
+			--ok: #9ece6a;
+			--err: #f7768e;
 		}
 
 		* {
@@ -15,51 +25,402 @@
 		body {
 			margin: 0;
 			min-height: 100vh;
-			display: grid;
-			place-items: center;
 			background: radial-gradient(circle at top, #3a4152 0%, #1f232b 45%, #111318 100%);
-			color: #f4f7ff;
+			color: var(--text);
 			font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+			line-height: 1.5;
+			padding: 40px 20px;
 		}
 
-		.card {
-			width: min(760px, 92vw);
-			padding: 36px;
-			border-radius: 18px;
-			background: rgba(255, 255, 255, 0.06);
-			border: 1px solid rgba(255, 255, 255, 0.12);
-			backdrop-filter: blur(4px);
+		header {
 			text-align: center;
-			box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+			margin-bottom: 36px;
 		}
 
 		h1 {
-			margin: 0 0 8px;
-			font-size: clamp(2rem, 4vw, 2.8rem);
-		}
-
-		h2 {
 			margin: 0;
-			font-size: clamp(1.1rem, 2.5vw, 1.5rem);
-			font-weight: 500;
-			color: #cdd6f4;
+			font-size: clamp(1.8rem, 4vw, 2.6rem);
 		}
 
-		p {
-			margin: 20px 0 0;
-			color: #dbe2ff;
-			line-height: 1.6;
+		header p {
+			margin: 8px 0 0;
+			color: var(--muted);
 		}
+
+		main {
+			max-width: 900px;
+			margin: 0 auto;
+			display: grid;
+			gap: 24px;
+		}
+
+		.card {
+			background: var(--surface);
+			border: 1px solid var(--border);
+			border-radius: 18px;
+			padding: 24px;
+			backdrop-filter: blur(4px);
+			box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+		}
+
+		.card h2 {
+			margin: 0 0 18px;
+			font-size: 1.25rem;
+			color: var(--accent);
+			border-bottom: 1px solid var(--border);
+			padding-bottom: 10px;
+		}
+
+		.row {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 12px;
+			align-items: center;
+			margin-bottom: 12px;
+		}
+
+		.row:last-child {
+			margin-bottom: 0;
+		}
+
+		button, a.btn {
+			appearance: none;
+			border: 1px solid var(--border);
+			background: rgba(255, 255, 255, 0.08);
+			color: var(--text);
+			padding: 10px 16px;
+			border-radius: 10px;
+			font: inherit;
+			cursor: pointer;
+			text-decoration: none;
+			transition: background 0.15s, border-color 0.15s;
+		}
+
+		button:hover, a.btn:hover {
+			background: rgba(255, 255, 255, 0.14);
+			border-color: rgba(255, 255, 255, 0.25);
+		}
+
+		button.primary {
+			background: var(--accent);
+			border-color: var(--accent);
+			color: #0b0e14;
+			font-weight: 600;
+		}
+
+		button.primary:hover {
+			background: #9ab8ff;
+		}
+
+		button.danger {
+			background: var(--err);
+			border-color: var(--err);
+			color: #1a0508;
+			font-weight: 600;
+		}
+
+		button.danger:hover {
+			background: #ff9aa8;
+		}
+
+		input[type="text"], input[type="file"], textarea, select {
+			background: rgba(0, 0, 0, 0.25);
+			border: 1px solid var(--border);
+			color: var(--text);
+			padding: 10px 12px;
+			border-radius: 10px;
+			font: inherit;
+			min-width: 220px;
+		}
+
+		textarea {
+			min-width: 100%;
+			min-height: 90px;
+			resize: vertical;
+		}
+
+		pre {
+			background: rgba(0, 0, 0, 0.35);
+			border: 1px solid var(--border);
+			border-radius: 12px;
+			padding: 16px;
+			overflow: auto;
+			max-height: 320px;
+			white-space: pre-wrap;
+			word-break: break-word;
+			font-size: 0.85rem;
+			margin: 12px 0 0;
+		}
+
+		pre:empty::before {
+			content: 'Henüz cevap yok.';
+			color: var(--muted);
+		}
+
+		.status {
+			display: inline-flex;
+			align-items: center;
+			gap: 8px;
+			padding: 6px 12px;
+			border-radius: 999px;
+			font-size: 0.85rem;
+			font-weight: 600;
+		}
+
+		.status.ok { background: rgba(158, 206, 106, 0.15); color: var(--ok); }
+		.status.err { background: rgba(247, 118, 142, 0.15); color: var(--err); }
+		.status.info { background: rgba(122, 162, 247, 0.15); color: var(--accent); }
+
+		.muted { color: var(--muted); font-size: 0.9rem; }
+		.hint { margin-top: 8px; color: var(--muted); font-size: 0.85rem; }
+		.output-label { font-size: 0.85rem; color: var(--muted); margin-top: 12px; }
 	</style>
 </head>
 <body>
-	<main class="card">
-		<h1>Merhaba Kanka! 👋</h1>
-		<h2>Kendi yazdığın C++ sunucuna hoş geldin 🚀</h2>
-		<p>
-			Eğer bunu görüyorsan soketler, <strong>bind</strong>, <strong>listen</strong>
-			ve <strong>accept</strong> başarılı şekilde çalışıyor demektir.
-		</p>
+	<header>
+		<h1>42 Webserv — Manuel Test Paneli</h1>
+		<p>Tarayıcıdan testleri çalıştır, cevapları aşağıda gör.</p>
+	</header>
+
+	<main>
+		<section class="card">
+			<h2>🚀 Sunucu Durumu</h2>
+			<div class="row">
+				<button id="btn-ping" class="primary">Ping at</button>
+				<span id="ping-status" class="status info">Bekleniyor</span>
+			</div>
+			<div class="output-label">Cevap:</div>
+			<pre id="ping-out"></pre>
+		</section>
+
+		<section class="card">
+			<h2>📄 Static Dosya</h2>
+			<div class="row">
+				<button data-get="/test_static.txt">GET /test_static.txt</button>
+				<button data-get="/gizli/dosya.html">GET /gizli/dosya.html</button>
+				<button data-get="/altklasor/">GET /altklasor/</button>
+			</div>
+			<div class="output-label">Cevap:</div>
+			<pre id="static-out"></pre>
+		</section>
+
+		<section class="card">
+			<h2>📝 Method Testleri</h2>
+
+			<h3 class="muted">GET</h3>
+			<div class="row">
+				<button data-get="/methodtest/">GET /methodtest/</button>
+			</div>
+
+			<h3 class="muted">POST (application/x-www-form-urlencoded)</h3>
+			<div class="row">
+				<input type="text" id="post-input" placeholder="Bir şeyler yaz..." value="selam" />
+				<button id="btn-post" class="primary">POST /methodtest/</button>
+			</div>
+
+			<h3 class="muted">DELETE</h3>
+			<div class="row">
+				<input type="text" id="delete-target" value="/upload/ornek.txt" />
+				<button id="btn-delete" class="danger">DELETE gönder</button>
+			</div>
+
+			<div class="output-label">Cevap:</div>
+			<pre id="method-out"></pre>
+		</section>
+
+		<section class="card">
+			<h2>📤 Dosya Yükleme</h2>
+			<div class="row">
+				<input type="file" id="upload-file" />
+				<button id="btn-upload" class="primary">POST /upload</button>
+			</div>
+			<p class="hint">Yüklenen dosyalar <code>html/upload/</code> altına kaydedilir.</p>
+			<div class="output-label">Cevap:</div>
+			<pre id="upload-out"></pre>
+		</section>
+
+		<section class="card">
+			<h2>🐍 CGI</h2>
+
+			<h3 class="muted">GET /cgi/flush.py</h3>
+			<div class="row">
+				<button data-get="/cgi/flush.py">flush.py</button>
+				<button data-get="/cgi/flush.py?isim=webserv">?isim=webserv</button>
+				<button data-get="/cgi/env.py">env.py</button>
+				<button data-get="/cgi/echo.py?msg=selam">echo.py</button>
+			</div>
+
+			<h3 class="muted">POST /cgi/flush.py</h3>
+			<div class="row">
+				<input type="text" id="cgi-isim" placeholder="isim" value="webserv" />
+				<input type="text" id="cgi-mesaj" placeholder="mesaj" value="merhaba" />
+				<button id="btn-cgi-post" class="primary">CGI POST</button>
+			</div>
+
+			<div class="output-label">Cevap:</div>
+			<pre id="cgi-out"></pre>
+		</section>
+
+		<section class="card">
+			<h2>📂 Autoindex</h2>
+			<div class="row">
+				<button data-get="/listelenecek/">GET /listelenecek/</button>
+				<button data-get="/depo/">GET /depo/</button>
+			</div>
+			<div class="output-label">Cevap:</div>
+			<pre id="autoindex-out"></pre>
+		</section>
+
+		<section class="card">
+			<h2>↩️ Redirect</h2>
+			<div class="row">
+				<button id="btn-redirect">GET /eski</button>
+			</div>
+			<p class="hint">Fetch redirect'i otomatik takip eder; 301 + Location başlığı görmek için manuel yakalanır.</p>
+			<div class="output-label">Cevap:</div>
+			<pre id="redirect-out"></pre>
+		</section>
+
+		<section class="card">
+			<h2>⚠️ Error Sayfaları</h2>
+			<div class="row">
+				<button data-get="/bulunmayan-sayfa-12345">GET 404</button>
+				<button id="btn-405">POST 405</button>
+				<button id="btn-413">POST 413</button>
+			</div>
+			<div class="output-label">Cevap:</div>
+			<pre id="error-out"></pre>
+		</section>
 	</main>
+
+	<script>
+		const MAX_PREVIEW = 2000;
+
+		function formatResponse(status, statusText, headers, body, url, method) {
+			let out = `${method || 'GET'} ${url}\n`;
+			out += `HTTP ${status} ${statusText}\n`;
+			if (headers) {
+				for (const [k, v] of headers) {
+					out += `${k}: ${v}\n`;
+				}
+			}
+			out += '\n';
+			out += body.slice(0, MAX_PREVIEW);
+			if (body.length > MAX_PREVIEW) out += '\n\n... (kısaltıldı)';
+			return out;
+		}
+
+		function setStatus(id, ok, text) {
+			const el = document.getElementById(id);
+			el.className = 'status ' + (ok ? 'ok' : 'err');
+			el.textContent = text;
+		}
+
+		async function doRequest(targetId, url, options = {}) {
+			const el = document.getElementById(targetId);
+			const method = options.method || 'GET';
+			el.textContent = 'İstek gönderiliyor...';
+			try {
+				const res = await fetch(url, options);
+				const text = await res.text();
+				el.textContent = formatResponse(res.status, res.statusText, res.headers, text, url, method);
+			} catch (e) {
+				el.textContent = `Hata: ${e.message}\n${method} ${url}`;
+			}
+		}
+
+		// Generic GET buttons
+		document.querySelectorAll('button[data-get]').forEach(btn => {
+			btn.addEventListener('click', () => {
+				const url = btn.dataset.get;
+				// Decide output target by section
+				const section = btn.closest('.card');
+				const pre = section.querySelector('pre');
+				doRequest(pre.id, url);
+			});
+		});
+
+		document.getElementById('btn-ping').addEventListener('click', async () => {
+			const status = document.getElementById('ping-status');
+			status.className = 'status info';
+			status.textContent = 'İstek gönderiliyor...';
+			try {
+				const res = await fetch('/');
+				const text = await res.text();
+				setStatus('ping-status', res.ok, `${res.status} ${res.statusText}`);
+				document.getElementById('ping-out').textContent = formatResponse(res.status, res.statusText, res.headers, text, '/', 'GET');
+			} catch (e) {
+				setStatus('ping-status', false, 'Bağlantı hatası');
+				document.getElementById('ping-out').textContent = e.message;
+			}
+		});
+
+		document.getElementById('btn-post').addEventListener('click', () => {
+			const val = document.getElementById('post-input').value;
+			doRequest('method-out', '/methodtest/', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+				body: new URLSearchParams({ mesaj: val })
+			});
+		});
+
+		document.getElementById('btn-delete').addEventListener('click', () => {
+			const target = document.getElementById('delete-target').value;
+			doRequest('method-out', target, { method: 'DELETE' });
+		});
+
+		document.getElementById('btn-upload').addEventListener('click', () => {
+			const fileInput = document.getElementById('upload-file');
+			if (!fileInput.files.length) {
+				document.getElementById('upload-out').textContent = 'Önce bir dosya seç.';
+				return;
+			}
+			const form = new FormData();
+			form.append('file', fileInput.files[0]);
+			doRequest('upload-out', '/upload', { method: 'POST', body: form });
+		});
+
+		document.getElementById('btn-cgi-post').addEventListener('click', () => {
+			const isim = document.getElementById('cgi-isim').value;
+			const mesaj = document.getElementById('cgi-mesaj').value;
+			doRequest('cgi-out', '/cgi/flush.py', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+				body: new URLSearchParams({ isim, mesaj })
+			});
+		});
+
+		document.getElementById('btn-redirect').addEventListener('click', async () => {
+			const out = document.getElementById('redirect-out');
+			out.textContent = 'İstek gönderiliyor...';
+			try {
+				const res = await fetch('/eski', { redirect: 'manual' });
+				const text = await res.text();
+				out.textContent = formatResponse(res.status, res.statusText, res.headers, text, '/eski', 'GET');
+			} catch (e) {
+				out.textContent = 'Hata: ' + e.message;
+			}
+		});
+
+		document.getElementById('btn-405').addEventListener('click', () => {
+			doRequest('error-out', '/readonly/', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+				body: new URLSearchParams({ test: '1' })
+			});
+		});
+
+		document.getElementById('btn-413').addEventListener('click', () => {
+			const size = 11 * 1024 * 1024;
+			const chunk = 'x'.repeat(1024);
+			let payload = '';
+			while (payload.length < size) payload += chunk;
+			doRequest('error-out', '/upload', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+				body: payload
+			});
+		});
+	</script>
 </body>
 </html>

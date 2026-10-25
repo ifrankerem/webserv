@@ -1,6 +1,8 @@
 #include "../includes/ServerManager.hpp"
 #include "../includes/RequestHandler.hpp"
+#include <csignal>
 #include <poll.h>
+#include <cerrno>
 
 ServerManager::ServerManager(const Config& config){
     _config = config;
@@ -16,8 +18,15 @@ const ServerConfig* findServerConfig(const Config& config, int port, const std::
         for (size_t j = 0; j < config.servers[i].listens.size(); j++) {
             if (config.servers[i].listens[j].port == port) {
                 if (default_server == NULL) default_server = &config.servers[i];
-                if (!config.servers[i].server_name.empty() && host_header.find(config.servers[i].server_name) != std::string::npos) {
-                    return &config.servers[i];
+                if (!config.servers[i].server_name.empty()) {
+                    bool match = false;
+                    for (size_t k = 0; k < config.servers[i].server_name.size(); k++) {
+                        if (host_header.find(config.servers[i].server_name[k]) != std::string::npos) {
+                            match = true;
+                            break;
+                        }
+                    }
+                    if (match) return &config.servers[i];
                 }
             }
         }
@@ -37,6 +46,8 @@ bool port_check(std::vector<int> &ports, int current)
 
 void ServerManager::setupServers()
 {
+    // CGI borusu koptugunda write() SIGPIPE ile sunucuyu öldürmesin
+    signal(SIGPIPE, SIG_IGN);
     _epoll_fd = epoll_create1(0);
 
     std::vector<int> ports;
@@ -93,7 +104,7 @@ void ServerManager::setupServers()
 
             ports.push_back(_config.servers[i].listens[j].port);
 
-            std::cout << "Port " << _config.servers[i].listens[j].port << std::endl;
+            std::cout << "127.0.0.1:" << _config.servers[i].listens[j].port << std::endl;
         }     
     }
 }
@@ -105,6 +116,8 @@ void ServerManager::run()
         int count_fd = epoll_wait(_epoll_fd, _events, MAX_EVENTS, -1);
         if(count_fd == -1)
         {
+            if (errno == EINTR)
+                continue;
             std::cout << "Error: Ctrl + c";
             break;
         }
@@ -141,7 +154,7 @@ void ServerManager::acceptConnection(int server_fd)
     int new_client_fd = accept(server_fd, (struct sockaddr *)&cl, &cl_len);
     if( new_client_fd == -1)
     {
-        std::cout << "error1";
+        return;
     }
     fcntl(new_client_fd, F_SETFL, O_NONBLOCK);          
     
@@ -157,8 +170,6 @@ void ServerManager::acceptConnection(int server_fd)
     _clients[new_client_fd].setState(READING);
 }
 
-
-
 void ServerManager::handleClientRead(int client_fd)
 {
     char buffer[4096];
@@ -171,7 +182,7 @@ void ServerManager::handleClientRead(int client_fd)
 
         if (_clients[client_fd].getParseState() == PARSE_DONE)
         {
-            _clients[client_fd].getParserObj().printDebug();
+            
             _clients[client_fd].setState(WRITING);
 
             struct epoll_event event;
@@ -185,8 +196,10 @@ void ServerManager::handleClientRead(int client_fd)
             closeConnection(client_fd);
         }
     }
-    else if (byte == 0)
+    else if (byte == -1)
     {
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
+            return;
         closeConnection(client_fd);
     }
     else
@@ -201,7 +214,7 @@ void ServerManager::handleClientWrite(int client_fd)
 
     if (!client.hasPendingData())
     {
-        HttpRequest req = client.getParserObj().getParsedRequest();
+        HttpRequest &req = client.getParserObj().getParsedRequest();
         req.server_port = client.getServerPort();
 
         std::string host = "";
@@ -220,7 +233,7 @@ void ServerManager::handleClientWrite(int client_fd)
         Step result = client.getHandler()->handle(req);
 
         if (result.kind == Step::RESPOND) {
-            client.prepareResponse(result.response.serialize());
+            client.prepareResponse(result.response.serialize(req.method == "HEAD"));
             client.clearHandler();
         } else if (result.kind == Step::WAIT) {
             for (size_t i = 0; i < result.watch.size(); i++) {
@@ -256,7 +269,7 @@ void ServerManager::handleClientWrite(int client_fd)
         {
             // Tüm veri gönderildi
             bool keep_alive = true;
-            HttpRequest req = client.getParserObj().getParsedRequest();
+            HttpRequest &req = client.getParserObj().getParsedRequest();
             if (req.headers.count("Connection") && req.headers["Connection"] == "close")
                 keep_alive = false;
 
@@ -272,9 +285,14 @@ void ServerManager::handleClientWrite(int client_fd)
             }
         }
     }
+    else if (bytes_sent == -1)
+    {
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
+            return; 
+        closeConnection(client_fd);
+    }
     else
     {
-        // 42 Subject kuralı: errno kontrolü yasak. -1 gelirse direkt kapatıyoruz.
         closeConnection(client_fd);
     }
 }
@@ -302,7 +320,11 @@ void ServerManager::closeConnection(int client_fd)
 
 void ServerManager::handleCgiEvent(int cgi_fd, uint32_t events)
 {
-    int client_fd = _cgi_to_client[cgi_fd];
+    std::map<int, int>::iterator mapped = _cgi_to_client.find(cgi_fd);
+    if (mapped == _cgi_to_client.end()) // bayat olay: bu fd artik bizim degil
+        return;
+
+    int client_fd = mapped->second;
     if (_clients.find(client_fd) == _clients.end()) {
         epoll_ctl(_epoll_fd, EPOLL_CTL_DEL, cgi_fd, NULL);
         close(cgi_fd);
@@ -321,11 +343,17 @@ void ServerManager::handleCgiEvent(int cgi_fd, uint32_t events)
 
     Step result = client.getHandler()->onReady(cgi_fd, poll_events);
 
+    for (size_t i = 0; i < result.unwatch.size(); i++) {
+        epoll_ctl(_epoll_fd, EPOLL_CTL_DEL, result.unwatch[i], NULL);
+        _cgi_to_client.erase(result.unwatch[i]);
+    }
+
     if (result.kind == Step::RESPOND) {
         epoll_ctl(_epoll_fd, EPOLL_CTL_DEL, cgi_fd, NULL);
         _cgi_to_client.erase(cgi_fd);
 
-        client.prepareResponse(result.response.serialize());
+        client.prepareResponse(result.response.serialize(
+            client.getParserObj().getParsedRequest().method == "HEAD"));
         client.clearHandler();
 
         client.setState(WRITING);

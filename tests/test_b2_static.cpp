@@ -9,14 +9,14 @@
 #include <string>
 #include <sys/stat.h>
 #include <cstdio>
-#include "RequestHandler.hpp"
+#include "../includes/RequestHandler.hpp"
 
 // Kok dizin "html". Location'lar: "/" (GET POST, autoindex acik), "/gizli"
 static ServerConfig makeServer()
 {
 	ServerConfig srv;
 	srv.root = "html";
-	srv.index = "index.html";
+	srv.index.push_back("index.html");
 	srv.client_max_body_size = 1000000;
 
 	// Hata sayfalari URL bicimindedir; error() bunlari root ile birlestirir.
@@ -27,7 +27,7 @@ static ServerConfig makeServer()
 	LocationConfig root;
 	root.path = "/";
 	root.root = "html";
-	root.index = "index.html";
+	root.index.push_back("index.html");
 	root.autoindex = true;
 	root.upload_enable = false;
 	root.client_max_body_size = 1000000;
@@ -36,11 +36,11 @@ static ServerConfig makeServer()
 	root.allowed_methods.push_back("POST");
 	srv.locations.push_back(root);
 
-	// Index dosyasi olmayan, autoindex kapali dizin -> 403
+	// Index dosyasi olmayan, autoindex kapali dizin -> 404
 	LocationConfig gizli = root;
 	gizli.path = "/gizli";
 	gizli.autoindex = false;
-	gizli.index = "bulunmayan.html";
+	gizli.index.push_back("bulunmayan.html");
 	srv.locations.push_back(gizli);
 
 	// Yonlendirme
@@ -185,9 +185,9 @@ int main()
 	if (res.status != 404)
 		return 1;
 
-	// --- dizin, index yok, autoindex kapali -> 403 + config'deki hata sayfasi ---
+	// --- dizin, index yok, autoindex kapali -> 404 + config'deki hata sayfasi ---
 	res = run(srv, "GET", "/gizli/");
-	if (res.status != 403 || !contains(res.body, "error_page 403"))
+	if (res.status != 404 || !contains(res.body, "error_page 404"))
 		return 1;
 
 	// --- olmayan dosya -> 404 + config'deki hata sayfasi ---
@@ -228,6 +228,12 @@ int main()
 	if (raw.compare(0, 17, "HTTP/1.1 200 OK\r\n") != 0
 		|| !contains(raw, "Content-Length: 7\r\n")
 		|| !contains(raw, "\r\n\r\nmerhaba"))
+		return 1;
+
+	// --- HEAD: Content-Length GET'teki gibi, govde yok ---
+	raw = res.serialize(true);
+	if (!contains(raw, "Content-Length: 7\r\n")
+		|| raw.compare(raw.size() - 4, 4, "\r\n\r\n") != 0)
 		return 1;
 
 	cleanFixtures();

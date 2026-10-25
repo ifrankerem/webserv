@@ -4,7 +4,7 @@
 
 #include <iostream>
 #include <string>
-#include "RequestHandler.hpp"
+#include "../includes/RequestHandler.hpp"
 
 static int g_failed = 0;
 static int g_passed = 0;
@@ -33,7 +33,7 @@ static LocationConfig makeLocation(const std::string& path)
     LocationConfig loc;
     loc.path = path;
     loc.root = "www";
-    loc.index = "index.html";
+    loc.index.push_back("index.html");
     loc.autoindex = false;
     loc.client_max_body_size = 1000;
     loc.redirect_code = 0;
@@ -49,7 +49,7 @@ static ServerConfig makeServer()
     l.port = 8080;
     srv.listens.push_back(l);
     srv.root = "www";
-    srv.index = "index.html";
+    srv.index.push_back("index.html");
     srv.client_max_body_size = 10000;
 
     LocationConfig root = makeLocation("/");
@@ -58,7 +58,7 @@ static ServerConfig makeServer()
     srv.locations.push_back(root);
 
     LocationConfig kapouet = makeLocation("/kapouet");
-    kapouet.root = "/tmp/www";
+    kapouet.root = "/tmp";
     kapouet.allowed_methods.push_back("GET");
     srv.locations.push_back(kapouet);
 
@@ -94,7 +94,8 @@ static HttpRequest makeRequest(const std::string& method, const std::string& pat
 static Step run(const ServerConfig& srv, const std::string& method, const std::string& path)
 {
     RequestHandler h(srv);
-    return h.handle(makeRequest(method, path));
+    HttpRequest req = makeRequest(method, path);
+    return h.handle(req);
 }
 
 static std::string header(const Step& s, const std::string& name)

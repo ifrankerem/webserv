@@ -2,9 +2,9 @@ name: C/C++ CI
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: [ "main", "master", "develop" ]
   pull_request:
-    branches: [ "main", "master" ]
+    branches: [ "main", "master", "develop" ]
 
 jobs:
   build_and_test:
@@ -12,14 +12,75 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - name: Build tests
+    - name: Build main server
+      run: make
+
+    - name: Build A-side tests
+      if: success() || failure()
       run: make test
 
     - name: 1. Config Parser Tests
+      if: success() || failure()
       run: ./test_config
 
     - name: 2. Server Setup Tests
+      if: success() || failure()
       run: ./test_setup
 
-    - name: 4. HTTP Parser Tests
+    - name: 3. HTTP Parser Tests
+      if: success() || failure()
       run: ./test_parser
+
+    - name: B1 Router Tests
+      if: success() || failure()
+      run: ./webserv_router
+
+    - name: B2 Static File Tests
+      if: success() || failure()
+      run: ./webserv_b2
+
+    - name: B3 Upload / DELETE Tests
+      if: success() || failure()
+      run: ./webserv_b3
+
+    - name: B4 CGI Tests
+      if: success() || failure()
+      run: ./webserv_b4
+
+    - name: Multi-CGI Parser Tests
+      if: success() || failure()
+      run: ./webserv_multi_cgi
+
+    - name: Setup 42 tester environment
+      if: success() || failure()
+      run: |
+        mkdir -p YoupiBanane/nop YoupiBanane/Yeah
+        touch YoupiBanane/youpi.bad_extension
+        touch YoupiBanane/youpi.bla
+        touch YoupiBanane/nop/youpi.bad_extension
+        touch YoupiBanane/nop/other.pouic
+        touch YoupiBanane/Yeah/not_happy.bad_extension
+        chmod +x tester_42 cgi_tester_42
+
+    - name: Run 42 webserv tester
+      if: success() || failure()
+      # normal run is ~5 min; without this a hung test burns the 6 h default
+      timeout-minutes: 20
+      run: |
+        ./webserv conf/tester_42.conf > /dev/null 2>&1 &
+        WS=$!
+        sleep 1
+        # every 30 s: memory and process state, so a hang shows where it stopped
+        ( while sleep 30; do
+            echo "[mon] $(free -m | awk '/Mem/{print "used="$3"MB avail="$7"MB"}') webserv_rss=$(ps -o rss= -p $WS 2>/dev/null)KB cgi=$(pgrep -c cgi_tester || true)"
+          done ) &
+        MON=$!
+        set +e
+        echo '' | ./tester_42 http://127.0.0.1:9000
+        RC=$?
+        kill $MON
+        echo "tester exit code: $RC"
+        if ! kill -0 $WS 2>/dev/null; then echo "webserv died during the test"; RC=1; fi
+        sudo dmesg 2>/dev/null | grep -iE "out of memory|killed process" | tail -5
+        kill $WS 2>/dev/null
+        exit $RC

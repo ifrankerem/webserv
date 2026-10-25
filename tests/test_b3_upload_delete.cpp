@@ -9,7 +9,7 @@
 #include <sys/stat.h>
 #include <cstdio>
 #include <unistd.h>
-#include "RequestHandler.hpp"
+#include "../includes/RequestHandler.hpp"
 
 static bool fileExists(const std::string& path)
 {
@@ -29,7 +29,7 @@ static ServerConfig makeServer()
 {
 	ServerConfig srv;
 	srv.root = "html";
-	srv.index = "index.html";
+	srv.index.push_back("index.html");
 	srv.client_max_body_size = 1000000;
 	srv.error_pages[404] = "/errors/404.html";
 	srv.error_pages[403] = "/errors/403.html";
@@ -37,7 +37,7 @@ static ServerConfig makeServer()
 	LocationConfig root;
 	root.path = "/";
 	root.root = "html";
-	root.index = "index.html";
+	root.index.push_back("index.html");
 	root.autoindex = true;
 	root.upload_enable = false;
 	root.client_max_body_size = 1000000;
@@ -48,14 +48,14 @@ static ServerConfig makeServer()
 	// Upload alani: uc metoda da izinli, kucuk body siniri.
 	LocationConfig upload = root;
 	upload.path = "/upload";
-	upload.root = "html/upload";
+	upload.root = "html";
 	upload.upload_store = "html/upload/klasor";
 	upload.upload_enable = true;
 	upload.allowed_methods.clear();
 	upload.allowed_methods.push_back("GET");
 	upload.allowed_methods.push_back("POST");
 	upload.allowed_methods.push_back("DELETE");
-	upload.client_max_body_size = 100;
+	upload.client_max_body_size = 1000000;
 	srv.locations.push_back(upload);
 
 	return srv;
@@ -78,7 +78,7 @@ static void resetFixtures()
 	symlink("../b3_outside", "html/upload/klasor/b3_link");
 }
 
-static int run(const ServerConfig& srv, const HttpRequest& req)
+static int run(const ServerConfig& srv, HttpRequest& req)
 {
 	RequestHandler handler(srv);
 	Step step = handler.handle(req);
@@ -146,19 +146,81 @@ int main()
 	std::remove("html/upload/klasor/not.txt");
 	std::remove("html/upload/klasor/ikili.bin");
 
-	// --- POST: multipart desteklenmiyor -> 415 ---
+	// --- POST: multipart/form-data -> 201, ad Content-Disposition'dan ---
 	req.path = "/upload";
 	req.headers["content-type"] = "multipart/form-data; boundary=SINIR";
 	req.body = "--SINIR\r\nContent-Disposition: form-data; name=\"f\"; filename=\"k.txt\"\r\n\r\nveri\r\n--SINIR--\r\n";
-	if (run(srv, req) != 415)
+	if (run(srv, req) != 201 || fileContent("html/upload/klasor/k.txt") != "veri")
+		return 1;
+	std::remove("html/upload/klasor/k.txt");
+
+	// --- POST: multipart, filename'siz field atlanir, ikili icerik korunur ---
+	// Null byte'ta kesilirse boyut tutmaz; "name" fonksiyonu filename'a
+	// karismamali (karisirsa part atlanir ve 400 doner).
+	req.body = "--SINIR\r\nContent-Disposition: form-data; name=\"aciklama\"\r\n\r\nduz metin\r\n";
+	req.body += "--SINIR\r\nContent-Disposition: form-data; name=\"f\"; filename=\"ikili.bin\"\r\n\r\n";
+	req.body += std::string("AB\0CD", 5);
+	req.body += "\r\n--SINIR--\r\n";
+	if (run(srv, req) != 201 || fileContent("html/upload/klasor/ikili.bin").size() != 5)
+		return 1;
+	std::remove("html/upload/klasor/ikili.bin");
+
+	// --- POST: boundary'siz/bozuk multipart -> 400 ---
+	req.body = "bu hic boundary icermiyor";
+	if (run(srv, req) != 400)
 		return 1;
 
-	// --- POST: URL dosya adi vermiyor -> 400 ---
+	req.headers["content-type"] = "multipart/form-data; boundary=SINIR";
+	req.body = "--SINIR\r\nContent-Disposition: form-data; name=\"f\"; filename=\"yarim.txt\"\r\n\r\nveri";
+	if (run(srv, req) != 400)
+		return 1;
+
+	// --- POST: filename path traversal -> 400, upload_store disina yazmamali ---
+	req.body = "--SINIR\r\nContent-Disposition: form-data; name=\"f\"; filename=\"../evil.txt\"\r\n\r\nEZILDI\r\n--SINIR--\r\n";
+	if (run(srv, req) != 400 || fileExists("html/upload/evil.txt"))
+		return 1;
+
+	// --- POST: URL dosya adi vermiyor -> 201, adi sunucu uretir ---
+	// Location'daki URL'nin gosterdigi dosyada govde olmali; iki POST iki ayri dosya
 	req.path = "/upload";
 	req.headers["content-type"] = "text/plain";
 	req.body = "veri";
-	if (run(srv, req) != 400)
-		return 1;
+	{
+		RequestHandler h1(srv);
+		HttpResponse r1 = h1.handle(req).response;
+		RequestHandler h2(srv);
+		HttpResponse r2 = h2.handle(req).response;
+		std::string loc1 = r1.headers["Location"];
+		std::string loc2 = r2.headers["Location"];
+		std::cout << "\n>>> POST /upload (adsiz x2) -> " << r1.status << " " << loc1
+			<< " | " << r2.status << " " << loc2 << "\n";
+		if (r1.status != 201 || r2.status != 201 || loc1 == loc2
+			|| loc1.compare(0, 8, "/upload/") != 0
+			|| fileContent("html/upload/klasor/" + loc1.substr(8)) != "veri"
+			|| fileContent("html/upload/klasor/" + loc2.substr(8)) != "veri")
+			return 1;
+		std::remove(("html/upload/klasor/" + loc1.substr(8)).c_str());
+		std::remove(("html/upload/klasor/" + loc2.substr(8)).c_str());
+
+		// '/' ile biten alt dizin: ad o dizinin icinde uretilir
+		req.path = "/upload/altklasor/";
+		RequestHandler h3(srv);
+		HttpResponse r3 = h3.handle(req).response;
+		std::string loc3 = r3.headers["Location"];
+		std::cout << ">>> POST /upload/altklasor/ -> " << r3.status << " " << loc3 << "\n";
+		if (r3.status != 201 || loc3.compare(0, 18, "/upload/altklasor/") != 0
+			|| fileContent("html/upload/klasor/" + loc3.substr(8)) != "veri")
+			return 1;
+		std::remove(("html/upload/klasor/" + loc3.substr(8)).c_str());
+
+		// '/' ile biten ama olmayan dizin: 404, "yok" adinda dosya olusmamali
+		req.path = "/upload/yok/";
+		RequestHandler h4(srv);
+		int s4 = h4.handle(req).response.status;
+		std::cout << ">>> POST /upload/yok/ -> " << s4 << "\n";
+		if (s4 != 404 || fileExists("html/upload/klasor/yok"))
+			return 1;
+	}
 
 	// --- POST: yukleme kapali location (/ sadece GET) -> 405 ---
 	req.path = "/index.html";
@@ -183,16 +245,17 @@ int main()
 	req.headers.erase("content-type");
 	req.body = "";
 
-// 	req.method = "POST";
-// 	req.path = "/upload/yeni311111111.txt";
-// 	req.headers["content-type"] = "text/plain";
-// 	req.body = "merhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunyamerhaba dunya\n";
-// 	run(srv, req);
-//
-// //	--- POST: body siniri asiliyor (location siniri 100 byte) ---
-// 	//Not: 413'u A uretiyor; burada bodyLimit()'in dogru sayiyi verdigini gor.
-// 	RequestHandler h(srv);
-// 	std::cout << "bodyLimit(/upload/x) = " << h.bodyLimit(req) << "\n";
+	// --- POST: body siniri asiliyor (location siniri 10 byte) -> 413 ---
+	// Fixture'in kucuk limitli kopyasi: kalan testleri etkilemesin.
+	// bodyLimit() artik handle() icinde calisiyor; govde diske yazilmamali.
+	ServerConfig kucuk = srv;
+	kucuk.locations[1].client_max_body_size = 10;
+	req.method = "POST";
+	req.path = "/upload/not.txt";
+	req.headers["content-type"] = "text/plain";
+	req.body = "bu govde siniri asiyor";
+	if (run(kucuk, req) != 413 || fileExists("html/upload/klasor/not.txt"))
+		return 1;
 
 //	--- DELETE: var olan dosya -> 204, govdesiz ---
 	req.method = "DELETE";
