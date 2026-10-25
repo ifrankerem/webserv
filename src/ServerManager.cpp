@@ -170,8 +170,6 @@ void ServerManager::acceptConnection(int server_fd)
     _clients[new_client_fd].setState(READING);
 }
 
-#include "../includes/Utils.hpp"
-
 void ServerManager::handleClientRead(int client_fd)
 {
     char buffer[4096];
@@ -216,7 +214,7 @@ void ServerManager::handleClientWrite(int client_fd)
 
     if (!client.hasPendingData())
     {
-        HttpRequest req = client.getParserObj().getParsedRequest();
+        HttpRequest &req = client.getParserObj().getParsedRequest();
         req.server_port = client.getServerPort();
 
         std::string host = "";
@@ -271,7 +269,7 @@ void ServerManager::handleClientWrite(int client_fd)
         {
             // Tüm veri gönderildi
             bool keep_alive = true;
-            HttpRequest req = client.getParserObj().getParsedRequest();
+            HttpRequest &req = client.getParserObj().getParsedRequest();
             if (req.headers.count("Connection") && req.headers["Connection"] == "close")
                 keep_alive = false;
 

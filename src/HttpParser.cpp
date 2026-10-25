@@ -126,6 +126,10 @@ const HttpRequest& HttpParser::getParsedRequest() const {
     return _request;
 }
 
+HttpRequest& HttpParser::getParsedRequest() {
+    return _request;
+}
+
 ParseState HttpParser::getState() const {
     return _state;
 }

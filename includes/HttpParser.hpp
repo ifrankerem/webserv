@@ -26,6 +26,7 @@ class HttpParser {
         void parse();
         const HttpRequest& getParsedRequest() const;
         ParseState getState() const;
+        HttpRequest& getParsedRequest();
         void reset(); // Yeni istek gelirse motoru temizlemek 
         size_t getTotalBodyRead() const;
         void printDebug() const;//bunu sil
