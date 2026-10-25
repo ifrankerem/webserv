@@ -75,12 +75,38 @@ jobs:
             echo "[mon] $(free -m | awk '/Mem/{print "used="$3"MB avail="$7"MB"}') webserv_rss=$(ps -o rss= -p $WS 2>/dev/null)KB cgi=$(pgrep -c cgi_tester || true)"
           done ) &
         MON=$!
+        # every 0.5 s: time, webserv RSS kB, sum of CGI children RSS kB, current test kind
+        echo plain > test_kind
+        ( while kill -0 $WS 2>/dev/null; do
+            echo "$(date +%s.%N) $(awk '/^VmRSS/{print $2}' /proc/$WS/status) $(ps --ppid $WS -o rss= | awk '{s+=$1} END{print s+0}') $(cat test_kind)"
+            sleep 0.5
+          done > mem.log 2>/dev/null ) &
+        SAMPLER=$!
         set +e
-        echo '' | ./tester_42 http://127.0.0.1:9000
-        RC=$?
-        kill $MON
+        START=$(date +%s)
+        # tester prints "Test ..." before each test; .bla in that line means the test goes through CGI
+        echo '' | ./tester_42 http://127.0.0.1:9000 | while IFS= read -r line || [ -n "$line" ]; do
+          printf '%s\n' "$line"
+          case $line in
+            *Test*.bla*) echo cgi > test_kind ;;
+            *Test*) echo plain > test_kind ;;
+          esac
+        done
+        RC=${PIPESTATUS[1]}
+        DUR=$(( $(date +%s) - START ))
+        kill $MON $SAMPLER; wait $SAMPLER 2>/dev/null
         echo "tester exit code: $RC"
         if ! kill -0 $WS 2>/dev/null; then echo "webserv died during the test"; RC=1; fi
+        # kernel-kept peak RSS; must be read before webserv is killed
+        HWM=$(awk '/^VmHWM/{print $2}' /proc/$WS/status 2>/dev/null)
         sudo dmesg 2>/dev/null | grep -iE "out of memory|killed process" | tail -5
         kill $WS 2>/dev/null
+        awk -v dur=$DUR -v hwm=${HWM:-0} -v rc=$RC -f .github/mem_report.awk mem.log | tee -a "$GITHUB_STEP_SUMMARY"
         exit $RC
+
+    - name: Upload memory log
+      if: success() || failure()
+      uses: actions/upload-artifact@v7
+      with:
+        name: mem-log
+        path: mem.log
