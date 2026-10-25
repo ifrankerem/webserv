@@ -2,7 +2,7 @@
 #include <cstdlib>
 #include <iostream>
 
-HttpParser::HttpParser() : _state(PARSE_READING), _total_body_read(0){}
+HttpParser::HttpParser() : _state(PARSE_READING), _total_body_read(0), _s_index(0){}
 
 HttpParser::~HttpParser() {}
 
@@ -16,12 +16,12 @@ void HttpParser::parse() {
         return;
 
     while (_state == PARSE_READING) {
-        size_t pos = _raw_data.find("\r\n");
+        size_t pos = _raw_data.find("\r\n", _s_index);
         if (pos == std::string::npos) 
             return; 
 
-        std::string line = _raw_data.substr(0, pos);
-        _raw_data.erase(0, pos + 2); 
+        std::string line = _raw_data.substr(_s_index, pos - _s_index);
+        _s_index = pos + 2;
 
         if (_request.method.empty()) {
             size_t first_space = line.find(' ');
@@ -44,6 +44,8 @@ void HttpParser::parse() {
         } 
         else if (line.empty()) {
             _state = PARSE_HEADERS_DONE;
+            _raw_data.erase(0, _s_index);
+            _s_index = 0;
             break; 
         } 
         else {
@@ -64,11 +66,14 @@ void HttpParser::parse() {
     if (_state == PARSE_HEADERS_DONE) {
         if (_request.headers.find("Content-Length") != _request.headers.end()) {
             size_t content_length = std::atoi(_request.headers["Content-Length"].c_str());
-            
 
             if (_raw_data.length() >= content_length) {
-                _request.body = _raw_data.substr(0, content_length);
-                _raw_data.erase(0, content_length);
+                if (_raw_data.length() == content_length) {
+                    _request.body.swap(_raw_data);
+                } else {
+                    _request.body.assign(_raw_data, 0, content_length);
+                    _raw_data.erase(0, content_length);
+                }
                 _state = PARSE_DONE;
             }
         } 
@@ -137,6 +142,7 @@ ParseState HttpParser::getState() const {
 void HttpParser::reset() {
     _raw_data.clear();
     _total_body_read = 0;
+    _s_index = 0;
     _request = HttpRequest(); // Struct'ı tamamen sıfırlar
     _state = PARSE_READING;
 }

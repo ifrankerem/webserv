@@ -17,6 +17,7 @@ class HttpParser {
         HttpRequest _request;  // Dolduracağımız struct kutusu              
         ParseState  _state;    // Parser'ın anlık durumu
         size_t      _total_body_read;
+        size_t          _s_index;//yeni eklendi
 
     public:
         HttpParser();
