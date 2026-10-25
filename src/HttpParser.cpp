@@ -140,7 +140,11 @@ ParseState HttpParser::getState() const {
 }
 
 void HttpParser::reset() {
-    _raw_data.clear();
+    if (_raw_data.capacity() > 64 * 1024) {
+        std::string().swap(_raw_data);
+    } else {
+        _raw_data.clear();
+    }
     _total_body_read = 0;
     _s_index = 0;
     _request = HttpRequest(); // Struct'ı tamamen sıfırlar
