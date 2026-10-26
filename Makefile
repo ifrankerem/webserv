@@ -33,7 +33,7 @@ TEST_SETUP_SRC = tests/test_setup.cpp $(A_SRC) $(B_SRC)
 TEST_SETUP_OBJS = $(TEST_SETUP_SRC:.cpp=.o)
 
 TEST_PARSER_NAME = test_parser
-TEST_PARSER_SRC = tests/test_parser.cpp src/HttpParser.cpp
+TEST_PARSER_SRC = tests/test_parser.cpp src/HttpParser.cpp src/Utils.cpp
 TEST_PARSER_OBJS = $(TEST_PARSER_SRC:.cpp=.o)
 
 MULTI_CGI_NAME = webserv_multi_cgi
