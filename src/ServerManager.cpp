@@ -70,7 +70,7 @@ void ServerManager::setupServers()
     // CGI borusu koptugunda write() SIGPIPE ile sunucuyu öldürmesin
     signal(SIGPIPE, SIG_IGN);
     signal(SIGINT, signal_handler);
-    _epoll_fd = epoll_create1(0);
+    _epoll_fd = epoll_create(1);
 
     std::vector<int> ports;
 
