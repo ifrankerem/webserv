@@ -1,4 +1,5 @@
 #include "../includes/HttpParser.hpp"
+#include "../includes/Utils.hpp"
 #include <cstdlib>
 #include <iostream>
 
@@ -51,7 +52,7 @@ void HttpParser::parse() {
         else {
             size_t colon_pos = line.find(':');
             if (colon_pos != std::string::npos) {
-                std::string key = line.substr(0, colon_pos);
+                std::string key = utils::toLower(line.substr(0, colon_pos));
                 std::string value = line.substr(colon_pos + 1);
                 
                 size_t first_non_space = value.find_first_not_of(" ");
@@ -64,8 +65,8 @@ void HttpParser::parse() {
     }
 
     if (_state == PARSE_HEADERS_DONE) {
-        if (_request.headers.find("Content-Length") != _request.headers.end()) {
-            size_t content_length = std::atoi(_request.headers["Content-Length"].c_str());
+        if (_request.headers.find("content-length") != _request.headers.end()) {
+            size_t content_length = std::atoi(_request.headers["content-length"].c_str());
 
             if (_raw_data.length() >= content_length) {
                 if (_raw_data.length() == content_length) {
@@ -77,8 +78,8 @@ void HttpParser::parse() {
                 _state = PARSE_DONE;
             }
         } 
-        else if (_request.headers.find("Transfer-Encoding") != _request.headers.end() &&
-                 _request.headers["Transfer-Encoding"] == "chunked") {
+        else if (_request.headers.find("transfer-encoding") != _request.headers.end() &&
+                 utils::toLower(_request.headers["transfer-encoding"]) == "chunked") {
             _state = PARSE_CHUNKED;
         }
         else {

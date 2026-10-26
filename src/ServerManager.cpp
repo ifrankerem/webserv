@@ -1,5 +1,6 @@
 #include "../includes/ServerManager.hpp"
 #include "../includes/RequestHandler.hpp"
+#include "../includes/Utils.hpp"
 #include <csignal>
 #include <poll.h>
 #include <cerrno>
@@ -239,8 +240,8 @@ void ServerManager::handleClientWrite(int client_fd)
         req.server_port = client.getServerPort();
 
         std::string host = "";
-        if (req.headers.count("Host"))
-            host = req.headers["Host"];
+        if (req.headers.count("host"))
+            host = req.headers["host"];
 
         if (client.getHandler() == NULL) {
             const ServerConfig* srv = findServerConfig(_config, client.getServerPort(), host);
@@ -291,7 +292,7 @@ void ServerManager::handleClientWrite(int client_fd)
             // Tüm veri gönderildi
             bool keep_alive = true;
             HttpRequest &req = client.getParserObj().getParsedRequest();
-            if (req.headers.count("Connection") && req.headers["Connection"] == "close")
+            if (req.headers.count("connection") && utils::toLower(req.headers["connection"]) == "close")
                 keep_alive = false;
 
             if (keep_alive) {
