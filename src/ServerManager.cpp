@@ -6,7 +6,7 @@
 #include <cerrno>
 #include <ctime>
 
-ServerManager::ServerManager(const Config& config){
+ServerManager::ServerManager(const Config& config) : _lastTimeoutScan(0) {
     _config = config;
 }
     
@@ -27,7 +27,9 @@ ServerManager::~ServerManager(){
     }
 }
 
-int g_running = 1;
+// Sinyal handler'indan yazilan degisken: standart bunun icin volatile sig_atomic_t ister,
+// boylece derleyici run()'daki okumayi optimize edip atamaz.
+volatile sig_atomic_t g_running = 1;
 
 void ServerManager::signal_handler(int sig)
 {
@@ -135,18 +137,17 @@ void ServerManager::setupServers()
 
 void ServerManager::run()
 {
-    while (true)
+    // Ctrl+C sunucu bir istegi islerken gelirse epoll_wait kesilmez; eskiden bayrak
+    // sadece epoll_wait -1 donunce okundugu icin o Ctrl+C kayboluyordu. Dongu artik
+    // en gec saniyede bir basa dondugu icin kosulda okumak yetiyor.
+    while (g_running)
     {
         // -1 verseydik epoll_wait olay gelmedikce hic donmezdi; tek bir asili client
         // varken timeout kontrolu de hic calismazdi. 1000 ms: olay olmasa bile
         // saniyede bir uyanip checkTimeouts()'a ugruyoruz.
         int count_fd = epoll_wait(_epoll_fd, _events, MAX_EVENTS, 1000);
         if(count_fd == -1)
-        {
-            if (!g_running)
-                break;
-            continue;
-        }
+            continue; // EINTR (ornegin SIGINT): dongu kosulu g_running'e bakar
         for (int i = 0; i < count_fd; i++){
             int current_fd = _events[i].data.fd;
             if (_server_fds.count(current_fd) > 0 )
@@ -375,6 +376,12 @@ void ServerManager::dropCgiFds(int client_fd)
 void ServerManager::checkTimeouts()
 {
     time_t now = std::time(NULL);
+    // Yuk altinda epoll saniyede binlerce kez doner; zaman cozunurlugu 1 saniye
+    // oldugu icin ayni saniye icinde tum client'lari tekrar gezmek bosa is.
+    if (now == _lastTimeoutScan)
+        return;
+    _lastTimeoutScan = now;
+
     std::map<int, Client>::iterator it = _clients.begin();
     while (it != _clients.end()) {
         int fd = it->first;
@@ -393,28 +400,37 @@ void ServerManager::checkTimeouts()
 
         // 1) CGI pipe'larini epoll'den cikar ki kapanan fd'ler icin olay gelmesin
         dropCgiFds(fd);
-        // 2) Handler'i sil: destructor'i CGI'a SIGTERM atar, waitpid ile toplar
-        //    (zombie kalmaz) ve pipe fd'lerini kapatir
-        client.clearHandler();
 
-        // 3) 504 cevabini hazirla. error() conf'taki error_page 504'u kullanir.
+        // 2) 504 cevabini hazirla. error() conf'taki error_page 504'u kullanir.
         //    PROCESSING'e ancak findServerConfig bir server bulduysa girilebilir,
         //    ayni girdilerle tekrar cagrildigi icin burada NULL donmez.
         HttpRequest& req = client.getParserObj().getParsedRequest();
         const ServerConfig* srv = findServerConfig(_config, client.getServerPort(),
             utils::getHeader(req.headers, "host"));
-        client.prepareResponse(RequestHandler::error(504, srv).serialize(req.method == "HEAD"));
 
-        // 4) Client'i yazma moduna al; 504'un gonderilmesi icin sure bastan baslar
-        client.setState(WRITING);
-        client.touch();
-
-        struct epoll_event event;
-        std::memset(&event, 0, sizeof(event));
-        event.events = EPOLLOUT;
-        event.data.fd = fd;
-        epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, fd, &event);
+        // 3) Gonder: queueResponse handler'i siler; destructor'i CGI'a SIGKILL atar,
+        //    waitpid ile toplar (zombie kalmaz) ve pipe fd'lerini kapatir
+        queueResponse(fd, RequestHandler::error(504, srv));
     }
+}
+
+// Hazir cevabi client'in yazma buffer'ina koyar ve client'i yazma moduna alir.
+// Handler'in isi bittigi icin silinir (CGI varsa destructor'i onu toplar).
+// CGI'in normal bitisi (handleCgiEvent) ve CGI timeout'u (checkTimeouts) kullanir.
+void ServerManager::queueResponse(int client_fd, const HttpResponse& response)
+{
+    Client& client = _clients[client_fd];
+    client.prepareResponse(response.serialize(
+        client.getParserObj().getParsedRequest().method == "HEAD"));
+    client.clearHandler();
+
+    client.setState(WRITING);
+    client.touch(); // cevabin gonderilmesi icin sure bastan baslar
+    struct epoll_event event;
+    std::memset(&event, 0, sizeof(event));
+    event.events = EPOLLOUT;
+    event.data.fd = client_fd;
+    epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, client_fd, &event);
 }
 
 void ServerManager::handleCgiEvent(int cgi_fd, uint32_t events)
@@ -454,16 +470,6 @@ void ServerManager::handleCgiEvent(int cgi_fd, uint32_t events)
     if (result.kind == Step::RESPOND) {
         epoll_ctl(_epoll_fd, EPOLL_CTL_DEL, cgi_fd, NULL);
         _cgi_to_client.erase(cgi_fd);
-
-        client.prepareResponse(result.response.serialize(
-            client.getParserObj().getParsedRequest().method == "HEAD"));
-        client.clearHandler();
-
-        client.setState(WRITING);
-        struct epoll_event event;
-        std::memset(&event, 0, sizeof(event));
-        event.events = EPOLLOUT;
-        event.data.fd = client_fd;
-        epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, client_fd, &event);
+        queueResponse(client_fd, result.response);
     }
 }

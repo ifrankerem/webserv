@@ -51,6 +51,29 @@ jobs:
       if: success() || failure()
       run: ./webserv_multi_cgi
 
+    - name: Timeout Tests
+      if: success() || failure()
+      # IDLE_TIMEOUT 30 s; iki senaryo ayni anda kosar, adim ~31 s surer
+      timeout-minutes: 3
+      run: |
+        ./webserv conf/default.conf > /dev/null 2>&1 &
+        WS=$!
+        sleep 1
+        # 1) Hic veri gondermeyen baglanti: sunucu kapatinca cat EOF gorur ve 0 ile biter.
+        #    Sunucu kapatmazsa timeout 40 sn sonra 124 ile keser.
+        ( exec 3<>/dev/tcp/127.0.0.1/8081; timeout 40 cat <&3 > /dev/null ) &
+        IDLE=$!
+        # 2) SIGTERM'i yok sayan sonsuz CGI (html/cgi/hang.py): 504 donmeli
+        CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 40 http://127.0.0.1:8081/cgi/hang.py || true)
+        IDLE_RC=0; wait $IDLE || IDLE_RC=$?
+        # 3) Timeout'tan sonra sunucu hala cevap vermeli (waitpid'de donmus olmamali)
+        AFTER=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1:8081/ || true)
+        # 4) CGI sureci gercekten olmus olmali
+        LEFT=$(pgrep -fc 'python3 hang.py' || true)
+        kill $WS 2>/dev/null || true
+        echo "idle_rc=$IDLE_RC (0 bekleniyor)  cgi=$CODE (504)  after=$AFTER (200)  hang.py=$LEFT (0)"
+        [ "$IDLE_RC" = 0 ] && [ "$CODE" = 504 ] && [ "$AFTER" = 200 ] && [ "$LEFT" = 0 ]
+
     - name: Setup 42 tester environment
       if: success() || failure()
       run: |
