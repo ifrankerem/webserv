@@ -16,6 +16,10 @@
 #include "Client.hpp"
 
 #define MAX_EVENTS 1024
+// Bir client (ya da onun CGI'i) bu kadar saniye hic aktivite gostermezse kapatilir.
+// Subject: "A request to your server should never hang indefinitely."
+// Aktivite = recv/send ile veri akmasi ya da CGI pipe'inda olay olmasi.
+#define IDLE_TIMEOUT 30
 
 class ServerManager {
 private:
@@ -33,6 +37,8 @@ private:
     void handleClientWrite(int client_fd);
     void closeConnection(int client_fd);
     void handleCgiEvent(int cgi_fd, uint32_t events);
+    void dropCgiFds(int client_fd);
+    void checkTimeouts();
     static void  signal_handler(int signal);
 
 public:

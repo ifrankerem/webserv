@@ -4,6 +4,7 @@
 #include <csignal>
 #include <poll.h>
 #include <cerrno>
+#include <ctime>
 
 ServerManager::ServerManager(const Config& config){
     _config = config;
@@ -136,7 +137,10 @@ void ServerManager::run()
 {
     while (true)
     {
-        int count_fd = epoll_wait(_epoll_fd, _events, MAX_EVENTS, -1);
+        // -1 verseydik epoll_wait olay gelmedikce hic donmezdi; tek bir asili client
+        // varken timeout kontrolu de hic calismazdi. 1000 ms: olay olmasa bile
+        // saniyede bir uyanip checkTimeouts()'a ugruyoruz.
+        int count_fd = epoll_wait(_epoll_fd, _events, MAX_EVENTS, 1000);
         if(count_fd == -1)
         {
             if (!g_running)
@@ -153,6 +157,15 @@ void ServerManager::run()
             {
                 handleCgiEvent(current_fd, _events[i].events);
             }
+            else if (_clients.find(current_fd) == _clients.end())
+            {
+                // Bayat olay: bu fd ayni epoll turunda daha once kapandi
+                // (ornegin CGI stdin'i, stdout'u bitince kapatildi).
+                // Eskiden asagidaki _clients[current_fd] burada sahte bir Client
+                // kaydi aciyordu. checkTimeouts() 30 sn sonra o sahte kaydi kapatirken
+                // fd numarasi o arada baska birine verildiyse onu kapatirdi.
+                continue;
+            }
             else if (_events[i].events & (EPOLLERR | EPOLLHUP | EPOLLRDHUP))
             {
                 closeConnection(current_fd);
@@ -166,6 +179,8 @@ void ServerManager::run()
                 handleClientWrite(current_fd);
             }
         }
+        // Olaylar islendikten sonra: sessiz kalanlari temizle
+        checkTimeouts();
     }
 }
 
@@ -199,6 +214,7 @@ void ServerManager::handleClientRead(int client_fd)
 
     if (byte > 0)
     {
+        _clients[client_fd].touch();
         _clients[client_fd].feedData(buffer, byte);
         _clients[client_fd].parseData();
 
@@ -286,6 +302,7 @@ void ServerManager::handleClientWrite(int client_fd)
 
     if (bytes_sent > 0)
     {
+        client.touch();
         client.advanceSent(bytes_sent);
         if (!client.hasPendingData())
         {
@@ -325,6 +342,18 @@ void ServerManager::closeConnection(int client_fd)
         _clients[client_fd].clearHandler();
     }
 
+    dropCgiFds(client_fd);
+
+    epoll_ctl(_epoll_fd, EPOLL_CTL_DEL, client_fd, NULL);
+    close(client_fd);
+    _clients.erase(client_fd);
+}
+
+// Client'a ait CGI pipe'larini epoll'den ve _cgi_to_client tablosundan cikarir.
+// fd'leri KAPATMAZ: onlar RequestHandler'a ait, onun destructor'i kapatir.
+// Hem closeConnection() hem checkTimeouts() kullanir.
+void ServerManager::dropCgiFds(int client_fd)
+{
     std::map<int, int>::iterator it = _cgi_to_client.begin();
     while (it != _cgi_to_client.end()) {
         if (it->second == client_fd) {
@@ -334,10 +363,58 @@ void ServerManager::closeConnection(int client_fd)
             ++it;
         }
     }
+}
 
-    epoll_ctl(_epoll_fd, EPOLL_CTL_DEL, client_fd, NULL);
-    close(client_fd);
-    _clients.erase(client_fd);
+// Her epoll turunun sonunda calisir. IDLE_TIMEOUT saniyedir sessiz olan client'lar:
+//
+//   READING    -> client hic/yarim istek gonderip durdu (bos nc, yarim header,
+//                 Content-Length'ten az body). Baglanti kapatilir.
+//   WRITING    -> client cevabimizi okumuyor (socket buffer'i dolu). Kapatilir.
+//   PROCESSING -> CGI calisiyor ama 30 sn'dir ne okudu ne yazdi (sonsuz dongu,
+//                 kilitlenme). CGI oldurulur, client'a 504 Gateway Timeout gider.
+void ServerManager::checkTimeouts()
+{
+    time_t now = std::time(NULL);
+    std::map<int, Client>::iterator it = _clients.begin();
+    while (it != _clients.end()) {
+        int fd = it->first;
+        Client& client = it->second;
+        // closeConnection() bu kaydi map'ten siler; silinen elemanin iterator'u
+        // gecersiz olur, o yuzden silmeden ONCE bir sonrakine geciyoruz.
+        ++it;
+
+        if (now - client.getLastActivity() < IDLE_TIMEOUT)
+            continue;
+
+        if (client.getState() != PROCESSING) {
+            closeConnection(fd);
+            continue;
+        }
+
+        // 1) CGI pipe'larini epoll'den cikar ki kapanan fd'ler icin olay gelmesin
+        dropCgiFds(fd);
+        // 2) Handler'i sil: destructor'i CGI'a SIGTERM atar, waitpid ile toplar
+        //    (zombie kalmaz) ve pipe fd'lerini kapatir
+        client.clearHandler();
+
+        // 3) 504 cevabini hazirla. error() conf'taki error_page 504'u kullanir.
+        //    PROCESSING'e ancak findServerConfig bir server bulduysa girilebilir,
+        //    ayni girdilerle tekrar cagrildigi icin burada NULL donmez.
+        HttpRequest& req = client.getParserObj().getParsedRequest();
+        const ServerConfig* srv = findServerConfig(_config, client.getServerPort(),
+            utils::getHeader(req.headers, "host"));
+        client.prepareResponse(RequestHandler::error(504, srv).serialize(req.method == "HEAD"));
+
+        // 4) Client'i yazma moduna al; 504'un gonderilmesi icin sure bastan baslar
+        client.setState(WRITING);
+        client.touch();
+
+        struct epoll_event event;
+        std::memset(&event, 0, sizeof(event));
+        event.events = EPOLLOUT;
+        event.data.fd = fd;
+        epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, fd, &event);
+    }
 }
 
 void ServerManager::handleCgiEvent(int cgi_fd, uint32_t events)
@@ -356,6 +433,10 @@ void ServerManager::handleCgiEvent(int cgi_fd, uint32_t events)
 
     Client& client = _clients[client_fd];
     if (client.getHandler() == NULL) return;
+    // CGI'dan olay geldi = hala calisiyor. Sayac sifirlanir; boylece yavas ama
+    // veri ureten CGI (ornegin 100 MB'lik tester testleri) oldurulmez,
+    // sadece tamamen sessiz kalan CGI timeout'a duser.
+    client.touch();
 
     short poll_events = 0;
     if (events & EPOLLIN) poll_events |= POLLIN;
