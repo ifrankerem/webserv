@@ -140,9 +140,7 @@ void ServerManager::run()
         {
             if (!g_running)
                 break;
-            if (errno == EINTR)
-                continue;
-            break;
+            continue;
         }
         for (int i = 0; i < count_fd; i++){
             int current_fd = _events[i].data.fd;
@@ -221,8 +219,8 @@ void ServerManager::handleClientRead(int client_fd)
     }
     else if (byte == -1)
     {
-        if (errno == EAGAIN || errno == EWOULDBLOCK)
-            return;
+        // if (errno == EAGAIN || errno == EWOULDBLOCK)
+        //     return;
         closeConnection(client_fd);
     }
     else
@@ -310,8 +308,8 @@ void ServerManager::handleClientWrite(int client_fd)
     }
     else if (bytes_sent == -1)
     {
-        if (errno == EAGAIN || errno == EWOULDBLOCK)
-            return; 
+        // if (errno == EAGAIN || errno == EWOULDBLOCK)
+        //     return; 
         closeConnection(client_fd);
     }
     else
