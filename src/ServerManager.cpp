@@ -9,7 +9,28 @@ ServerManager::ServerManager(const Config& config){
 }
     
 ServerManager::~ServerManager(){
+    std::map<int, Client>::iterator it = _clients.begin();
+    while (it != _clients.end()) {
+        int fd = it->first;
+        ++it;
+        closeConnection(fd);
+    }
+    for (std::map<int, int>::iterator it = _server_fds.begin(); it != _server_fds.end(); ++it) {
+        close(it->first);
+    }
+    _server_fds.clear();
+    if (_epoll_fd != -1) {
+        close(_epoll_fd);
+        _epoll_fd = -1;
+    }
+}
 
+int g_running = 1;
+
+void ServerManager::signal_handler(int sig)
+{
+    (void)sig;
+    g_running = 0;
 }
 
 const ServerConfig* findServerConfig(const Config& config, int port, const std::string& host_header) {
@@ -48,6 +69,7 @@ void ServerManager::setupServers()
 {
     // CGI borusu koptugunda write() SIGPIPE ile sunucuyu öldürmesin
     signal(SIGPIPE, SIG_IGN);
+    signal(SIGINT, signal_handler);
     _epoll_fd = epoll_create1(0);
 
     std::vector<int> ports;
@@ -116,9 +138,10 @@ void ServerManager::run()
         int count_fd = epoll_wait(_epoll_fd, _events, MAX_EVENTS, -1);
         if(count_fd == -1)
         {
+            if (!g_running)
+                break;
             if (errno == EINTR)
                 continue;
-            std::cout << "Error: Ctrl + c";
             break;
         }
         for (int i = 0; i < count_fd; i++){

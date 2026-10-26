@@ -33,6 +33,7 @@ private:
     void handleClientWrite(int client_fd);
     void closeConnection(int client_fd);
     void handleCgiEvent(int cgi_fd, uint32_t events);
+    static void  signal_handler(int signal);
 
 public:
     ServerManager(const Config& config);
