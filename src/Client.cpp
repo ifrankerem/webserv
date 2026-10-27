@@ -62,6 +62,9 @@ void Client::prepareResponse(const std::string& serialized) {
     _writeBuffer = serialized;
     _bytesSent = 0;
 }
+struct sockaddr_in Client::getAdress(){
+    return _address;
+};
 
 bool Client::hasPendingData() const { 
     return !_writeBuffer.empty() && _bytesSent < _writeBuffer.length(); 

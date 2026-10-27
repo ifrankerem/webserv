@@ -40,6 +40,7 @@
         void feedData(const char* chunk, int size);
         HttpParser& getParserObj();
         void resetForNextRequest();
+        struct sockaddr_in        getAdress();
 
         void        setServerPort(int port);
         int         getServerPort() const;
