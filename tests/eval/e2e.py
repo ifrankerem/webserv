@@ -332,7 +332,7 @@ def test_status_table():
         ("C-09", "GET / -> index", http("GET", "/"), lambda r: r.status == 200 and b"SITE-A" in r.body),
         ("C-12", "listeleme acik -> 200 + liste", http("GET", "/liste_acik/"),
          lambda r: r.status == 200 and b"x.txt" in r.body and b"y.txt" in r.body),
-        ("C-12", "listeleme kapali, index yok -> 403", http("GET", "/liste_kapali/"), lambda r: r.status == 403),
+        ("C-12", "listeleme kapali, index yok -> 404", http("GET", "/liste_kapali/"), lambda r: r.status == 404),
         ("H-03", "okuma izni yok -> 403", http("GET", "/gizli.txt"),
          lambda r: r.status == 403 or os.geteuid() == 0),
         ("C-11", "redirect -> 301 + Location", http("GET", "/eski"),

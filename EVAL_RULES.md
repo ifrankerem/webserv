@@ -48,6 +48,7 @@ E2 09.2026) kazanır. Bilinen çelişkiler ve bağlayıcı yorum:
 | İstemci başına I/O sayısı | E1: "only one read or one write per client per select". E2: "acceptable to read/write until EAGAIN/EWOULDBLOCK". | EAGAIN'i görmek errno okumayı gerektirir ve bu SIFIR'dır. Bu yüzden her readiness olayında fd başına **tek** read/recv veya **tek** write/send. Döngüyle tekrar okuma/yazma yok. |
 | Virtual host | E1: farklı hostname'lerle çoklu sunucu test eder. S: "considered out of scope. But you are allowed to implement it". E2: "unless the team has chosen to implement the virtual host feature". | Opsiyonel. Uygulanmışsa çalışmak zorunda; uygulanmamışsa aynı interface:port tekrarı hata vermeli (C-04). |
 | Siege kurulumu | E1: homebrew. E2: apt. | Fark yok; hangi paket yöneticisi varsa. |
+| Index'siz dizin, listeleme kapalı | E1/E2 eki 42 tester: `GET /directory/Yeah` için "Expected 404". S: "NGINX may be used to compare" (NGINX 403 döner). | 404. Tester eval'in resmi eki; NGINX sadece karşılaştırma önerisi. |
 
 ---
 
@@ -376,7 +377,7 @@ Her kural: **Kaynak** (alıntı), **Kontrol** (komut veya inceleme), **Geçme kr
 #### C-12 — Dizin listeleme açık/kapalı — BÖLÜM (Check with a browser)
 - **Kaynak:** S: "Enabling or disabling directory listing." E1/E2: "Try to list a directory."
 - **Kontrol:** index dosyası olmayan iki dizin: biri listeleme açık, biri kapalı.
-- **Geçme:** açık → 200, dizindeki her girişi link olarak gösteren HTML. Kapalı → 403.
+- **Geçme:** açık → 200, dizindeki her girişi link olarak gösteren HTML. Kapalı → 404 (bkz. Bölüm 0 çelişki tablosu).
 
 #### C-13 — Upload izni ve depolama yeri — ZORUNLU
 - **Kaynak:** S: "Uploading files from the clients to the server is authorized, and storage location is provided."
@@ -415,7 +416,7 @@ Her kural: **Kaynak** (alıntı), **Kontrol** (komut veya inceleme), **Geçme kr
 | Olmayan yola GET | 404 |
 | Dizin, index var | 200 (index içeriği) |
 | Dizin, index yok, listeleme açık | 200 (liste) |
-| Dizin, index yok, listeleme kapalı | 403 |
+| Dizin, index yok, listeleme kapalı | 404 (42 tester; Bölüm 0) |
 | Okuma izni olmayan dosya (`chmod 000`) | 403 |
 | GET/POST/DELETE ama route izin vermiyor | 405 |
 | Bu üçü dışında metot (`FOO`, `PUT`, `HEAD`...) | 501 (RFC 9110 §15.6.2). 405 da kabul (NGINX davranışı, S: "NGINX may be used to compare"). Başka kod KALDI. |
