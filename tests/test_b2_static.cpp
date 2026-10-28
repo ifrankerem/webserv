@@ -36,7 +36,7 @@ static ServerConfig makeServer()
 	root.allowed_methods.push_back("POST");
 	srv.locations.push_back(root);
 
-	// Index dosyasi olmayan, autoindex kapali dizin -> 404
+	// Index dosyasi olmayan, autoindex kapali dizin -> 403
 	LocationConfig gizli = root;
 	gizli.path = "/gizli";
 	gizli.autoindex = false;
@@ -185,9 +185,9 @@ int main()
 	if (res.status != 404)
 		return 1;
 
-	// --- dizin, index yok, autoindex kapali -> 404 + config'deki hata sayfasi ---
+	// --- dizin, index yok, autoindex kapali -> 403 (NGINX gibi) + config'deki hata sayfasi ---
 	res = run(srv, "GET", "/gizli/");
-	if (res.status != 404 || !contains(res.body, "error_page 404"))
+	if (res.status != 403 || !contains(res.body, "error_page 403"))
 		return 1;
 
 	// --- olmayan dosya -> 404 + config'deki hata sayfasi ---
