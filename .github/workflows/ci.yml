@@ -5,8 +5,49 @@ on:
     branches: [ "main", "master", "develop" ]
   pull_request:
     branches: [ "main", "master", "develop" ]
+  workflow_dispatch:
 
 jobs:
+  # EVAL_RULES.md kurallari. Her satir bir kural ID'si basar (G-02, H-03...).
+  eval-static:
+    name: "EVAL static (G, F, IO)"
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: G-01..G-05, F-01..F-04, IO-01/05/08
+      run: python3 tests/eval/static_checks.py
+
+  eval-e2e:
+    name: "EVAL e2e (C, H, CGI, R, P)"
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - run: make
+    - name: C-01..C-13, H-01..H-09, CGI-01..CGI-07, R-01, IO-07/08, P-03
+      timeout-minutes: 10
+      run: python3 tests/eval/e2e.py
+
+  eval-heavy:
+    name: "EVAL heavy (R-02, IO-09, CGI-08, siege, valgrind)"
+    # uzun surer: sadece PR'da ve elle tetiklenince
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - run: sudo apt-get update && sudo apt-get install -y siege valgrind
+    - run: make
+    - name: R-02 timeout'lar, IO-09, CGI-08, R-01 fd/bellek siniri
+      timeout-minutes: 10
+      run: python3 tests/eval/e2e.py --heavy
+    - name: S-01..S-04 siege
+      if: success() || failure()
+      timeout-minutes: 15
+      run: python3 tests/eval/e2e.py --siege
+    - name: S-05 valgrind
+      if: success() || failure()
+      timeout-minutes: 30
+      run: python3 tests/eval/e2e.py --valgrind
+
   build_and_test:
     runs-on: ubuntu-latest
     steps:

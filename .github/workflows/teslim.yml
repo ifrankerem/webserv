@@ -1,0 +1,14 @@
+name: Teslim kontrolu
+
+# EVAL_RULES.md D (README), T (teslim dosyalari), K-03 (kapsam).
+# Teslimden once elle calistir: Actions > Teslim kontrolu > Run workflow.
+on:
+  workflow_dispatch:
+
+jobs:
+  teslim:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: D-01..D-05, T-01, T-02, K-03
+      run: python3 tests/eval/static_checks.py --teslim
