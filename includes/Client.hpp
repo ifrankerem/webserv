@@ -3,6 +3,7 @@
 
     #include <sys/socket.h>
     #include <netinet/in.h>
+    #include <ctime>
     #include "HttpParser.hpp"
 
     class RequestHandler;
@@ -26,6 +27,9 @@
         size_t              _bytesSent;
         int                 _serverPort;
         RequestHandler*     _handler;
+        // Son recv/send ya da CGI olayinin zamani (saniye).
+        // ServerManager::checkTimeouts() simdiki zamanla farkina bakar.
+        time_t              _lastActivity;
 
     public:
         Client();
@@ -53,6 +57,9 @@
         RequestHandler* getHandler() const;
         void            setHandler(RequestHandler* handler);
         void            clearHandler();
+
+        void            touch();                 // "su an aktif" diye isaretle
+        time_t          getLastActivity() const;
     };
 
     #endif

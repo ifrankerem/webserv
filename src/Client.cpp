@@ -1,12 +1,23 @@
 #include "../includes/Client.hpp"
 #include "../includes/RequestHandler.hpp"
 
-Client::Client(): _fd(-1), _state(READING), _bytesSent(0), _serverPort(0), _handler(NULL) {
+Client::Client(): _fd(-1), _state(READING), _bytesSent(0), _serverPort(0), _handler(NULL), _lastActivity(std::time(NULL)) {
 
 }
 
-Client::Client(int fd, sockaddr_in &address): _fd(fd), _address(address), _state(READING), _bytesSent(0), _serverPort(0), _handler(NULL)
+Client::Client(int fd, sockaddr_in &address): _fd(fd), _address(address), _state(READING), _bytesSent(0), _serverPort(0), _handler(NULL), _lastActivity(std::time(NULL))
 {
+}
+
+// Veri her aktiginda cagrilir: zaman asimi sayaci bastan baslar.
+// std::time C++98 standart kutuphanesinden (<ctime>); subject'in sistem cagrisi
+// listesinde zaman fonksiyonu olmadigi icin onu kullaniyoruz.
+void Client::touch() {
+    _lastActivity = std::time(NULL);
+}
+
+time_t Client::getLastActivity() const {
+    return _lastActivity;
 }
 
 int Client::getFd() const{

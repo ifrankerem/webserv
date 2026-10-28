@@ -31,7 +31,9 @@ RequestHandler::~RequestHandler()
 			close(cgiStdinFd);
 		if (cgiPid != -1)
 		{
-			kill(cgiPid, SIGTERM);
+			// SIGKILL: yakalanamaz, yok sayilamaz. SIGTERM'i yok sayan bir script
+			// olsaydi asagidaki bloklayan waitpid hic donmez, tum sunucu donardi.
+			kill(cgiPid, SIGKILL);
 			waitpid(cgiPid, NULL, 0);
 		}
 	}
