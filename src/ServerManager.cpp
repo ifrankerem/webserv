@@ -201,6 +201,7 @@ void ServerManager::handleClientRead(int client_fd)
 
     if (byte > 0)
     {
+        _clients[client_fd].touch();
         _clients[client_fd].feedData(buffer, byte);
         _clients[client_fd].parseData();
 
@@ -275,7 +276,7 @@ void ServerManager::handleClientWrite(int client_fd)
             }
             
             client.setState(PROCESSING);
-            _cgi_start_times[client_fd] = std::time(NULL);
+            client.touch();
             
             struct epoll_event c_event;
             std::memset(&c_event, 0, sizeof(c_event));
@@ -289,6 +290,7 @@ void ServerManager::handleClientWrite(int client_fd)
 
     if (bytes_sent > 0)
     {
+        client.touch();
         client.advanceSent(bytes_sent);
         if (!client.hasPendingData())
         {
@@ -340,7 +342,6 @@ void ServerManager::closeConnection(int client_fd)
 
     epoll_ctl(_epoll_fd, EPOLL_CTL_DEL, client_fd, NULL);
     close(client_fd);
-    _cgi_start_times.erase(client_fd);
     _clients.erase(client_fd);
 }
 
@@ -360,6 +361,7 @@ void ServerManager::handleCgiEvent(int cgi_fd, uint32_t events)
 
     Client& client = _clients[client_fd];
     if (client.getHandler() == NULL) return;
+    client.touch();
 
     short poll_events = 0;
     if (events & EPOLLIN) poll_events |= POLLIN;
@@ -375,7 +377,6 @@ void ServerManager::handleCgiEvent(int cgi_fd, uint32_t events)
     }
 
     if (result.kind == Step::RESPOND) {
-        _cgi_start_times.erase(client_fd);
         epoll_ctl(_epoll_fd, EPOLL_CTL_DEL, cgi_fd, NULL);
         _cgi_to_client.erase(cgi_fd);
 
@@ -395,39 +396,43 @@ void ServerManager::handleCgiEvent(int cgi_fd, uint32_t events)
 void ServerManager::checkTimeouts()
 {
     time_t now = std::time(NULL);
-    std::map<int, time_t>::iterator it = _cgi_start_times.begin();
-    while (it != _cgi_start_times.end())
+    std::map<int, Client>::iterator it = _clients.begin();
+    while (it != _clients.end())
     {
         int client_fd = it->first;
-        time_t start = it->second;
-        if (now - start > 5)
-        {
-            _cgi_start_times.erase(it++);
+        Client& client = it->second;
+        ++it;
 
-            std::map<int, int>::iterator cgi_it = _cgi_to_client.begin();
-            while (cgi_it != _cgi_to_client.end()) {
-                if (cgi_it->second == client_fd) {
-                    epoll_ctl(_epoll_fd, EPOLL_CTL_DEL, cgi_it->first, NULL);
-                    _cgi_to_client.erase(cgi_it++);
-                } else {
-                    ++cgi_it;
+        if (now - client.getLastActivity() > 30)
+        {
+            if (client.getState() == PROCESSING)
+            {
+                std::map<int, int>::iterator cgi_it = _cgi_to_client.begin();
+                while (cgi_it != _cgi_to_client.end()) {
+                    if (cgi_it->second == client_fd) {
+                        epoll_ctl(_epoll_fd, EPOLL_CTL_DEL, cgi_it->first, NULL);
+                        _cgi_to_client.erase(cgi_it++);
+                    } else {
+                        ++cgi_it;
+                    }
                 }
+
+                Client& client_ref = _clients[client_fd];
+                client_ref.prepareResponse(utils::defaultErrorPage(504).serialize());
+                client_ref.clearHandler(); // ~RequestHandler() calisir: kill(pid, SIGKILL) ve waitpid yapar!
+                client_ref.setState(WRITING);
+                client_ref.touch();
+
+                struct epoll_event event;
+                std::memset(&event, 0, sizeof(event));
+                event.events = EPOLLOUT;
+                event.data.fd = client_fd;
+                epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, client_fd, &event);
             }
-
-            Client& client = _clients[client_fd];
-            client.prepareResponse(utils::defaultErrorPage(504).serialize());
-            client.clearHandler(); // ~RequestHandler() calisir: kill(pid, SIGTERM) ve waitpid yapar!
-            client.setState(WRITING);
-
-            struct epoll_event event;
-            std::memset(&event, 0, sizeof(event));
-            event.events = EPOLLOUT;
-            event.data.fd = client_fd;
-            epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, client_fd, &event);
-        }
-        else
-        {
-            ++it;
+            else
+            {
+                closeConnection(client_fd);
+            }
         }
     }
 }

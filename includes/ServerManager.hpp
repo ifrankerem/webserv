@@ -28,7 +28,6 @@ private:
     
     std::map<int, Client>           _clients;
     std::map<int, int>              _cgi_to_client; // cgi_pipe_fd -> client_fd
-    std::map<int, time_t>           _cgi_start_times; // client_fd -> start time
 
     void acceptConnection(int server_fd); 
     void handleClientRead(int client_fd);
