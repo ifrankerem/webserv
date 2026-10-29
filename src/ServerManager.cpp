@@ -98,7 +98,7 @@ void ServerManager::setupServers()
 
             std::memset(&address,0,sizeof(address));
             address.sin_family = AF_INET;
-            address.sin_addr.s_addr = inet_addr(ip.c_str());
+            address.sin_addr.s_addr = utils::inet_addr(ip);
             address.sin_port = htons(port);
                     
             if(bind(socket_fd, (struct sockaddr*)&address, sizeof(address)) == -1)

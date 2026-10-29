@@ -2,6 +2,7 @@
 #include <sstream>
 #include <cctype>
 #include <cstring>
+#include <netdb.h>
 
 namespace utils
 {
@@ -165,5 +166,21 @@ int atoi(const std::string &str)
         i++;
     }
     return (int)val;
+}
+
+in_addr_t inet_addr(const std::string& ip)
+{
+    struct addrinfo hints, *res = NULL;
+    std::memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = AI_NUMERICHOST;
+
+    if (getaddrinfo(ip.c_str(), NULL, &hints, &res) != 0 || !res)
+        return static_cast<in_addr_t>(-1);
+
+    in_addr_t s_addr = reinterpret_cast<struct sockaddr_in*>(res->ai_addr)->sin_addr.s_addr;
+    freeaddrinfo(res);
+    return s_addr;
 }
 } // namespace utils
