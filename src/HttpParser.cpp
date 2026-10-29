@@ -65,6 +65,17 @@ void HttpParser::parse() {
     }
 
     if (_state == PARSE_HEADERS_DONE) {
+        if (_request.version == "HTTP/1.1" && _request.headers.find("host") == _request.headers.end()) {
+            _state = PARSE_ERROR;
+            return;
+        }
+
+        if (_request.headers.find("content-length") != _request.headers.end() &&
+            _request.headers.find("transfer-encoding") != _request.headers.end()) {
+            _state = PARSE_ERROR;
+            return;
+        }
+
         if (_request.headers.find("content-length") != _request.headers.end()) {
             size_t content_length = std::atoi(_request.headers["content-length"].c_str());
 
