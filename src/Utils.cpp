@@ -48,7 +48,6 @@ static const ReasonEntry reasonTable[] = {
     { 505, "HTTP Version Not Supported" }
 };
 
-// 404 -> "Not Found"
 std::string httpReason(int status)
 {
     size_t count = sizeof(reasonTable) / sizeof(reasonTable[0]);
@@ -60,7 +59,6 @@ std::string httpReason(int status)
     return "Unknown";
 }
 
-// "/a/b.py" -> ".py". Nokta son '/'den once ise ("/a.d/b") uzanti yok.
 std::string getExtension(const std::string& path)
 {
     size_t dot = path.rfind('.');
@@ -81,7 +79,6 @@ std::string toLower(const std::string& s)
     return out;
 }
 
-// Tek hex karakterin degeri ('a' -> 10); hex degilse -1
 static int hexValue(char c)
 {
     if (c >= '0' && c <= '9')
@@ -93,8 +90,6 @@ static int hexValue(char c)
     return -1;
 }
 
-// "%41" -> "A". Gecersiz dizi ("%zz", sonda yarim "%4") oldugu gibi kalir.
-// plusIsSpace sadece form verisi icin: orada '+' boslugu temsil eder.
 static std::string percentDecode(const std::string& s, bool plusIsSpace)
 {
     std::string out;
@@ -107,7 +102,7 @@ static std::string percentDecode(const std::string& s, bool plusIsSpace)
             if (high != -1 && low != -1)
             {
                 out += static_cast<char>(high * 16 + low);
-                i += 2; // iki hex karakter tuketildi
+                i += 2;
                 continue;
             }
         }
@@ -124,7 +119,6 @@ std::string urlDecode(const std::string& s)
     return percentDecode(s, true);
 }
 
-// URL path'inde '+' gercek '+' karakteridir, bosluk degil
 std::string decodePath(const std::string& s)
 {
     return percentDecode(s, false);
@@ -135,8 +129,6 @@ bool endsWithSlash(const std::string& s)
     return !s.empty() && s[s.size() - 1] == '/';
 }
 
-// Araya tam bir '/' koyarak birlestirir:
-// ("www/", "/a") -> "www/a", ("www", "a") -> "www/a"
 std::string joinPath(std::string base, const std::string& rest)
 {
     if (endsWithSlash(base))
@@ -148,26 +140,23 @@ std::string joinPath(std::string base, const std::string& rest)
     return base + "/" + rest;
 }
 
-// Bastaki ve sondaki bosluk/tab'lari siler
 std::string trim(const std::string& s)
 {
     size_t first = s.find_first_not_of(" \t");
     if (first == std::string::npos)
-        return ""; // sadece bosluktan olusuyor
+        return "";
     size_t last = s.find_last_not_of(" \t");
     return s.substr(first, last - first + 1);
 }
 
 std::string getHeader(const std::map<std::string, std::string>& headers, const std::string& key)
 {
-    // A header adlarini kucuk harfle doldurur; key de kucuk harf verilmeli
     std::map<std::string, std::string>::const_iterator it = headers.find(key);
     if (it == headers.end())
         return "";
     return it->second;
 }
 
-// conf'ta error_page yoksa kullanilan sade hata sayfasi
 HttpResponse defaultErrorPage(int status)
 {
     std::string code = toString(static_cast<size_t>(status));
@@ -181,7 +170,6 @@ HttpResponse defaultErrorPage(int status)
     return x;
 }
 
-// {"A": "1"} -> {"A=1"}: execve'nin bekledigi "AD=DEGER" bicimi
 std::vector<std::string> mapToEnv(const std::map<std::string, std::string>& env)
 {
     std::vector<std::string> out;
@@ -191,8 +179,6 @@ std::vector<std::string> mapToEnv(const std::map<std::string, std::string>& env)
     return out;
 }
 
-// Sadece rakamlardan olusan pozitif sayi. Bos, rakam disi karakter
-// ya da int tasmasi -> -1
 int atoi(const std::string &str)
 {
     if (str.empty())

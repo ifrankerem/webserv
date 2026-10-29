@@ -150,7 +150,6 @@ static void testPathSafety(const ServerConfig& srv)
     section("path safety: never escape root");
     CHECK(run(srv, "GET", "/../etc/passwd").response.status != 200);
     CHECK(run(srv, "GET", "/a/../../etc/passwd").response.status != 200);
-    // %XX is decoded before normalizing: encoded ".." must still be caught.
     CHECK(run(srv, "GET", "/%2e%2e/etc/passwd").response.status == 400);
     CHECK(run(srv, "GET", "/a/..%2f..%2fetc/passwd").response.status == 400);
     CHECK(run(srv, "GET", "/a%00b").response.status == 400);

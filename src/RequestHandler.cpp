@@ -106,7 +106,7 @@ std::string RequestHandler::resolveDiskPath(const LocationConfig& loc, const std
 	if (!loc.alias.empty())
 		return utils::joinPath(loc.alias, path.substr(loc.path.size()));
 	if (loc.root.empty())
-		return utils::joinPath(server->root, path); // location root yazmadiysa server'inki
+		return utils::joinPath(server->root, path);
 	return utils::joinPath(loc.root, path);
 }
 
@@ -187,7 +187,6 @@ static bool parseCgiOutput(std::string& raw, HttpResponse& response)
 		return false;
 	response.body.swap(raw);
 
-	// satirlar "\r\n" ya da "\n" ile bitebilir: getline '\n'de boler, kalan '\r' silinir
 	std::istringstream lines(headersPart);
 	std::string line;
 	while (std::getline(lines, line))
@@ -196,7 +195,7 @@ static bool parseCgiOutput(std::string& raw, HttpResponse& response)
 			line.erase(line.size() - 1);
 		size_t colon = line.find(':');
 		if (colon == std::string::npos)
-			return false; // header olmayan satir: bozuk CGI ciktisi
+			return false;
 		std::string key = line.substr(0, colon);
 		std::string value = utils::trim(line.substr(colon + 1));
 		if (key == "Status")
@@ -264,19 +263,32 @@ void RequestHandler::closeCgiStdin(Step& x)
 
 Step RequestHandler::handle(HttpRequest &req)
 {
-
 	Step x;
 	x.kind = Step::RESPOND;
+
+	std::string path;
+	if (!validateRequest(req, path, x))
+		return x;
+
+	const LocationConfig *best = applyLocationRules(req, path, x);
+	if (best == NULL)
+		return x;
+
+	return execute(req, path, best);
+}
+
+bool RequestHandler::validateRequest(HttpRequest &req, std::string &path, Step &x)
+{
 	if(req.version != "HTTP/1.0" && req.version != "HTTP/1.1")
 	{
 		x.response = error(505,server);
-		return x;
+		return false;
 	}
 
 	if(req.version == "HTTP/1.1" && utils::getHeader(req.headers,"host").size() == 0)
 	{
 		x.response = error(400,server);
-		return x;
+		return false;
 	}
 
 	// Govde limiti conf'tan; direktif verilmemisse (0) sinirsiz sayilir
@@ -284,24 +296,26 @@ Step RequestHandler::handle(HttpRequest &req)
 	if(limit != 0 && req.body.size() > limit)
 	{
 		x.response = error(413, server);
-		return x;
+		return false;
 	}
 
-	std::string path;
-	// %XX normalizePath'ten once cozulmeli ki "%2e%2e" de ".." olarak yakalansin
 	if (!normalizePath(utils::decodePath(req.path), path))
 	{
 		x.response = error(400,server);
-		return x;
+		return false;
 	}
+	return true;
+}
 
+const LocationConfig* RequestHandler::applyLocationRules(HttpRequest &req, const std::string &path, Step &x)
+{
 	const LocationConfig *best = findLocation(path);
 
 	if(best == NULL)
 	{
 		//TODO conf has no location so maybe use Default Settings?
 		x.response = error(404,server);
-		return x;
+		return NULL;
 	}
 
 	bool allowed = false;
@@ -322,107 +336,119 @@ Step RequestHandler::handle(HttpRequest &req)
 
 	    x.response = error(405,server);
 	    x.response.headers["Allow"] = allow;
-	    return x;
+	    return NULL;
 	}
 
 	if(best->redirect_code != 0)
 	{
 		x.response = ResponseHandler::redirect_handler(best->redirect_code,best->redirect_target);
-		return x;
+		return NULL;
 	}
+	return best;
+}
 
+Step RequestHandler::execute(HttpRequest &req, const std::string &path, const LocationConfig *best)
+{
 	std::string ext = utils::getExtension(path);
 	std::map<std::string, std::string>::const_iterator cgi_it = best->cgi_pass.find(ext);
 	if(cgi_it != best->cgi_pass.end() && !cgi_it->second.empty())
+		return executeCgi(req, path, best, cgi_it->second);
+	return executeMethod(req, path, best);
+}
+
+Step RequestHandler::executeCgi(HttpRequest &req, const std::string &path, const LocationConfig *best, const std::string &interpreter)
+{
+	struct Step x = Step();
+	std::string scriptPath = resolveDiskPath(*best, path);
+
+	// resmi tester: POST'ta .bla, dosya diskte olmasa da CGI'ya gider.
+	// GET'te olmayan script 404 kalir (b4 beklentisi).
+	if (req.method != "POST" && access(scriptPath.c_str(), F_OK) != 0)
 	{
-		struct Step x = Step();
-		std::string scriptPath = resolveDiskPath(*best, path);
-
-		// resmi tester: POST'ta .bla, dosya diskte olmasa da CGI'ya gider.
-		// GET'te olmayan script 404 kalir (b4 beklentisi).
-		if (req.method != "POST" && access(scriptPath.c_str(), F_OK) != 0)
-		{
-			x.kind = Step::RESPOND;
-			x.response = error(404, server);
-			return x;
-		}
-
-		std::map<std::string, std::string> env_variables = buildCgiEnv(req, *server, scriptPath);
-		int output_pipe[2];
-		int input_pipe[2];
-		if (pipe(output_pipe) == -1)
-		{
-			x.kind = Step::RESPOND;
-			x.response = error(500, server);
-			return x;
-		}
-		if (pipe(input_pipe) == -1)
-		{
-			close(output_pipe[0]);
-			close(output_pipe[1]);
-			x.kind = Step::RESPOND;
-			x.response = error(500, server);
-			return x;
-		}
-		std::flush(std::cout); //flushing the cout because stdout will be pipe after this
-		int id = fork();
-		if(id == -1)
-		{
-			close(output_pipe[0]);
-			close(output_pipe[1]);
-			close(input_pipe[0]);
-			close(input_pipe[1]);
-			x.kind = Step::RESPOND;
-			x.response = error(500, server);
-			return x;
-		}
-		else if(id == 0)
-		{
-			close(output_pipe[0]); //child will not read so close it !!!
-			close(input_pipe[1]); //child will not write anything so close it!!
-		 	ResponseHandler::handle_cgi_child(output_pipe[1], input_pipe[0], env_variables, scriptPath, cgi_it->second);
-		}
-		else //parent processs
-		{
-			close(output_pipe[1]); //parent will not write anything so close it!!
-			close(input_pipe[0]); //parent will not read anything so close it!!
-			fcntl(input_pipe[1], F_SETFL, O_NONBLOCK);
-
-
-			cgiActive = true;
-			cgiPid = id;
-			cgiPipeFd = output_pipe[0];
-			cgiStdinFd = input_pipe[1];
-			cgiBody.swap(req.body);
-			cgiInOffset = 0;
-			cgiBuffer.clear();
-
-			struct WatchFd y = WatchFd();
-			y.fd = output_pipe[0];
-			fcntl(output_pipe[0], F_SETFL, O_NONBLOCK);
-			y.events = POLLIN;
-			x.watch.push_back(y);
-
-			// govde olay dongusunde yazilir; ayni anda CGI ciktisi okunabilsin ki
-			// buyuk govdelerde iki boru birbirini kilitlemesin
-			struct WatchFd in = WatchFd();
-			in.fd = input_pipe[1];
-			in.events = POLLOUT;
-			x.watch.push_back(in);
-			x.kind = Step::WAIT;
-		}
+		x.kind = Step::RESPOND;
+		x.response = error(404, server);
 		return x;
 	}
-	else {
-		std::string diskPath;
-		//POST ve DELETE ayni klasorle calisir: hedefi tek yerde hesapla
-		if ((req.method == "DELETE" || req.method == "POST") && !best->upload_store.empty())
-			diskPath = resolveUploadPath(*best, path);
-		else
-			diskPath = resolveDiskPath(*best, path); // its final version of path root + req
-		x.response = ResponseHandler::handle(diskPath, path, req, *best, *server);
+
+	std::map<std::string, std::string> env_variables = buildCgiEnv(req, *server, scriptPath);
+	int output_pipe[2];
+	int input_pipe[2];
+	if (pipe(output_pipe) == -1)
+	{
+		x.kind = Step::RESPOND;
+		x.response = error(500, server);
 		return x;
 	}
+	if (pipe(input_pipe) == -1)
+	{
+		close(output_pipe[0]);
+		close(output_pipe[1]);
+		x.kind = Step::RESPOND;
+		x.response = error(500, server);
+		return x;
+	}
+	std::flush(std::cout); //flushing the cout because stdout will be pipe after this
+	int id = fork();
+	if(id == -1)
+	{
+		close(output_pipe[0]);
+		close(output_pipe[1]);
+		close(input_pipe[0]);
+		close(input_pipe[1]);
+		x.kind = Step::RESPOND;
+		x.response = error(500, server);
+		return x;
+	}
+	else if(id == 0)
+	{
+		close(output_pipe[0]); //child will not read so close it !!!
+		close(input_pipe[1]); //child will not write anything so close it!!
+	 	ResponseHandler::handle_cgi_child(output_pipe[1], input_pipe[0], env_variables, scriptPath, interpreter);
+	}
+	else //parent processs
+	{
+		close(output_pipe[1]); //parent will not write anything so close it!!
+		close(input_pipe[0]); //parent will not read anything so close it!!
+		fcntl(input_pipe[1], F_SETFL, O_NONBLOCK);
+
+
+		cgiActive = true;
+		cgiPid = id;
+		cgiPipeFd = output_pipe[0];
+		cgiStdinFd = input_pipe[1];
+		cgiBody.swap(req.body);
+		cgiInOffset = 0;
+		cgiBuffer.clear();
+
+		struct WatchFd y = WatchFd();
+		y.fd = output_pipe[0];
+		fcntl(output_pipe[0], F_SETFL, O_NONBLOCK);
+		y.events = POLLIN;
+		x.watch.push_back(y);
+
+		// govde olay dongusunde yazilir; ayni anda CGI ciktisi okunabilsin ki
+		// buyuk govdelerde iki boru birbirini kilitlemesin
+		struct WatchFd in = WatchFd();
+		in.fd = input_pipe[1];
+		in.events = POLLOUT;
+		x.watch.push_back(in);
+		x.kind = Step::WAIT;
+	}
+	return x;
+}
+
+Step RequestHandler::executeMethod(HttpRequest &req, const std::string &path, const LocationConfig *best)
+{
+	Step x;
+	x.kind = Step::RESPOND;
+	std::string diskPath;
+	//POST ve DELETE ayni klasorle calisir: hedefi tek yerde hesapla
+	if ((req.method == "DELETE" || req.method == "POST") && !best->upload_store.empty())
+		diskPath = resolveUploadPath(*best, path);
+	else
+		diskPath = resolveDiskPath(*best, path); // its final version of path root + req
+	x.response = ResponseHandler::handle(diskPath, path, req, *best, *server);
+	return x;
 }
 
 

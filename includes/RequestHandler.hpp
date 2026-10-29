@@ -48,6 +48,11 @@ private:
 	bool            normalizePath(const std::string& path, std::string& out); //NOTE A decoded sekilde path vermeli bana!
 	std::string     resolveDiskPath(const LocationConfig& loc, const std::string& path);
 	std::string     resolveUploadPath(const LocationConfig& loc, const std::string& path);
+	bool            validateRequest(HttpRequest& req, std::string& path, Step& x);
+	const LocationConfig* applyLocationRules(HttpRequest& req, const std::string& path, Step& x);
+	Step            execute(HttpRequest& req, const std::string& path, const LocationConfig* best);
+	Step            executeCgi(HttpRequest& req, const std::string& path, const LocationConfig* best, const std::string& interpreter);
+	Step            executeMethod(HttpRequest& req, const std::string& path, const LocationConfig* best);
 	RequestHandler(const RequestHandler& other);
 	RequestHandler& operator=(const RequestHandler& other);
 	
