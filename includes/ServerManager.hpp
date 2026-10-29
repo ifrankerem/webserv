@@ -24,7 +24,7 @@ private:
     int                             _epoll_fd;
     struct epoll_event              _events[MAX_EVENTS];
     
-    std::map<int, int>              _server_fds; 
+    std::map<int, Listen>           _server_fds; 
     
     std::map<int, Client>           _clients;
     std::map<int, int>              _cgi_to_client; // cgi_pipe_fd -> client_fd

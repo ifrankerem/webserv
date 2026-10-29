@@ -68,6 +68,8 @@ Client::~Client()
 
 void Client::setServerPort(int port) { _serverPort = port; }
 int Client::getServerPort() const { return _serverPort; }
+void Client::setServerIp(const std::string& ip) { _serverIp = ip; }
+const std::string& Client::getServerIp() const { return _serverIp; }
 
 void Client::prepareResponse(const std::string& serialized) {
     _writeBuffer = serialized;
