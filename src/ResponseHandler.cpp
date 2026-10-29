@@ -77,18 +77,26 @@ HttpResponse ResponseHandler::handle(const std::string& diskPath,const std::stri
 }
 
 
-HttpResponse ResponseHandler::handle_get(const std::string& diskPath,const HttpRequest &req, const LocationConfig& loc,const ServerConfig& srv)
+static int check_stat(struct stat &info, const std::string& diskPath)
 {
-	struct stat info;
 	if (::stat(diskPath.c_str(), &info) == -1)
 	{
 		// errno kullanmak yasak; access() ile varlik/yetki ayirt et
 		if (::access(diskPath.c_str(), F_OK) == -1)
-			return RequestHandler::error(404, &srv);
+			return 404;
 		if (::access(diskPath.c_str(), R_OK) == -1)
-			return RequestHandler::error(403, &srv);
-		return RequestHandler::error(500, &srv);
+			return 403;
+		return 500;
 	}
+	return 1;
+}
+
+HttpResponse ResponseHandler::handle_get(const std::string& diskPath,const HttpRequest &req, const LocationConfig& loc,const ServerConfig& srv)
+{
+	struct stat info;
+	int stat_info = check_stat(info, diskPath);
+	if(stat_info != 1)
+		return RequestHandler::error(stat_info,&srv);
 
 	if(S_ISDIR(info.st_mode) != 0)
 	{
@@ -104,14 +112,11 @@ HttpResponse ResponseHandler::handle_get(const std::string& diskPath,const HttpR
 		}
 		else if(indexPath[indexPath.size() - 1] != '/')
 			indexPath += '/';
-		std::string backup = indexPath;
 		for (size_t i = 0; i < loc.index.size(); i++) 
 		{
-			indexPath += loc.index[i];
-			if (::stat(indexPath.c_str(), &info) == 0)
-				return serveFile(indexPath,srv);
-			else
-				indexPath = backup;
+			std::string temp_path = indexPath + loc.index[i];
+			if (::stat(temp_path.c_str(), &info) == 0)
+				return serveFile(temp_path,srv);
 		}
 		if(loc.autoindex)
 			return listDirectory(diskPath, loc, srv);
@@ -130,12 +135,9 @@ HttpResponse ResponseHandler::serveFile(const std::string& diskPath,const Server
 {
 	HttpResponse x;
 	struct stat info;
-	if (::stat(diskPath.c_str(), &info) == -1)
-	{
-		if (::access(diskPath.c_str(), F_OK) == -1)
-			return RequestHandler::error(404, &srv);
-		return RequestHandler::error(403, &srv);
-	}
+	int stat_info = check_stat(info, diskPath);
+	if(stat_info != 1)
+		return RequestHandler::error(stat_info,&srv);
 	if (!S_ISREG(info.st_mode))
 		return RequestHandler::error(403, &srv);
 
@@ -218,13 +220,13 @@ HttpResponse ResponseHandler::handle_post(const std::string& diskPath,const std:
 	if(loc.upload_store.empty())
 		return RequestHandler::error(405, &srv); //ngnix returned 405 so i did it too
 
-	std::string type = utils::toLower(utils::getHeader(req.headers, "Content-Type"));
+	std::string type = utils::toLower(utils::getHeader(req.headers, "content-type"));
 	if(type.find("multipart/") != std::string::npos)
 	{
 		// Dosya adi URL'den degil part'in Content-Disposition'indan gelir
 		std::vector<MultipartPart> parts;
 		// boundary case-sensitive: ham header gerekli (type lowercase edilmis olan)
-		if(!parseMultipart(req.body, utils::getHeader(req.headers, "Content-Type"), parts))
+		if(!parseMultipart(req.body, utils::getHeader(req.headers, "content-type"), parts))
 			return RequestHandler::error(400, &srv);
 
 		std::string store = loc.upload_store;
@@ -308,14 +310,9 @@ HttpResponse ResponseHandler::handle_delete(const std::string& diskPath, const L
 	if(loc.upload_store.empty())
 		return RequestHandler::error(403, &srv);
 	struct stat info;
-	if (::stat(diskPath.c_str(), &info) == -1)
-	{
-		if (::access(diskPath.c_str(), F_OK) == -1)
-			return RequestHandler::error(404, &srv);
-		return RequestHandler::error(403, &srv);
-	}
-	if (S_ISDIR(info.st_mode) != 0)
-		return RequestHandler::error(403, &srv);
+	int stat_info = check_stat(info, diskPath);
+	if(stat_info != 1)
+		return RequestHandler::error(stat_info,&srv);
 	if (S_ISREG(info.st_mode) == 0)
 		return RequestHandler::error(403, &srv);
 	if (std::remove(diskPath.c_str()) != 0)
@@ -332,7 +329,7 @@ HttpResponse ResponseHandler::handle_delete(const std::string& diskPath, const L
 }
 
 
-void ResponseHandler::handle_cgi_child(const int output_fd,const int input_fd,std::map<std::string, std::string>& env_variables,const std::string& interpreter)
+void ResponseHandler::handle_cgi_child(const int output_fd,const int input_fd,std::map<std::string, std::string>& env_variables,const std::string& scriptPath,const std::string& interpreter)
 {
 	// Script needs to read request body from STDIN, so body comes from parent through input pipe
 	dup2(input_fd, STDIN_FILENO);
@@ -350,10 +347,6 @@ void ResponseHandler::handle_cgi_child(const int output_fd,const int input_fd,st
 	for(size_t i = 0; i < temp_env.size() ; i++)
 		envp.push_back(const_cast<char*>(temp_env[i].c_str()));
 	envp.push_back(NULL);
-	std::string scriptPath;
-	std::map<std::string, std::string>::const_iterator it = env_variables.find("SCRIPT_FILENAME");
-	if (it != env_variables.end())
-		scriptPath = it->second;
 
 	// CGI should run in the script's own directory for relative path access.
 	// After chdir, execve argument must be the script basename only.

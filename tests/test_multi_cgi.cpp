@@ -139,7 +139,7 @@ static bool testOrder(const std::string& order)
 
 	HttpRequest req;
 	req.version = "HTTP/1.1";
-	req.headers["Host"] = "localhost";
+	req.headers["host"] = "localhost";
 	req.remote_addr = "127.0.0.1";
 	req.server_port = 8080;
 	req.method = "GET";

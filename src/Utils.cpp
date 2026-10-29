@@ -108,15 +108,11 @@ std::string urlDecode(const std::string& s)
 
 std::string getHeader(const std::map<std::string, std::string>& headers, const std::string& key)
 {
-    std::string lowerKey = toLower(key);
-    std::map<std::string, std::string>::const_iterator it = headers.begin();
-    while (it != headers.end())
-    {
-        if (toLower(it->first) == lowerKey)
-            return it->second;
-        ++it;
-    }
-    return "";
+    // A header adlarini kucuk harfle doldurur; key de kucuk harf verilmeli
+    std::map<std::string, std::string>::const_iterator it = headers.find(key);
+    if (it == headers.end())
+        return "";
+    return it->second;
 }
 
 HttpResponse defaultErrorPage(int status)

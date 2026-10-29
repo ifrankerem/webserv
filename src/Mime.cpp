@@ -1,5 +1,5 @@
 #include "../includes/Mime.hpp"
-#include <cctype>
+#include "../includes/Utils.hpp"
 #include <cstddef>
 
 struct MimeEntry {
@@ -25,13 +25,7 @@ static const MimeEntry mimeTable[] = {
 
 std::string mimeType(const std::string& path)
 {
-	size_t dot = path.rfind('.');
-	if (dot == std::string::npos)
-		return "application/octet-stream";
-
-	std::string ext = path.substr(dot);
-	for (size_t i = 0; i < ext.size(); i++)
-		ext[i] = std::tolower(ext[i]);
+	std::string ext = utils::toLower(utils::getExtension(path));
 
 	size_t count = sizeof(mimeTable) / sizeof(mimeTable[0]);
 	for (size_t i = 0; i < count; i++)

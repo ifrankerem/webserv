@@ -4,6 +4,7 @@
 #include "../includes/ResponseHandler.hpp"
 #include "../includes/Utils.hpp"
 #include <csignal>
+ #include <algorithm>
 #include <cstddef>
 #include <cstdlib>
 #include <fcntl.h>
@@ -131,8 +132,7 @@ std::string RequestHandler::resolveUploadPath(const LocationConfig& loc, const s
 	return root + rest;
 }
 
-static std::map<std::string, std::string> buildCgiEnv(const HttpRequest& req,
-	const LocationConfig& loc, const ServerConfig& srv, const std::string& scriptPath)
+static std::map<std::string, std::string> buildCgiEnv(const HttpRequest& req, const ServerConfig& srv, const std::string& scriptPath)
 {
 	std::map<std::string, std::string> env;
 	env["REQUEST_METHOD"] = req.method;
@@ -144,9 +144,9 @@ static std::map<std::string, std::string> buildCgiEnv(const HttpRequest& req,
 	env["QUERY_STRING"] = req.query;
 	env["SERVER_PROTOCOL"] = req.version;
 	env["GATEWAY_INTERFACE"] = "CGI/1.1";
-	env["CONTENT_TYPE"] = utils::getHeader(req.headers, "Content-Type");
+	env["CONTENT_TYPE"] = utils::getHeader(req.headers, "content-type");
 	env["CONTENT_LENGTH"] = utils::toString(req.body.size());
-	std::string host_name = utils::getHeader(req.headers, "Host");
+	std::string host_name = utils::getHeader(req.headers, "host");
 	if(srv.server_name.size() != 0)
 	{
 		env["SERVER_NAME"] = srv.server_name[0]; //default is the first one
@@ -162,13 +162,6 @@ static std::map<std::string, std::string> buildCgiEnv(const HttpRequest& req,
 	env["SERVER_PORT"] = utils::toString(static_cast<size_t>(req.server_port));
 	env["REMOTE_ADDR"] = req.remote_addr;
 	env["REDIRECT_STATUS"] = "200";
-	std::string userAgent = utils::getHeader(req.headers, "User-Agent");
-	if (!userAgent.empty())
-		env["HTTP_USER_AGENT"] = userAgent;
-
-	std::string host = utils::getHeader(req.headers, "Host");
-	if (!host.empty())
-		env["HTTP_HOST"] = host;
 
 	for (std::map<std::string, std::string>::const_iterator it = req.headers.begin(); it != req.headers.end(); ++it) 
     {
@@ -185,7 +178,6 @@ static std::map<std::string, std::string> buildCgiEnv(const HttpRequest& req,
             env[env_key] = it->second;
         }
     }
-	(void)loc;
 	return env;
 }
 
@@ -316,18 +308,16 @@ void RequestHandler::closeCgiStdin(Step& x)
 Step RequestHandler::handle(HttpRequest &req)
 {
 
+	Step x;
+	x.kind = Step::RESPOND;
 	if(req.version != "HTTP/1.0" && req.version != "HTTP/1.1")
 	{
-		Step x;
-		x.kind = Step::RESPOND;
 		x.response = error(505,server);
 		return x;
 	}	
 
 	if(req.version == "HTTP/1.1" && utils::getHeader(req.headers,"host").size() == 0)
 	{
-		Step x;
-		x.kind = Step::RESPOND;
 		x.response = error(400,server);
 		return x;
 	}
@@ -336,8 +326,6 @@ Step RequestHandler::handle(HttpRequest &req)
 	size_t limit = bodyLimit(req);
 	if(limit != 0 && req.body.size() > limit)
 	{
-		Step x;
-		x.kind = Step::RESPOND;
 		x.response = error(413, server);
 		return x;
 	}
@@ -345,8 +333,6 @@ Step RequestHandler::handle(HttpRequest &req)
 	std::string path;
 	if (!normalizePath(req.path, path))
 	{
-		Step x;
-		x.kind = Step::RESPOND;
 		x.response = error(400,server);
 		return x;
 	}
@@ -356,26 +342,16 @@ Step RequestHandler::handle(HttpRequest &req)
 	if(best == NULL)
 	{
 		//TODO conf has no location so maybe use Default Settings?
-		struct Step x = Step();
-		x.kind = Step::RESPOND;
 		x.response = error(404,server);
 		return x;
 	}
 
 	bool allowed = false;
-	if (best->allowed_methods.empty()) {
-        allowed = true;
-    } else {
-        for(size_t i = 0 ; i < best->allowed_methods.size(); i++)
-        {
-            // HEAD bilerek GET'e baglanmadi: tester_42 "/ sadece GET"te HEAD icin 405 bekliyor
-            if(best->allowed_methods[i] == req.method)
-            {
-                allowed = true;
-                break;
-            }
-        }
-    }
+	if (best->allowed_methods.empty())
+		allowed = true;
+	else if(std::find(best->allowed_methods.begin(), best->allowed_methods.end(), req.method) != best->allowed_methods.end())
+		allowed = true;
+	
 	if (allowed == false)
 	{
 	    std::string allow;
@@ -386,8 +362,6 @@ Step RequestHandler::handle(HttpRequest &req)
 	        allow += best->allowed_methods[i];
 	    }
 
-	    Step x;
-	    x.kind = Step::RESPOND;
 	    x.response = error(405,server);
 	    x.response.headers["Allow"] = allow;
 	    return x;
@@ -395,8 +369,6 @@ Step RequestHandler::handle(HttpRequest &req)
 
 	if(best->redirect_code != 0)
 	{
-		struct Step x = Step();
-		x.kind = Step::RESPOND;
 		x.response = ResponseHandler::redirect_handler(best->redirect_code,best->redirect_target);
 		return x;
 	}
@@ -417,7 +389,7 @@ Step RequestHandler::handle(HttpRequest &req)
 			return x;
 		}
 
-		std::map<std::string, std::string> env_variables = buildCgiEnv(req, *best, *server, scriptPath);
+		std::map<std::string, std::string> env_variables = buildCgiEnv(req, *server, scriptPath);
 		int output_pipe[2];
 		int input_pipe[2];
 		if (pipe(output_pipe) == -1)
@@ -450,7 +422,7 @@ Step RequestHandler::handle(HttpRequest &req)
 		{
 			close(output_pipe[0]); //child will not read so close it !!!
 			close(input_pipe[1]); //child will not write anything so close it!!
-		 	ResponseHandler::handle_cgi_child(output_pipe[1], input_pipe[0], env_variables, cgi_it->second);
+		 	ResponseHandler::handle_cgi_child(output_pipe[1], input_pipe[0], env_variables, scriptPath, cgi_it->second);
 		}
 		else //parent processs
 		{
@@ -490,8 +462,6 @@ Step RequestHandler::handle(HttpRequest &req)
 			diskPath = resolveUploadPath(*best, path);
 		else
 			diskPath = resolveDiskPath(*best, path); // its final version of path root + req
-		struct Step x = Step();
-		x.kind = Step::RESPOND;
 		x.response = ResponseHandler::handle(diskPath, path, req, *best, *server);
 		return x;
 	}
