@@ -12,6 +12,7 @@
 #include <map>
 #include <ostream>
 #include <poll.h>
+#include <string>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -314,6 +315,23 @@ void RequestHandler::closeCgiStdin(Step& x)
 
 Step RequestHandler::handle(HttpRequest &req)
 {
+
+	if(req.version != "HTTP/1.0" && req.version != "HTTP/1.1")
+	{
+		Step x;
+		x.kind = Step::RESPOND;
+		x.response = error(505,server);
+		return x;
+	}	
+
+	if(req.version == "HTTP/1.1" && utils::getHeader(req.headers,"host").size() == 0)
+	{
+		Step x;
+		x.kind = Step::RESPOND;
+		x.response = error(400,server);
+		return x;
+	}
+	
 	// Govde limiti conf'tan; direktif verilmemisse (0) sinirsiz sayilir
 	size_t limit = bodyLimit(req);
 	if(limit != 0 && req.body.size() > limit)
@@ -329,7 +347,7 @@ Step RequestHandler::handle(HttpRequest &req)
 	{
 		Step x;
 		x.kind = Step::RESPOND;
-		x.response = error(400,server);
+		x.response = error(505,server);
 		return x;
 	}
 
