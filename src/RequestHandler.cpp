@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <fcntl.h>
 #include <fstream>
+#include <sstream>
 #include <iostream>
 #include <map>
 #include <ostream>
@@ -52,7 +53,7 @@ const LocationConfig* RequestHandler::findLocation(const std::string& path)
 		const LocationConfig &loc = server->locations[i];
 		bool pathMatch = path.compare(0, loc.path.size(), loc.path) == 0;
 		bool pathBoundary = loc.path == "/" || path.size() == loc.path.size()
-			|| (!loc.path.empty() && loc.path[loc.path.size() - 1] == '/')
+			|| utils::endsWithSlash(loc.path)
 			|| (path.size() > loc.path.size() && path[loc.path.size()] == '/');
 		if (pathMatch && pathBoundary)
 		{
@@ -103,33 +104,15 @@ bool RequestHandler::normalizePath(const std::string& path, std::string& out)
 std::string RequestHandler::resolveDiskPath(const LocationConfig& loc, const std::string& path)
 {
 	if (!loc.alias.empty())
-	{
-		std::string alias = loc.alias;
-		if (!alias.empty() && alias[alias.size() - 1] == '/')
-			alias.erase(alias.size() - 1);
-		std::string rest = path.substr(loc.path.size());
-		if (rest.empty() || rest[0] != '/')
-			rest = "/" + rest;
-		return alias + rest;
-	}
-
-	std::string root = loc.root;
-	if (root.empty())
-		root = server->root;
-	if (!root.empty() && root[root.size() - 1] == '/')
-		root.erase(root.size() - 1);
-	return root + path;
+		return utils::joinPath(loc.alias, path.substr(loc.path.size()));
+	if (loc.root.empty())
+		return utils::joinPath(server->root, path); // location root yazmadiysa server'inki
+	return utils::joinPath(loc.root, path);
 }
 
 std::string RequestHandler::resolveUploadPath(const LocationConfig& loc, const std::string& path)
 {
-	std::string root = loc.upload_store;
-	if (!root.empty() && root[root.size() - 1] == '/')
-		root.erase(root.size() - 1);
-	std::string rest = path.substr(loc.path.size());
-	if (rest.empty() || rest[0] != '/')
-		rest = "/" + rest;
-	return root + rest;
+	return utils::joinPath(loc.upload_store, path.substr(loc.path.size()));
 }
 
 static std::map<std::string, std::string> buildCgiEnv(const HttpRequest& req, const ServerConfig& srv, const std::string& scriptPath)
@@ -163,11 +146,11 @@ static std::map<std::string, std::string> buildCgiEnv(const HttpRequest& req, co
 	env["REMOTE_ADDR"] = req.remote_addr;
 	env["REDIRECT_STATUS"] = "200";
 
-	for (std::map<std::string, std::string>::const_iterator it = req.headers.begin(); it != req.headers.end(); ++it) 
+	for (std::map<std::string, std::string>::const_iterator it = req.headers.begin(); it != req.headers.end(); ++it)
     {
         std::string key = it->first;
         std::string env_key = "HTTP_";
-        for (size_t i = 0; i < key.size(); i++) 
+        for (size_t i = 0; i < key.size(); i++)
         {
             if (key[i] == '-')
                 env_key += '_';
@@ -200,54 +183,26 @@ static bool parseCgiOutput(std::string& raw, HttpResponse& response)
 		headersPart = raw.substr(0, blank);
 		raw.erase(0, blank + headerEndLen);
 	}
-	if(headersPart.size() == 0)
-	{
-		response.status = 502;
+	if (headersPart.empty())
 		return false;
-	}
 	response.body.swap(raw);
 
-	std::string remaining = headersPart;
-	while (!remaining.empty())
+	// satirlar "\r\n" ya da "\n" ile bitebilir: getline '\n'de boler, kalan '\r' silinir
+	std::istringstream lines(headersPart);
+	std::string line;
+	while (std::getline(lines, line))
 	{
-		size_t lineEnd = remaining.find("\r\n");
-		size_t skip = 2;
-		if (lineEnd == std::string::npos)
-		{
-			lineEnd = remaining.find('\n');
-			skip = 1;
-		}
-
-		std::string line;
-		if (lineEnd == std::string::npos)
-		{
-			line = remaining;
-			remaining.clear();
-		}
-		else
-		{
-			line = remaining.substr(0, lineEnd);
-			remaining = remaining.substr(lineEnd + skip);
-		}
-
+		if (!line.empty() && line[line.size() - 1] == '\r')
+			line.erase(line.size() - 1);
 		size_t colon = line.find(':');
-		if (colon != std::string::npos)
-		{
-			std::string key = line.substr(0, colon);
-			std::string value = line.substr(colon + 1);
-			size_t first = value.find_first_not_of(" \t");
-			if (first != std::string::npos)
-				value = value.substr(first);
-
-			if (key == "Status")
-				response.status = std::atoi(value.c_str());
-			else
-				response.headers[key] = value;
-		}
-		else {
-			response.status = 502;
-			return false;
-		}
+		if (colon == std::string::npos)
+			return false; // header olmayan satir: bozuk CGI ciktisi
+		std::string key = line.substr(0, colon);
+		std::string value = utils::trim(line.substr(colon + 1));
+		if (key == "Status")
+			response.status = std::atoi(value.c_str());
+		else
+			response.headers[key] = value;
 	}
 
 	if (response.headers.find("Content-Type") == response.headers.end())
@@ -277,7 +232,9 @@ HttpResponse RequestHandler::error(int status, const ServerConfig *server)
 	// sayfa URI'si normal istek gibi cozulur: eslesen location'in root/alias'i
 	RequestHandler tmp(*server);
 	const LocationConfig* loc = tmp.findLocation(it->second);
-	std::string path = loc ? tmp.resolveDiskPath(*loc, it->second) : server->root + it->second;
+	std::string path = server->root + it->second;
+	if (loc != NULL)
+		path = tmp.resolveDiskPath(*loc, it->second);
 	std::ifstream file(path.c_str());
 
 	if (!file.is_open())
@@ -286,7 +243,7 @@ HttpResponse RequestHandler::error(int status, const ServerConfig *server)
 	std::istreambuf_iterator<char> first(file);
 	std::istreambuf_iterator<char> last;
 	//For performance i use iterators while loop is so slow for these interections
-	// 
+	//
 	x.body.assign(first, last);
 
 	x.status = status;
@@ -314,14 +271,14 @@ Step RequestHandler::handle(HttpRequest &req)
 	{
 		x.response = error(505,server);
 		return x;
-	}	
+	}
 
 	if(req.version == "HTTP/1.1" && utils::getHeader(req.headers,"host").size() == 0)
 	{
 		x.response = error(400,server);
 		return x;
 	}
-	
+
 	// Govde limiti conf'tan; direktif verilmemisse (0) sinirsiz sayilir
 	size_t limit = bodyLimit(req);
 	if(limit != 0 && req.body.size() > limit)
@@ -331,7 +288,8 @@ Step RequestHandler::handle(HttpRequest &req)
 	}
 
 	std::string path;
-	if (!normalizePath(req.path, path))
+	// %XX normalizePath'ten once cozulmeli ki "%2e%2e" de ".." olarak yakalansin
+	if (!normalizePath(utils::decodePath(req.path), path))
 	{
 		x.response = error(400,server);
 		return x;
@@ -351,7 +309,7 @@ Step RequestHandler::handle(HttpRequest &req)
 		allowed = true;
 	else if(std::find(best->allowed_methods.begin(), best->allowed_methods.end(), req.method) != best->allowed_methods.end())
 		allowed = true;
-	
+
 	if (allowed == false)
 	{
 	    std::string allow;
@@ -540,7 +498,7 @@ Step RequestHandler::onReady(int fd, short revents)
 			if(parseCgiOutput(cgiBuffer, x.response) == false)
 				x.response = error(502, server);
 		}
-		else 
+		else
 			x.response = error(502, server);
 		close(fd);
 		closeCgiStdin(x);

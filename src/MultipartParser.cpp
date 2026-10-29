@@ -40,7 +40,10 @@ bool parseMultipart(const std::string& body, const std::string& contentType,
     if (!boundary.empty() && boundary[0] == '"')
     {
         size_t end = boundary.find('"', 1);
-        boundary = (end == std::string::npos) ? boundary.substr(1) : boundary.substr(1, end - 1);
+        if (end == std::string::npos)
+            boundary = boundary.substr(1);
+        else
+            boundary = boundary.substr(1, end - 1);
     }
     if (boundary.empty())
         return false;
@@ -91,11 +94,7 @@ bool parseMultipart(const std::string& body, const std::string& contentType,
             size_t ct_end = lower_headers.find("\r\n", ct);
             if (ct_end == std::string::npos)
                 ct_end = headers.size();
-            std::string value = headers.substr(ct + 13, ct_end - (ct + 13));
-            size_t first = value.find_first_not_of(" \t");
-            if (first != std::string::npos)
-                value = value.substr(first);
-            item.contentType = value;
+            item.contentType = utils::trim(headers.substr(ct + 13, ct_end - (ct + 13)));
         }
 
         item.content = part.substr(hdr_end + 4);

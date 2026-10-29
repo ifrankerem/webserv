@@ -5,6 +5,7 @@
 #include <iostream>
 #include <string>
 #include "../includes/RequestHandler.hpp"
+#include "../includes/Utils.hpp"
 
 static int g_failed = 0;
 static int g_passed = 0;
@@ -149,8 +150,10 @@ static void testPathSafety(const ServerConfig& srv)
     section("path safety: never escape root");
     CHECK(run(srv, "GET", "/../etc/passwd").response.status != 200);
     CHECK(run(srv, "GET", "/a/../../etc/passwd").response.status != 200);
-    // A decodes the path, so "%2e%2e/" and "..%2f" reach us as "../".
-    CHECK(run(srv, "GET", "/../etc/passwd").response.status != 200);
+    // %XX is decoded before normalizing: encoded ".." must still be caught.
+    CHECK(run(srv, "GET", "/%2e%2e/etc/passwd").response.status == 400);
+    CHECK(run(srv, "GET", "/a/..%2f..%2fetc/passwd").response.status == 400);
+    CHECK(run(srv, "GET", "/a%00b").response.status == 400);
     CHECK(run(srv, "GET", "/a/./../../etc/passwd").response.status != 200);
     // "." and ".." that stay inside the root are fine.
     CHECK(run(srv, "GET", "/a/../index.html").response.status != 400);
@@ -175,6 +178,29 @@ static void testQueryIgnored(const ServerConfig& srv)
     CHECK(h.bodyLimit(limit) == 5);
 }
 
+static void testUtils()
+{
+    section("utils: path and string helpers");
+    CHECK(utils::decodePath("/a%20b") == "/a b");
+    CHECK(utils::decodePath("/c+d") == "/c+d");
+    CHECK(utils::decodePath("/bad%zz%4") == "/bad%zz%4");
+    CHECK(utils::urlDecode("a+b%21") == "a b!");
+    CHECK(utils::endsWithSlash("/x/"));
+    CHECK(!utils::endsWithSlash("/x"));
+    CHECK(!utils::endsWithSlash(""));
+    CHECK(utils::joinPath("www/", "/a") == "www/a");
+    CHECK(utils::joinPath("www", "a") == "www/a");
+    CHECK(utils::joinPath("www/", "") == "www/");
+    CHECK(utils::trim("  text/plain \t") == "text/plain");
+    CHECK(utils::trim("   ") == "");
+    CHECK(utils::atoi("2147483647") == 2147483647);
+    CHECK(utils::atoi("2147483648") == -1);
+    CHECK(utils::atoi("12a") == -1);
+    CHECK(utils::atoi("") == -1);
+    CHECK(utils::getExtension("/a.d/b") == "");
+    CHECK(utils::getExtension("/a/b.py") == ".py");
+}
+
 static void testAlwaysResponds(const ServerConfig& srv)
 {
     section("router phase: handle() always returns RESPOND");
@@ -193,6 +219,7 @@ int main()
     testPathSafety(srv);
    testQueryIgnored(srv);
     testAlwaysResponds(srv);
+    testUtils();
 
     std::cout << "\n" << g_passed << " passed, " << g_failed << " failed\n";
     return g_failed == 0 ? 0 : 1;

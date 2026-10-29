@@ -100,8 +100,7 @@ HttpResponse ResponseHandler::handle_get(const std::string& diskPath,const HttpR
 
 	if(S_ISDIR(info.st_mode) != 0)
 	{
-		std::string indexPath = diskPath;
-		if (req.path[req.path.size() - 1] != '/')
+		if (!utils::endsWithSlash(req.path))
 		{
 			std::string red_path;
 			if(!req.query.empty())
@@ -110,11 +109,9 @@ HttpResponse ResponseHandler::handle_get(const std::string& diskPath,const HttpR
 				red_path = req.path + '/';
 			return ResponseHandler::redirect_handler(301, red_path);
 		}
-		else if(indexPath[indexPath.size() - 1] != '/')
-			indexPath += '/';
 		for (size_t i = 0; i < loc.index.size(); i++) 
 		{
-			std::string temp_path = indexPath + loc.index[i];
+			std::string temp_path = utils::joinPath(diskPath, loc.index[i]);
 			if (::stat(temp_path.c_str(), &info) == 0)
 				return serveFile(temp_path,srv);
 		}
@@ -124,7 +121,7 @@ HttpResponse ResponseHandler::handle_get(const std::string& diskPath,const HttpR
 			return RequestHandler::error(404,&srv);
 	}
 	else {
-		if (req.path[req.path.size() - 1] == '/')
+		if (utils::endsWithSlash(req.path))
 			return RequestHandler::error(404, &srv);
 	}
 	return serveFile(diskPath,srv); //Its normal file on the directory
@@ -229,10 +226,6 @@ HttpResponse ResponseHandler::handle_post(const std::string& diskPath,const std:
 		if(!parseMultipart(req.body, utils::getHeader(req.headers, "content-type"), parts))
 			return RequestHandler::error(400, &srv);
 
-		std::string store = loc.upload_store;
-		if(!store.empty() && store[store.size() - 1] == '/')
-			store.erase(store.size() - 1);
-
 		bool wrote = false;
 		for(size_t i = 0; i < parts.size(); i++)
 		{
@@ -246,7 +239,7 @@ HttpResponse ResponseHandler::handle_post(const std::string& diskPath,const std:
 				|| filename.find('\0') != std::string::npos)
 				return RequestHandler::error(400, &srv);
 
-			std::ofstream outfile((store + "/" + filename).c_str(), std::ios::binary);
+			std::ofstream outfile(utils::joinPath(loc.upload_store, filename).c_str(), std::ios::binary);
 			if(!outfile)
 				return RequestHandler::error(500, &srv);
 			outfile.write(parts[i].content.data(), parts[i].content.size());
@@ -271,23 +264,18 @@ HttpResponse ResponseHandler::handle_post(const std::string& diskPath,const std:
 	std::string url = path;
 	struct stat st;
 	bool isDir = ::stat(diskPath.c_str(), &st) == 0 && S_ISDIR(st.st_mode);
-	if(path == loc.path || req.path[req.path.size() - 1] == '/' || isDir)
+	if(path == loc.path || utils::endsWithSlash(req.path) || isDir)
 	{
 		if(!isDir)
 			return RequestHandler::error(404, &srv);
-		std::string dir = diskPath;
-		if(dir[dir.size() - 1] != '/')
-			dir += "/";
-		if(url[url.size() - 1] != '/')
-			url += "/";
 		// sayac yeniden baslatmada sifirlanir; access() dolu adlari atlar
 		static size_t counter = 0;
 		std::string name;
 		do
 			name = "upload_" + utils::toString(counter++);
-		while(::access((dir + name).c_str(), F_OK) == 0);
-		target = dir + name;
-		url += name;
+		while(::access(utils::joinPath(diskPath, name).c_str(), F_OK) == 0);
+		target = utils::joinPath(diskPath, name);
+		url = utils::joinPath(path, name);
 	}
 
 	std::ofstream outfile(target.c_str(), std::ios::binary);
