@@ -134,6 +134,8 @@ void ServerManager::setupServers()
             std::cout << ip << ":" << port << std::endl;
         }     
     }
+    if (_server_fds.empty()) 
+        throw std::runtime_error("No listening sockets could be bound.");
 }
 
 void ServerManager::run()
