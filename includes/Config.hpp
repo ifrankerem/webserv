@@ -6,6 +6,8 @@
 #include <map>
 
 struct Listen {
+    Listen() : port(0) {}
+
     std::string ip;
     int port;
 };

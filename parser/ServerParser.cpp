@@ -69,6 +69,8 @@ Config ConfigParser::parse_config_file(const std::string& filename)
             }
 
             if (command_map.find(token) != command_map.end()) {
+                if (i + 1 >= tokens.size() || tokens[i + 1] == ";" || tokens[i + 1] == "{" || tokens[i + 1] == "}")
+                    throw std::runtime_error("Config Error: Directive '" + token + "' requires at least one argument.");
                 (this->*command_map[token])(tokens, i, current_server);
             }
             else {
@@ -181,19 +183,29 @@ void ConfigParser::parse_error_page(std::vector<std::string>& tokens, size_t& i,
 {
     i++;
     std::vector<int> codes;
-    // Hata kodlarını oku (örneğin: 500 502 503)
-    while (i < tokens.size() && tokens[i] != ";" && isdigit(tokens[i][0])) {
+
+    while (i < tokens.size() && tokens[i] != ";" && tokens[i] != "{" && tokens[i] != "}") {
+        if (i + 1 < tokens.size() && tokens[i + 1] == ";")
+            break;
+
         int code = utils::atoi(tokens[i]);
-        if(code == -1)
-            throw std::runtime_error("Config Error: 'error_page' 1");
+        if (code < 300 || code > 599)
+            throw std::runtime_error("Config Error: Invalid status code in 'error_page': " + tokens[i]);
         codes.push_back(code);
         i++;
     }
 
-    std::string page = tokens[i]; // Son argüman hedef sayfadır (/errors/50x.html)
+    if (codes.empty())
+        throw std::runtime_error("Config Error: 'error_page' requires at least one status code.");
+
+    if (i >= tokens.size() || tokens[i] == ";" || tokens[i] == "{" || tokens[i] == "}")
+        throw std::runtime_error("Config Error: 'error_page' requires a target URI/path.");
+
+    std::string page = tokens[i];
 
     i++;
-    if (i >= tokens.size() || tokens[i] != ";") throw std::runtime_error("Config Error: 'error_page' must end with ';'");
+    if (i >= tokens.size() || tokens[i] != ";") 
+        throw std::runtime_error("Config Error: 'error_page' must end with ';'");
 
     for (size_t j = 0; j < codes.size(); j++) {
         server.error_pages[codes[j]] = page;

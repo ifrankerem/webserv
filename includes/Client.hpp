@@ -26,6 +26,7 @@
         std::string         _writeBuffer;
         size_t              _bytesSent;
         int                 _serverPort;
+        std::string         _serverIp;
         RequestHandler*     _handler;
         // Son recv/send ya da CGI olayinin zamani (saniye).
         // ServerManager::checkTimeouts() simdiki zamanla farkina bakar.
@@ -48,6 +49,8 @@
 
         void        setServerPort(int port);
         int         getServerPort() const;
+        void        setServerIp(const std::string& ip);
+        const std::string& getServerIp() const;
         void        prepareResponse(const std::string& serialized);
         bool        hasPendingData() const;
         const char* sendPtr() const;

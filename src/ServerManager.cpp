@@ -16,7 +16,7 @@ ServerManager::~ServerManager(){
         ++it;
         closeConnection(fd);
     }
-    for (std::map<int, int>::iterator it = _server_fds.begin(); it != _server_fds.end(); ++it) {
+    for (std::map<int, Listen>::iterator it = _server_fds.begin(); it != _server_fds.end(); ++it) {
         close(it->first);
     }
     _server_fds.clear();
@@ -34,11 +34,12 @@ void ServerManager::signal_handler(int sig)
     g_running = 0;
 }
 
-const ServerConfig* findServerConfig(const Config& config, int port, const std::string& host_header) {
+const ServerConfig* findServerConfig(const Config& config, const std::string& ip, int port, const std::string& host_header) {
     const ServerConfig* default_server = NULL;
     for (size_t i = 0; i < config.servers.size(); i++) {
         for (size_t j = 0; j < config.servers[i].listens.size(); j++) {
-            if (config.servers[i].listens[j].port == port) {
+            if (config.servers[i].listens[j].port == port &&
+                (config.servers[i].listens[j].ip == ip || config.servers[i].listens[j].ip == "0.0.0.0" || ip == "0.0.0.0")) {
                 if (default_server == NULL) default_server = &config.servers[i];
                 if (!config.servers[i].server_name.empty()) {
                     bool match = false;
@@ -56,11 +57,11 @@ const ServerConfig* findServerConfig(const Config& config, int port, const std::
     return default_server;
 }
 
-bool port_check(std::vector<int> &ports, int current)
+bool listen_check(const std::vector<Listen> &listens, const std::string &ip, int port)
 {
-    for (size_t i = 0; i < ports.size(); i++)
+    for (size_t i = 0; i < listens.size(); i++)
     {
-        if (ports[i] == current)
+        if (listens[i].ip == ip && listens[i].port == port)
             return true;
     }
     return false;
@@ -74,14 +75,16 @@ void ServerManager::setupServers()
     signal(SIGTERM, signal_handler);
     _epoll_fd = epoll_create(1);
 
-    std::vector<int> ports;
+    std::vector<Listen> opened_listens;
 
     for (size_t i = 0; i < _config.servers.size(); i++)
     {
         for (size_t j = 0; j < _config.servers[i].listens.size(); j++)
         {
-      
-            if (port_check(ports,_config.servers[i].listens[j].port))
+            const std::string& ip = _config.servers[i].listens[j].ip;
+            int port = _config.servers[i].listens[j].port;
+
+            if (listen_check(opened_listens, ip, port))
                 continue;      
             
             int socket_fd = socket(AF_INET,SOCK_STREAM,0);
@@ -95,8 +98,8 @@ void ServerManager::setupServers()
 
             std::memset(&address,0,sizeof(address));
             address.sin_family = AF_INET;
-            address.sin_addr.s_addr = inet_addr(_config.servers[i].listens[j].ip.c_str()); //kendi inetaddr ni yaz veya tip tanımla
-            address.sin_port = htons(_config.servers[i].listens[j].port);
+            address.sin_addr.s_addr = inet_addr(ip.c_str());
+            address.sin_port = htons(port);
                     
             if(bind(socket_fd, (struct sockaddr*)&address, sizeof(address)) == -1)
             {
@@ -124,13 +127,15 @@ void ServerManager::setupServers()
                 continue;
             }
 
-            _server_fds[socket_fd] = _config.servers[i].listens[j].port;
+            _server_fds[socket_fd] = _config.servers[i].listens[j];
 
-            ports.push_back(_config.servers[i].listens[j].port);
+            opened_listens.push_back(_config.servers[i].listens[j]);
 
-            std::cout << "127.0.0.1:" << _config.servers[i].listens[j].port << std::endl;
+            std::cout << ip << ":" << port << std::endl;
         }     
     }
+    if (_server_fds.empty()) 
+        throw std::runtime_error("No listening sockets could be bound.");
 }
 
 void ServerManager::run()
@@ -189,7 +194,8 @@ void ServerManager::acceptConnection(int server_fd)
     epoll_ctl(_epoll_fd, EPOLL_CTL_ADD, new_client_fd, &event); 
     
     Client new_client(new_client_fd,cl);
-    new_client.setServerPort(_server_fds[server_fd]);
+    new_client.setServerPort(_server_fds[server_fd].port);
+    new_client.setServerIp(_server_fds[server_fd].ip);
     _clients[new_client_fd] = new_client;
     _clients[new_client_fd].setState(READING);
 }
@@ -247,7 +253,7 @@ void ServerManager::handleClientWrite(int client_fd)
             host = req.headers["host"];
 
         if (client.getHandler() == NULL) {
-            const ServerConfig* srv = findServerConfig(_config, client.getServerPort(), host);
+            const ServerConfig* srv = findServerConfig(_config, client.getServerIp(), client.getServerPort(), host);
             if (srv == NULL) {
                 closeConnection(client_fd);
                 return;

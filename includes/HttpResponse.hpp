@@ -5,6 +5,8 @@
 #include <map>
 
 struct HttpResponse {
+    HttpResponse() : status(200) {}
+
     int status;
     std::map<std::string, std::string> headers;
     std::string body;
