@@ -8,7 +8,9 @@
 #include <cstdlib>
 #include <fcntl.h>
 #include <fstream>
+#include <iostream>
 #include <map>
+#include <ostream>
 #include <poll.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -401,6 +403,7 @@ Step RequestHandler::handle(HttpRequest &req)
 			x.response = error(500, server);
 			return x;
 		}
+		std::flush(std::cout); //flushing the cout because stdout will be pipe after this
 		int id = fork();
 		if(id == -1)
 		{

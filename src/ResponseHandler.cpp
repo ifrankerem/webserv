@@ -399,5 +399,5 @@ void ResponseHandler::handle_cgi_child(const int output_fd,const int input_fd,st
 	for (size_t i = 0; i < envp.size(); ++i) //freeing the envp just in case
 		free(envp[i]);
 
-	_exit(1); //kills child automatically
+	std::exit(1);
 }
