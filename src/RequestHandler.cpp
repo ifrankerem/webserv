@@ -347,7 +347,7 @@ Step RequestHandler::handle(HttpRequest &req)
 	{
 		Step x;
 		x.kind = Step::RESPOND;
-		x.response = error(505,server);
+		x.response = error(400,server);
 		return x;
 	}
 
