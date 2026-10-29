@@ -142,20 +142,22 @@ static std::map<std::string, std::string> buildCgiEnv(const HttpRequest& req,
 	env["PATH_TRANSLATED"] = "";
 	env["QUERY_STRING"] = req.query;
 	env["SERVER_PROTOCOL"] = req.version;
-
+	env["GATEWAY_INTERFACE"] = "CGI/1.1";
 	env["CONTENT_TYPE"] = utils::getHeader(req.headers, "Content-Type");
 	env["CONTENT_LENGTH"] = utils::toString(req.body.size());
 	std::string host_name = utils::getHeader(req.headers, "Host");
-	env["SERVER_NAME"] = srv.server_name[0]; //default is the first one
-	for(size_t i = 0; i < srv.server_name.size();i++)
+	if(srv.server_name.size() != 0)
 	{
-		if(host_name == srv.server_name[i])
+		env["SERVER_NAME"] = srv.server_name[0]; //default is the first one
+		for(size_t i = 0; i < srv.server_name.size();i++)
 		{
-			env["SERVER_NAME"] = host_name;
-			break;
+			if(host_name == srv.server_name[i])
+			{
+				env["SERVER_NAME"] = host_name;
+				break;
+			}
 		}
 	}
-	
 	env["SERVER_PORT"] = utils::toString(static_cast<size_t>(req.server_port));
 	env["REMOTE_ADDR"] = req.remote_addr;
 	env["REDIRECT_STATUS"] = "200";
@@ -187,7 +189,7 @@ static std::map<std::string, std::string> buildCgiEnv(const HttpRequest& req,
 }
 
 // raw tuketilir: govde kopyalanmadan response.body'ye swap edilir (100 MB cikti = 0 ek kopya)
-static void parseCgiOutput(std::string& raw, HttpResponse& response)
+static bool parseCgiOutput(std::string& raw, HttpResponse& response)
 {
 	response.status = 200;
 
@@ -204,6 +206,11 @@ static void parseCgiOutput(std::string& raw, HttpResponse& response)
 	{
 		headersPart = raw.substr(0, blank);
 		raw.erase(0, blank + headerEndLen);
+	}
+	if(headersPart.size() == 0)
+	{
+		response.status = 502;
+		return false;
 	}
 	response.body.swap(raw);
 
@@ -244,10 +251,16 @@ static void parseCgiOutput(std::string& raw, HttpResponse& response)
 			else
 				response.headers[key] = value;
 		}
+		else {
+			response.status = 502;
+			return false;
+		}
 	}
 
 	if (response.headers.find("Content-Type") == response.headers.end())
 		response.headers["Content-Type"] = "text/html; charset=UTF-8";
+
+	return true;
 
 }
 
@@ -522,7 +535,8 @@ Step RequestHandler::onReady(int fd, short revents)
 			if (cgiBuffer.empty())
 				x.response = error(502, server); // CGI produced no output (likely execve failed)
 			else
-				parseCgiOutput(cgiBuffer, x.response);
+				if(parseCgiOutput(cgiBuffer, x.response) == false)
+					x.response = error(502, server);
 		}
 		else
 		{
@@ -534,7 +548,10 @@ Step RequestHandler::onReady(int fd, short revents)
 	else if (revents & (POLLERR | POLLHUP)) // fd error or pipe hang up (closed)
 	{
 		if(!(cgiBuffer.empty())) //there is a tricky situation in this case POLLHUP means pipe closed but there will remain cgi buffer. But kernel sends POLLHUP instaead of PULLIN so there is valid data in there but we just did the error in this if. So i fixed it
-			parseCgiOutput(cgiBuffer, x.response);
+		{
+			if(parseCgiOutput(cgiBuffer, x.response) == false)
+				x.response = error(502, server);
+		}
 		else 
 			x.response = error(502, server);
 		close(fd);
