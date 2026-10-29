@@ -159,6 +159,10 @@ void ServerManager::run()
             {
                 handleCgiEvent(current_fd, _events[i].events);
             }
+            else if (_clients.count(current_fd) == 0)
+            {
+                continue;
+            }
             else if (_events[i].events & (EPOLLERR | EPOLLHUP | EPOLLRDHUP))
             {
                 closeConnection(current_fd);
@@ -286,7 +290,8 @@ void ServerManager::handleClientWrite(int client_fd)
             
             struct epoll_event c_event;
             std::memset(&c_event, 0, sizeof(c_event));
-            c_event.events = 0; // İstemciye dönene kadar bekle
+            c_event.events = EPOLLRDHUP;
+            c_event.data.fd = client_fd;
             epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, client_fd, &c_event);
             return;
         }
@@ -332,10 +337,6 @@ void ServerManager::handleClientWrite(int client_fd)
 
 void ServerManager::closeConnection(int client_fd)
 {
-    if (_clients.find(client_fd) != _clients.end()) {
-        _clients[client_fd].clearHandler();
-    }
-
     std::map<int, int>::iterator it = _cgi_to_client.begin();
     while (it != _cgi_to_client.end()) {
         if (it->second == client_fd) {
@@ -344,6 +345,10 @@ void ServerManager::closeConnection(int client_fd)
         } else {
             ++it;
         }
+    }
+
+    if (_clients.find(client_fd) != _clients.end()) {
+        _clients[client_fd].clearHandler();
     }
 
     epoll_ctl(_epoll_fd, EPOLL_CTL_DEL, client_fd, NULL);
@@ -379,11 +384,13 @@ void ServerManager::handleCgiEvent(int cgi_fd, uint32_t events)
 
     for (size_t i = 0; i < result.unwatch.size(); i++) {
         epoll_ctl(_epoll_fd, EPOLL_CTL_DEL, result.unwatch[i], NULL);
+        close(result.unwatch[i]);
         _cgi_to_client.erase(result.unwatch[i]);
     }
 
     if (result.kind == Step::RESPOND) {
         epoll_ctl(_epoll_fd, EPOLL_CTL_DEL, cgi_fd, NULL);
+        close(cgi_fd);
         _cgi_to_client.erase(cgi_fd);
 
         client.prepareResponse(result.response.serialize(
