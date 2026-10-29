@@ -22,6 +22,8 @@ struct Step {
     };
 
     Kind                 kind;
+
+    Step() : kind(RESPOND) {}
     HttpResponse         response;
     std::vector<WatchFd> watch;
     std::vector<int>     unwatch; // epoll'den cikarilacak fd'ler (kapanan CGI stdin)

@@ -152,7 +152,7 @@ int atoi(const std::string &str)
     if (str.empty())
         return -1;
 
-    while (str[i])
+    while (i < (int)str.length())
     {
         if (str[i] >= '0' && str[i] <= '9')
         {

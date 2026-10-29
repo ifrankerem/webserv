@@ -5,6 +5,8 @@
 #include <map>
 
 struct HttpRequest {
+    HttpRequest() : server_port(0) {}
+
     std::string method;
     std::string path;
     std::string query;

@@ -9,10 +9,12 @@ void ConfigParser::parse_location(std::vector<std::string>& tokens, size_t& i, S
     loc.upload_enable = false;
     
     i++; 
+    if (i >= tokens.size() || tokens[i] == "{" || tokens[i] == "}" || tokens[i] == ";")
+        throw std::runtime_error("Config Error: 'location' requires a path.");
     loc.path = tokens[i];
     
     i++;
-    if (tokens[i] != "{") throw std::runtime_error("Config Error: Expected '{' after location path.");
+    if (i >= tokens.size() || tokens[i] != "{") throw std::runtime_error("Config Error: Expected '{' after location path.");
     
     i++; 
     
@@ -60,7 +62,7 @@ void ConfigParser::parse_upload_enable(std::vector<std::string>& tokens, size_t&
     else 
         throw std::runtime_error("Config Error: 'upload_enable' can only be 'on' or 'off'! Received value: " + tokens[i]);
     i++;
-    if (tokens[i] != ";") throw std::runtime_error("Config Error: 'upload_enable' must end with ';'");
+    if (i >= tokens.size() || tokens[i] != ";") throw std::runtime_error("Config Error: 'upload_enable' must end with ';'");
 }
 
 void ConfigParser::parse_location_root(std::vector<std::string>& tokens, size_t& i, LocationConfig& location)
@@ -182,6 +184,8 @@ void ConfigParser::parse_location_client_max_body_size(std::vector<std::string>&
 {
     i++;
     std::string val = tokens[i];
+    if (val.empty())
+        throw std::runtime_error("Config Error: 'client_max_body_size' cannot be empty");
     size_t multiplier = 1;
     char last_char = val[val.length() - 1];
 
