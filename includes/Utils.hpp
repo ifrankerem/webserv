@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <netinet/in.h>
 #include "HttpResponse.hpp"
 
 namespace utils
@@ -17,6 +18,7 @@ namespace utils
     HttpResponse defaultErrorPage(int status);
     std::vector<char*> mapToEnv(const std::map<std::string, std::string>& env);
     int atoi(const std::string &str);
+    in_addr_t inet_addr(const std::string& ip);
 }
 
 #endif

@@ -9,8 +9,6 @@
 #include <fcntl.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <arpa/inet.h>
-#include <arpa/inet.h>
 #include <cstring>
 #include <ctime>
 #include "ConfigParser.hpp"
