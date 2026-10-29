@@ -222,13 +222,22 @@ void ServerManager::handleClientRead(int client_fd)
 
             struct epoll_event event;
             std::memset(&event, 0, sizeof(event));
-            event.events = EPOLLOUT;
+            event.events = EPOLLOUT | EPOLLRDHUP;
             event.data.fd = client_fd;
             epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, client_fd, &event);
         }
         else if (_clients[client_fd].getParseState() == PARSE_ERROR)
         {
-            closeConnection(client_fd);
+            HttpResponse err = utils::defaultErrorPage(400);
+            err.headers["Connection"] = "close";
+            _clients[client_fd].prepareResponse(err.serialize());
+            _clients[client_fd].setState(WRITING);
+
+            struct epoll_event event;
+            std::memset(&event, 0, sizeof(event));
+            event.events = EPOLLOUT | EPOLLRDHUP;
+            event.data.fd = client_fd;
+            epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, client_fd, &event);
         }
     }
     else if (byte == -1)
@@ -252,48 +261,65 @@ void ServerManager::handleClientWrite(int client_fd)
         HttpRequest &req = client.getParserObj().getParsedRequest();
         req.server_port = client.getServerPort();
 
-        std::string host = "";
-        if (req.headers.count("host"))
-            host = req.headers["host"];
+        if (req.version.compare(0, 5, "HTTP/") == 0 && req.version != "HTTP/1.0" && req.version != "HTTP/1.1")
+        {
+            HttpResponse err = utils::defaultErrorPage(505);
+            err.headers["Connection"] = "close";
+            client.prepareResponse(err.serialize());
+        }
+        else if ((req.method == "POST" || req.method == "PUT") &&
+                 req.headers.count("content-length") == 0 &&
+                 req.headers.count("transfer-encoding") == 0)
+        {
+            HttpResponse err = utils::defaultErrorPage(411);
+            err.headers["Connection"] = "close";
+            client.prepareResponse(err.serialize());
+        }
+        else
+        {
+            std::string host = "";
+            if (req.headers.count("host"))
+                host = req.headers["host"];
 
-        if (client.getHandler() == NULL) {
-            const ServerConfig* srv = findServerConfig(_config, client.getServerIp(), client.getServerPort(), host);
-            if (srv == NULL) {
-                closeConnection(client_fd);
+            if (client.getHandler() == NULL) {
+                const ServerConfig* srv = findServerConfig(_config, client.getServerIp(), client.getServerPort(), host);
+                if (srv == NULL) {
+                    closeConnection(client_fd);
+                    return;
+                }
+                client.setHandler(new RequestHandler(*srv));
+            }
+
+            Step result = client.getHandler()->handle(req);
+
+            if (result.kind == Step::RESPOND) {
+                client.prepareResponse(result.response.serialize(req.method == "HEAD"));
+                client.clearHandler();
+            } else if (result.kind == Step::WAIT) {
+                for (size_t i = 0; i < result.watch.size(); i++) {
+                    struct epoll_event event;
+                    std::memset(&event, 0, sizeof(event));
+                    if (result.watch[i].events & POLLIN)
+                        event.events |= EPOLLIN;
+                    if (result.watch[i].events & POLLOUT)
+                        event.events |= EPOLLOUT;
+                    
+                    event.data.fd = result.watch[i].fd;
+                    epoll_ctl(_epoll_fd, EPOLL_CTL_ADD, result.watch[i].fd, &event);
+                    
+                    _cgi_to_client[result.watch[i].fd] = client_fd;
+                }
+                
+                client.setState(PROCESSING);
+                client.touch();
+                
+                struct epoll_event c_event;
+                std::memset(&c_event, 0, sizeof(c_event));
+                c_event.events = EPOLLRDHUP;
+                c_event.data.fd = client_fd;
+                epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, client_fd, &c_event);
                 return;
             }
-            client.setHandler(new RequestHandler(*srv));
-        }
-
-        Step result = client.getHandler()->handle(req);
-
-        if (result.kind == Step::RESPOND) {
-            client.prepareResponse(result.response.serialize(req.method == "HEAD"));
-            client.clearHandler();
-        } else if (result.kind == Step::WAIT) {
-            for (size_t i = 0; i < result.watch.size(); i++) {
-                struct epoll_event event;
-                std::memset(&event, 0, sizeof(event));
-                if (result.watch[i].events & POLLIN)
-                    event.events |= EPOLLIN;
-                if (result.watch[i].events & POLLOUT)
-                    event.events |= EPOLLOUT;
-                
-                event.data.fd = result.watch[i].fd;
-                epoll_ctl(_epoll_fd, EPOLL_CTL_ADD, result.watch[i].fd, &event);
-                
-                _cgi_to_client[result.watch[i].fd] = client_fd;
-            }
-            
-            client.setState(PROCESSING);
-            client.touch();
-            
-            struct epoll_event c_event;
-            std::memset(&c_event, 0, sizeof(c_event));
-            c_event.events = EPOLLRDHUP;
-            c_event.data.fd = client_fd;
-            epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, client_fd, &c_event);
-            return;
         }
     }
 
