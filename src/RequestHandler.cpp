@@ -279,18 +279,6 @@ Step RequestHandler::handle(HttpRequest &req)
 
 bool RequestHandler::validateRequest(HttpRequest &req, std::string &path, Step &x)
 {
-	if(req.version != "HTTP/1.0" && req.version != "HTTP/1.1")
-	{
-		x.response = error(505,server);
-		return false;
-	}
-
-	if(req.version == "HTTP/1.1" && utils::getHeader(req.headers,"host").size() == 0)
-	{
-		x.response = error(400,server);
-		return false;
-	}
-
 	// Govde limiti conf'tan; direktif verilmemisse (0) sinirsiz sayilir
 	size_t limit = bodyLimit(req);
 	if(limit != 0 && req.body.size() > limit)
