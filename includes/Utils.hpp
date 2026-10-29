@@ -16,7 +16,7 @@ namespace utils
     std::string urlDecode(const std::string& s);
     std::string getHeader(const std::map<std::string, std::string>& headers, const std::string& key);
     HttpResponse defaultErrorPage(int status);
-    std::vector<char*> mapToEnv(const std::map<std::string, std::string>& env);
+    std::vector<std::string> mapToEnv(const std::map<std::string, std::string>& env);
     int atoi(const std::string &str);
     in_addr_t inet_addr(const std::string& ip);
 }

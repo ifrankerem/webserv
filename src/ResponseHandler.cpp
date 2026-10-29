@@ -8,6 +8,7 @@
 #include "../includes/MultipartParser.hpp"
 #include <algorithm>
 #include <cstddef>
+#include <string>
 #include <unistd.h>
 #include <vector>
 #include <dirent.h>
@@ -344,7 +345,11 @@ void ResponseHandler::handle_cgi_child(const int output_fd,const int input_fd,st
 	for (int i = 3; i < 1024; ++i) {
         close(i);
     }
-	std::vector<char*> envp = utils::mapToEnv(env_variables);
+	std::vector<char*> envp;
+	std::vector<std::string> temp_env = utils::mapToEnv(env_variables);
+	for(size_t i = 0; i < temp_env.size() ; i++)
+		envp.push_back(const_cast<char*>(temp_env[i].c_str()));
+	envp.push_back(NULL);
 	std::string scriptPath;
 	std::map<std::string, std::string>::const_iterator it = env_variables.find("SCRIPT_FILENAME");
 	if (it != env_variables.end())
@@ -395,9 +400,6 @@ void ResponseHandler::handle_cgi_child(const int output_fd,const int input_fd,st
 	execve(interp.c_str(), argv, &envp[0]);
 
 	// if execve fails these lines of code will work
-
-	for (size_t i = 0; i < envp.size(); ++i) //freeing the envp just in case
-		free(envp[i]);
 
 	std::exit(1);
 }

@@ -131,17 +131,16 @@ HttpResponse defaultErrorPage(int status)
     return x;
 }
 
-std::vector<char*> mapToEnv(const std::map<std::string, std::string>& env)
+std::vector<std::string> mapToEnv(const std::map<std::string, std::string>& env)
 {
-    std::vector<char*> out;
+    std::vector<std::string> out;
     std::map<std::string, std::string>::const_iterator it = env.begin();
     while (it != env.end())
     {
         std::string pair = it->first + "=" + it->second;
-        out.push_back(::strdup(pair.c_str()));
+        out.push_back(pair);
         ++it;
     }
-    out.push_back(NULL);
     return out;
 }
 
