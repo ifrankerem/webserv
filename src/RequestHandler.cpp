@@ -422,9 +422,8 @@ Step RequestHandler::handle(HttpRequest &req)
 		{
 			close(output_pipe[1]); //parent will not write anything so close it!!
 			close(input_pipe[0]); //parent will not read anything so close it!!
-			int fl = fcntl(input_pipe[1], F_GETFL);
-			if (fl != -1)
-				fcntl(input_pipe[1], F_SETFL, fl | O_NONBLOCK);
+			fcntl(input_pipe[1], F_SETFL, O_NONBLOCK);
+
 
 			cgiActive = true;
 			cgiPid = id;
@@ -435,10 +434,8 @@ Step RequestHandler::handle(HttpRequest &req)
 			cgiBuffer.clear();
 
 			struct WatchFd y = WatchFd();
-			fl = fcntl(output_pipe[0], F_GETFL);
-			if (fl != -1)
-				fcntl(output_pipe[0], F_SETFL, fl | O_NONBLOCK);
 			y.fd = output_pipe[0];
+			fcntl(output_pipe[0], F_SETFL, O_NONBLOCK);
 			y.events = POLLIN;
 			x.watch.push_back(y);
 

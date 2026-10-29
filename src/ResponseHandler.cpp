@@ -7,7 +7,6 @@
 #include "../includes/Utils.hpp"
 #include "../includes/MultipartParser.hpp"
 #include <algorithm>
-#include <cerrno>
 #include <cstddef>
 #include <unistd.h>
 #include <vector>
