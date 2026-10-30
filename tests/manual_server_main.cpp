@@ -1,6 +1,6 @@
 #include <iostream>
-#include "ConfigParser.hpp"
-#include "ServerManager.hpp"
+#include "../includes/core/ConfigParser.hpp"
+#include "../includes/event/ServerManager.hpp"
 
 // Elle test etmek icin ayri main.
 // Kullanim: ./webserv_manual conf/manual_test.conf

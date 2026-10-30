@@ -1,5 +1,5 @@
-#include "MultipartParser.hpp"
-#include "Utils.hpp"
+#include "../../../includes/http/modules/MultipartParser.hpp"
+#include "../../../includes/core/Utils.hpp"
 #include <cctype>
 
 // header satirindan name="x" / filename="y" parametresinin degerini cikarir.

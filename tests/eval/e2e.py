@@ -790,7 +790,7 @@ def test_siege(srv):
 # ---------------------------------------------------------------- --valgrind
 
 def valgrind_report():
-    project = {os.path.basename(f) for f in glob.glob("src/*.cpp") + glob.glob("parser/*.cpp") + ["main.cpp"]}
+    project = {os.path.basename(f) for f in glob.glob("src/**/*.cpp", recursive=True) + ["main.cpp"]}
     logs = sorted(glob.glob(f"{D}/vg-*.log"))
     bad, crashed = [], 0
     for log in logs:

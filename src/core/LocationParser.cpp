@@ -1,5 +1,5 @@
-#include "ConfigParser.hpp"
-#include "Utils.hpp"
+#include "../../includes/core/ConfigParser.hpp"
+#include "../../includes/core/Utils.hpp"
 
 void ConfigParser::parse_location(std::vector<std::string>& tokens, size_t& i, ServerConfig& server)
 {

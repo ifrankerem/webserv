@@ -1,6 +1,6 @@
-#include "ServerManager.hpp"
-#include "RequestHandler.hpp"
-#include "Utils.hpp"
+#include "../../includes/event/ServerManager.hpp"
+#include "../../includes/http/RequestHandler.hpp"
+#include "../../includes/core/Utils.hpp"
 #include <csignal>
 #include <poll.h>
 #include <cerrno>

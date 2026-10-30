@@ -1,5 +1,5 @@
-#include "HttpParser.hpp"
-#include "Utils.hpp"
+#include "../../includes/http/HttpParser.hpp"
+#include "../../includes/core/Utils.hpp"
 #include <cstdlib>
 #include <iostream>
 

@@ -1,5 +1,5 @@
-#include "Mime.hpp"
-#include "Utils.hpp"
+#include "../../includes/core/Mime.hpp"
+#include "../../includes/core/Utils.hpp"
 #include <cstddef>
 
 struct MimeEntry {

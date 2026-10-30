@@ -5,7 +5,7 @@
 #include <vector>
 #include <map>
 #include <netinet/in.h>
-#include "HttpResponse.hpp"
+#include "../http/HttpResponse.hpp"
 
 namespace utils
 {

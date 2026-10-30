@@ -1,9 +1,9 @@
 #ifndef RESPONSE_HANDLER
 #define RESPONSE_HANDLER
 
-#include "HttpRequest.hpp"
-#include "HttpResponse.hpp"
-#include "Config.hpp"
+#include "../HttpRequest.hpp"
+#include "../HttpResponse.hpp"
+#include "../../core/Config.hpp"
 #include <dirent.h>
 #include <map>
 #include <string>

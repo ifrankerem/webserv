@@ -11,8 +11,8 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <poll.h>
-#include "ConfigParser.hpp"
-#include "RequestHandler.hpp"
+#include "../includes/core/ConfigParser.hpp"
+#include "../includes/http/RequestHandler.hpp"
 
 static void writeFile(const std::string& path, const std::string& content)
 {

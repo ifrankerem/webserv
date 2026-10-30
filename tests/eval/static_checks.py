@@ -14,8 +14,8 @@ import subprocess
 import sys
 import time
 
-SOURCES = sorted(glob.glob("src/*.cpp") + glob.glob("parser/*.cpp")
-                 + glob.glob("includes/*.hpp") + ["main.cpp"])
+SOURCES = sorted(glob.glob("src/**/*.cpp", recursive=True)
+                 + glob.glob("includes/**/*.hpp", recursive=True) + ["main.cpp"])
 results = []
 
 
@@ -100,7 +100,7 @@ def check_build():
 
     rules = all(re.search(rf"^{r}\s*:", mk, re.M) for r in (r"\$\(NAME\)", "all", "clean", "fclean", "re"))
     run("make clean")
-    objs = [o for o in glob.glob("*.o") + glob.glob("src/*.o") + glob.glob("parser/*.o") + glob.glob("tests/*.o")]
+    objs = [o for o in glob.glob("*.o") + glob.glob("src/**/*.o", recursive=True) + glob.glob("tests/*.o")]
     clean_ok = not objs and os.path.exists("webserv")
     run("make fclean")
     fclean_ok = not os.path.exists("webserv")

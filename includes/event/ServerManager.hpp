@@ -11,7 +11,7 @@
 #include <netinet/in.h>
 #include <cstring>
 #include <ctime>
-#include "ConfigParser.hpp"
+#include "../core/ConfigParser.hpp"
 #include "Client.hpp"
 
 #define MAX_EVENTS 1024

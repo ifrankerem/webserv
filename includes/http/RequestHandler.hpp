@@ -5,7 +5,7 @@
 #include <string>
 #include <sys/types.h>
 #include <vector>
-#include "Config.hpp"
+#include "../core/Config.hpp"
 #include "HttpRequest.hpp"
 #include "HttpResponse.hpp"
 

@@ -1,7 +1,7 @@
 NAME=webserv
 
 CXX = c++
-CXXFLAGS = -std=c++98 -Wall -Wextra -Werror -g -Iincludes -Iincludes/core -Iincludes/event -Iincludes/http -Iincludes/http/modules
+CXXFLAGS = -std=c++98 -Wall -Wextra -Werror -g
 
 CORE_SRC = src/core/LocationParser.cpp src/core/ServerParser.cpp src/core/Mime.cpp src/core/Utils.cpp
 EVENT_SRC = src/event/ServerManager.cpp src/event/Client.cpp

@@ -4,7 +4,7 @@
     #include <sys/socket.h>
     #include <netinet/in.h>
     #include <ctime>
-    #include "HttpParser.hpp"
+    #include "../http/HttpParser.hpp"
 
     class RequestHandler;
 
