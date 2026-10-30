@@ -4,8 +4,8 @@
 
 #include <iostream>
 #include <string>
-#include "../includes/RequestHandler.hpp"
-#include "../includes/Utils.hpp"
+#include "RequestHandler.hpp"
+#include "Utils.hpp"
 
 static int g_failed = 0;
 static int g_passed = 0;

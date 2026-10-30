@@ -1,5 +1,5 @@
-#include "../includes/ServerManager.hpp"
-#include "../includes/ConfigParser.hpp"
+#include "ServerManager.hpp"
+#include "ConfigParser.hpp"
 #include <iostream>
 
 int main() {

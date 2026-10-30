@@ -1,6 +1,6 @@
 #include <iostream>
-#include "includes/ConfigParser.hpp"
-#include "includes/ServerManager.hpp"
+#include "core/ConfigParser.hpp"
+#include "event/ServerManager.hpp"
 #include <dirent.h>
 #include <sys/stat.h>
 #include <fcntl.h>

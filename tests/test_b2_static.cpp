@@ -9,7 +9,7 @@
 #include <string>
 #include <sys/stat.h>
 #include <cstdio>
-#include "../includes/RequestHandler.hpp"
+#include "RequestHandler.hpp"
 
 // Kok dizin "html". Location'lar: "/" (GET POST, autoindex acik), "/gizli"
 static ServerConfig makeServer()

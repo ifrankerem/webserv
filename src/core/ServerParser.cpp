@@ -1,5 +1,5 @@
-#include "../includes/ConfigParser.hpp"
-#include "../includes/Utils.hpp"      
+#include "ConfigParser.hpp"
+#include "Utils.hpp"      
 
 ConfigParser::ConfigParser()
 {

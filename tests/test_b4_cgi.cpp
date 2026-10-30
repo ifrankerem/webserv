@@ -11,7 +11,7 @@
 #include <cstdio>
 #include <unistd.h>
 #include <poll.h>
-#include "../includes/RequestHandler.hpp"
+#include "RequestHandler.hpp"
 
 static ServerConfig makeServer()
 {

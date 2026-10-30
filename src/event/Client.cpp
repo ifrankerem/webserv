@@ -1,5 +1,5 @@
-#include "../includes/Client.hpp"
-#include "../includes/RequestHandler.hpp"
+#include "Client.hpp"
+#include "RequestHandler.hpp"
 
 Client::Client(): _fd(-1), _state(READING), _bytesSent(0), _serverPort(0), _handler(NULL), _lastActivity(std::time(NULL)) {
 

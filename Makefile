@@ -1,11 +1,16 @@
 NAME=webserv
 
 CXX = c++
-CXXFLAGS = -std=c++98 -Wall -Wextra -Werror -g
+CXXFLAGS = -std=c++98 -Wall -Wextra -Werror -g -Iincludes -Iincludes/core -Iincludes/event -Iincludes/http -Iincludes/http/modules
 
-B_SRC = src/RequestHandler.cpp src/ResponseHandler.cpp src/Mime.cpp src/HttpResponse.cpp src/Utils.cpp src/MultipartParser.cpp
-A_SRC = parser/LocationParser.cpp parser/ServerParser.cpp src/ServerManager.cpp src/Client.cpp src/HttpParser.cpp
-SRC = main.cpp $(B_SRC) $(A_SRC)
+CORE_SRC = src/core/LocationParser.cpp src/core/ServerParser.cpp src/core/Mime.cpp src/core/Utils.cpp
+EVENT_SRC = src/event/ServerManager.cpp src/event/Client.cpp
+HTTP_SRC = src/http/HttpParser.cpp src/http/HttpResponse.cpp src/http/RequestHandler.cpp
+MODULES_SRC = src/http/modules/ResponseHandler.cpp src/http/modules/MultipartParser.cpp
+
+B_SRC = src/http/RequestHandler.cpp $(MODULES_SRC) src/core/Mime.cpp src/http/HttpResponse.cpp src/core/Utils.cpp
+A_SRC = src/core/LocationParser.cpp src/core/ServerParser.cpp $(EVENT_SRC) src/http/HttpParser.cpp
+SRC = main.cpp $(CORE_SRC) $(EVENT_SRC) $(HTTP_SRC) $(MODULES_SRC)
 OBJS = $(SRC:.cpp=.o)
 
 ROUTER_NAME = webserv_router
@@ -25,7 +30,7 @@ B4_SRC = tests/test_b4_cgi.cpp $(B_SRC)
 B4_OBJS = $(B4_SRC:.cpp=.o)
 
 TEST_CONF_NAME = test_config
-TEST_CONF_SRC = tests/test_config.cpp parser/ServerParser.cpp parser/LocationParser.cpp src/Utils.cpp
+TEST_CONF_SRC = tests/test_config.cpp src/core/ServerParser.cpp src/core/LocationParser.cpp src/core/Utils.cpp
 TEST_CONF_OBJS = $(TEST_CONF_SRC:.cpp=.o)
 
 TEST_SETUP_NAME = test_setup
@@ -33,7 +38,7 @@ TEST_SETUP_SRC = tests/test_setup.cpp $(A_SRC) $(B_SRC)
 TEST_SETUP_OBJS = $(TEST_SETUP_SRC:.cpp=.o)
 
 TEST_PARSER_NAME = test_parser
-TEST_PARSER_SRC = tests/test_parser.cpp src/HttpParser.cpp src/Utils.cpp
+TEST_PARSER_SRC = tests/test_parser.cpp src/http/HttpParser.cpp src/core/Utils.cpp
 TEST_PARSER_OBJS = $(TEST_PARSER_SRC:.cpp=.o)
 
 MULTI_CGI_NAME = webserv_multi_cgi

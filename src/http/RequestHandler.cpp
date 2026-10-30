@@ -1,8 +1,8 @@
-#include "../includes/RequestHandler.hpp"
-#include "../includes/Config.hpp"
-#include "../includes/HttpResponse.hpp"
-#include "../includes/ResponseHandler.hpp"
-#include "../includes/Utils.hpp"
+#include "RequestHandler.hpp"
+#include "Config.hpp"
+#include "HttpResponse.hpp"
+#include "ResponseHandler.hpp"
+#include "Utils.hpp"
 #include <csignal>
  #include <algorithm>
 #include <cstddef>

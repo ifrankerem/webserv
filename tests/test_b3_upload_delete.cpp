@@ -9,7 +9,7 @@
 #include <sys/stat.h>
 #include <cstdio>
 #include <unistd.h>
-#include "../includes/RequestHandler.hpp"
+#include "RequestHandler.hpp"
 
 static bool fileExists(const std::string& path)
 {

@@ -1,5 +1,5 @@
 webserv
-./vscode
+.vscode/
 compile_flags.txt
 *.o
 docs/not_kerem.txt

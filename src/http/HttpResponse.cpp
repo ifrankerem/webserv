@@ -1,5 +1,5 @@
-#include "../includes/HttpResponse.hpp"
-#include "../includes/Utils.hpp"
+#include "HttpResponse.hpp"
+#include "Utils.hpp"
 #include <cstddef>
 
 // headOnly: HEAD istegi. Content-Length GET'teki gibi gercek boyu soyler, govde yazilmaz (RFC 9110 8.6)
