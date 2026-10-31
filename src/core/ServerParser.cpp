@@ -116,7 +116,7 @@ void ConfigParser::parse_listen(std::vector<std::string>& tokens, size_t& i, Ser
         }
         if(dot != 3)
           throw std::runtime_error("Config Error: 'parse_listen' invalid ip format");
-        int port = utils::atoi(value.substr(colon + 1));//kendi atoimiz yazılacak harf görürse hata verecek
+        int port = utils::atoi(value.substr(colon + 1));
         if (port == -1 || (port > 65535 || port <= 0))
         {
             throw std::runtime_error("Config Error: 'parse_listen' 2 ");
@@ -128,7 +128,7 @@ void ConfigParser::parse_listen(std::vector<std::string>& tokens, size_t& i, Ser
         new_listen.ip = "127.0.0.1";
         
 
-        int port = utils::atoi(value);//kendi atoimiz yazılacak harf görürse hata verecek
+        int port = utils::atoi(value);
         if (port == -1 || (port > 65535 || port <= 0))
             throw std::runtime_error("Config Error: 'parse_listen' 3");
         new_listen.port = port;
@@ -152,8 +152,7 @@ void ConfigParser::parse_server_name(std::vector<std::string>& tokens, size_t& i
     i++;
     while (i < tokens.size() && tokens[i] != ";") {
         if (tokens[i] == "{" || tokens[i] == "}")
-            throw std::runtime_error("Config Error: 'server_name' komutunda ';' unutulmus olabilir.");
-        
+            throw std::runtime_error("Config Error: Missing ';' in 'server_name' directive.");          
         for (size_t j = 0; j < server.server_name.size(); j++) {
             if (server.server_name[j] == tokens[i])
                 throw std::runtime_error("Config Error: Duplicate server name '" + tokens[i] + "'");
@@ -245,8 +244,7 @@ void ConfigParser::parse_index(std::vector<std::string>& tokens, size_t& i, Serv
         throw std::runtime_error("Config Error: Duplicate 'index'");
     while (i < tokens.size() && tokens[i] != ";") {
         if (tokens[i] == "{" || tokens[i] == "}")
-            throw std::runtime_error("Config Error: 'index' komutunda ';' unutulmus olabilir.");
-        
+            throw std::runtime_error("Config Error: Missing ';' in 'index' directive.");        
         for (size_t j = 0; j < server.index.size(); j++) {
             if (server.index[j] == tokens[i])
                 throw std::runtime_error("Config Error: Duplicate index '" + tokens[i] + "'");

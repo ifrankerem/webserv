@@ -93,9 +93,6 @@ void ConfigParser::parse_cgi_path(std::vector<std::string>& tokens, size_t& i, L
 {
     i++;
     std::string path = tokens[i];
-
-    // Birden fazla CGI cifti (ext/path, ext/path, ...) destegi icin:
-    // interpreter'i bos degerli ilk slotu doldur; yoksa gecici " park yeri ac.
     std::map<std::string, std::string>::iterator it = location.cgi_pass.begin();
     while (it != location.cgi_pass.end() && !it->second.empty())
         ++it;
@@ -131,8 +128,7 @@ void ConfigParser::parse_location_index(std::vector<std::string>& tokens, size_t
     while (i < tokens.size() && tokens[i] != ";") {
 
         if (tokens[i] == "{" || tokens[i] == "}") 
-            throw std::runtime_error("Config Error: 'index' komutunda ';' unutulmus olabilir.");
-
+            throw std::runtime_error("Config Error: Missing ';' in 'index' directive.");        
         for (size_t j = 0; j < location.index.size(); j++) {
             if (location.index[j] == tokens[i])
                 throw std::runtime_error("Config Error: Duplicate index '" + tokens[i] + "' in location");
@@ -154,7 +150,7 @@ void ConfigParser::parse_allow_methods(std::vector<std::string>& tokens, size_t&
             for (size_t j = 0; j < location.allowed_methods.size(); j++)
             {
                 if (location.allowed_methods[j] == tokens[i])
-                    throw std::runtime_error("Config Error: Duplicate method! '" + tokens[i] + "' is already added.");//break de atılabilir bilemedim
+                    throw std::runtime_error("Config Error: Duplicate method! '" + tokens[i] + "' is already added.");
             }
             location.allowed_methods.push_back(tokens[i]);
         }
@@ -169,8 +165,8 @@ void ConfigParser::parse_allow_methods(std::vector<std::string>& tokens, size_t&
 void ConfigParser::parse_return(std::vector<std::string>& tokens, size_t& i, LocationConfig& location)
 {
     i++;
-    location.redirect_code = utils::atoi(tokens[i].c_str());//kendi atoini yaz hatalı bura 301kamil
-    if (location.redirect_code < 100 || location.redirect_code > 599) //burayı sen düzeltirsin ben tam aralığını bilmiyorum zaten harf gelirse 0 olucak 0 diye durum kodu yok yine hata
+    location.redirect_code = utils::atoi(tokens[i].c_str());
+    if (location.redirect_code < 100 || location.redirect_code > 599)
         throw std::runtime_error("Config Error: Status code 'return' must be a number only!Received:");
     i++;
     if (i >= tokens.size() || tokens[i] == ";" || tokens[i] == "{" || tokens[i] == "}")

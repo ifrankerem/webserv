@@ -5,8 +5,6 @@
 
 HttpParser::HttpParser() : _state(PARSE_READING), _total_body_read(0), _s_index(0){}
 
-HttpParser::~HttpParser() {}
-
 void HttpParser::feed(const char* chunk, int size) {
     if (chunk && size > 0)
         _raw_data.append(chunk, size);
@@ -115,7 +113,7 @@ void HttpParser::parse() {
             if (c >= '0' && c <= '9')      chunk_size += c - '0';
             else if (c >= 'a' && c <= 'f') chunk_size += c - 'a' + 10;
             else if (c >= 'A' && c <= 'F') chunk_size += c - 'A' + 10;
-            else { _state = PARSE_ERROR; return; } // Geçersiz hex karakter
+            else { _state = PARSE_ERROR; return; }
         }
 
         if (chunk_size == 0) {
@@ -159,31 +157,10 @@ void HttpParser::reset() {
     }
     _total_body_read = 0;
     _s_index = 0;
-    _request = HttpRequest(); // Struct'ı tamamen sıfırlar
+    _request = HttpRequest(); 
     _state = PARSE_READING;
 }
 
 size_t HttpParser::getTotalBodyRead() const {
     return _total_body_read;
-}
-
-void HttpParser::printDebug() const {
-    std::cout << "\n========== [ PARSER DEBUG ] ==========" << std::endl;
-    std::cout << "Method  : [" << _request.method << "]" << std::endl;
-    std::cout << "Path    : [" << _request.path << "]" << std::endl;
-    std::cout << "Query   : [" << _request.query << "]" << std::endl;
-    std::cout << "Version : [" << _request.version << "]" << std::endl;
-    
-    std::cout << "--- Headers (" << _request.headers.size() << ") ---" << std::endl;
-    for (std::map<std::string, std::string>::const_iterator it = _request.headers.begin(); 
-         it != _request.headers.end(); ++it) {
-        std::cout << "  '" << it->first << "' : '" << it->second << "'" << std::endl;
-    }
-    
-    std::cout << "--- Body (" << _request.body.length() << " bytes) ---" << std::endl;
-    if (_request.body.empty())
-        std::cout << "  (Body Bos)" << std::endl;
-    else
-        std::cout << _request.body << std::endl;
-    std::cout << "======================================\n" << std::endl;
 }
