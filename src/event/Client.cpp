@@ -57,11 +57,10 @@ HttpParser& Client::getParserObj()
 void Client::resetForNextRequest() 
 {
     _parser.reset();
-    if (_writeBuffer.capacity() > 64 * 1024) {
+    if (_writeBuffer.capacity() > 64 * 1024)
         std::string().swap(_writeBuffer);
-    } else {
+    else
         _writeBuffer.clear();
-    }
     _bytesSent = 0;
     _state = READING;
     clearHandler();
@@ -136,7 +135,8 @@ void Client::setHandler(RequestHandler* handler)
 
 void Client::clearHandler() 
 {
-    if (_handler != NULL) {
+    if (_handler != NULL) 
+    {
         delete _handler;
         _handler = NULL;
     }

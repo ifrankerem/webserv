@@ -3,14 +3,18 @@
 #include <cstdlib>
 #include <iostream>
 
-HttpParser::HttpParser() : _state(PARSE_READING), _total_body_read(0), _s_index(0){}
+HttpParser::HttpParser() : _state(PARSE_READING), _total_body_read(0), _s_index(0)
+{
+}
 
-void HttpParser::feed(const char* chunk, int size) {
+void HttpParser::feed(const char* chunk, int size) 
+{
     if (chunk && size > 0)
         _raw_data.append(chunk, size);
 }
 
-void HttpParser::parse() {
+void HttpParser::parse() 
+{
     if (_state == PARSE_DONE || _state == PARSE_ERROR)
         return;
 
@@ -137,19 +141,23 @@ void HttpParser::parse() {
 }
 
 
-const HttpRequest& HttpParser::getParsedRequest() const {
+const HttpRequest& HttpParser::getParsedRequest() const 
+{
     return _request;
 }
 
-HttpRequest& HttpParser::getParsedRequest() {
+HttpRequest& HttpParser::getParsedRequest() 
+{
     return _request;
 }
 
-ParseState HttpParser::getState() const {
+ParseState HttpParser::getState() const 
+{
     return _state;
 }
 
-void HttpParser::reset() {
+void HttpParser::reset() 
+{
     if (_raw_data.capacity() > 64 * 1024) {
         std::string().swap(_raw_data);
     } else {
@@ -161,6 +169,7 @@ void HttpParser::reset() {
     _state = PARSE_READING;
 }
 
-size_t HttpParser::getTotalBodyRead() const {
+size_t HttpParser::getTotalBodyRead() const 
+{
     return _total_body_read;
 }

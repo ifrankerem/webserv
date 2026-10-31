@@ -29,15 +29,12 @@ Config ConfigParser::parse_config_file(const std::string& filename)
     Config config;
 
     std::ifstream file(filename.c_str());
-    if (!file.is_open()) {
+    if (!file.is_open())
         throw std::runtime_error("Config Error: The file could not be opened or found: " + filename);
-    }
 
     std::vector<std::string> tokens = tokenize(file);
-
-    if (tokens.empty()) {
+    if (tokens.empty()) 
         throw std::runtime_error("Config Error: File is empty.");
-    }
 
     ServerConfig current_server;
     int in_server = 0;
@@ -49,14 +46,13 @@ Config ConfigParser::parse_config_file(const std::string& filename)
         if (in_server == 0) {
             if (token == "server") {
                 in_server = 1;
-                if (i + 1 < tokens.size() && tokens[i + 1] == "{") {
+                if (i + 1 < tokens.size() && tokens[i + 1] == "{")
                     i++;
-                } else {
+                else
                     throw std::runtime_error("Config Error: Expected '{' after 'server'.");
-                }
-            } else {
+            } 
+            else 
                 throw std::runtime_error("Config Error: Unexpected token '" + token + "' outside of server block.");
-            }
             continue;
         }
 
@@ -73,15 +69,13 @@ Config ConfigParser::parse_config_file(const std::string& filename)
                     throw std::runtime_error("Config Error: Directive '" + token + "' requires at least one argument.");
                 (this->*command_map[token])(tokens, i, current_server);
             }
-            else {
+            else
                 throw std::runtime_error("Config Error: Unknown or invalid directive '" + token + "'.");
-            }
         }
     }
 
-    if (in_server != 0) {
+    if (in_server != 0)
         throw std::runtime_error("Config Error: Unexpected end of file (missing '}').");
-    }
 
     if (config.servers.empty())
          throw std::runtime_error("Config Error: No valid server configuration found.");
@@ -124,7 +118,8 @@ void ConfigParser::parse_listen(std::vector<std::string>& tokens, size_t& i, Ser
         
         new_listen.ip = ip.substr(0,ip.size()-1);
         new_listen.port = port;
-    } else { //burda hata vermesi gerekniyor mu? valuede belki askdfjalskdfja yazıyor port yapmaya mı uğraşıcaz onu
+    } 
+    else {
         new_listen.ip = "127.0.0.1";
         
 
@@ -134,11 +129,9 @@ void ConfigParser::parse_listen(std::vector<std::string>& tokens, size_t& i, Ser
         new_listen.port = port;
     }
     for (size_t j = 0; j < server.listens.size(); j++) {
-        if (server.listens[j].ip == new_listen.ip && server.listens[j].port == new_listen.port) {
+        if (server.listens[j].ip == new_listen.ip && server.listens[j].port == new_listen.port)
             throw std::runtime_error("Config Error: Duplicate listen " + value);
-        }
     }
-
     server.listens.push_back(new_listen);
 
     i++;
@@ -150,7 +143,8 @@ void ConfigParser::parse_server_name(std::vector<std::string>& tokens, size_t& i
     if (!server.server_name.empty()) throw std::runtime_error("Config Error: Duplicate 'server_name'");
     
     i++;
-    while (i < tokens.size() && tokens[i] != ";") {
+    while (i < tokens.size() && tokens[i] != ";") 
+    {
         if (tokens[i] == "{" || tokens[i] == "}")
             throw std::runtime_error("Config Error: Missing ';' in 'server_name' directive.");          
         for (size_t j = 0; j < server.server_name.size(); j++) {
@@ -165,17 +159,20 @@ void ConfigParser::parse_server_name(std::vector<std::string>& tokens, size_t& i
     if (server.server_name.empty())
         throw std::runtime_error("Config Error: Directive 'server_name' requires at least one argument.");
 
-    if (i >= tokens.size() || tokens[i] != ";") throw std::runtime_error("Config Error: 'server_name' must end with ';'");
+    if (i >= tokens.size() || tokens[i] != ";") 
+        throw std::runtime_error("Config Error: 'server_name' must end with ';'");
 }
 
 void ConfigParser::parse_root(std::vector<std::string>& tokens, size_t& i, ServerConfig& server)
 {
-    if (!server.root.empty()) throw std::runtime_error("Config Error: Duplicate 'root'");
+    if (!server.root.empty()) 
+        throw std::runtime_error("Config Error: Duplicate 'root'");
     i++;
     server.root = tokens[i];
 
     i++;
-    if (i >= tokens.size() || tokens[i] != ";") throw std::runtime_error("Config Error: 'root' must end with ';'");
+    if (i >= tokens.size() || tokens[i] != ";") 
+        throw std::runtime_error("Config Error: 'root' must end with ';'");
 }
 
 void ConfigParser::parse_error_page(std::vector<std::string>& tokens, size_t& i, ServerConfig& server)
@@ -206,9 +203,8 @@ void ConfigParser::parse_error_page(std::vector<std::string>& tokens, size_t& i,
     if (i >= tokens.size() || tokens[i] != ";") 
         throw std::runtime_error("Config Error: 'error_page' must end with ';'");
 
-    for (size_t j = 0; j < codes.size(); j++) {
+    for (size_t j = 0; j < codes.size(); j++)
         server.error_pages[codes[j]] = page;
-    }
 }
 
 void ConfigParser::parse_client_max_body_size(std::vector<std::string>& tokens, size_t& i, ServerConfig& server)
@@ -218,13 +214,18 @@ void ConfigParser::parse_client_max_body_size(std::vector<std::string>& tokens, 
     size_t multiplier = 1;
     char last_char = val[val.length() - 1];
 
-    if (last_char == 'M' || last_char == 'm') {
+    if (last_char == 'M' || last_char == 'm') 
+    {
         multiplier = 1024 * 1024;
         val = val.substr(0, val.length() - 1);
-    } else if (last_char == 'K' || last_char == 'k') {
+    } 
+    else if (last_char == 'K' || last_char == 'k') 
+    {
         multiplier = 1024;
         val = val.substr(0, val.length() - 1);
-    } else if (last_char == 'G' || last_char == 'g') {
+    } 
+    else if (last_char == 'G' || last_char == 'g') 
+    {
         multiplier = 1024 * 1024 * 1024;
         val = val.substr(0, val.length() - 1);
     }
@@ -232,9 +233,12 @@ void ConfigParser::parse_client_max_body_size(std::vector<std::string>& tokens, 
     int size = utils::atoi(val);
     if (size <= 0)
         throw std::runtime_error("Config Error: 'client_max_body_size' must be positive");
+
     server.client_max_body_size = size * multiplier;
     i++;
-    if (i >= tokens.size() || tokens[i] != ";") throw std::runtime_error("Config Error: 'client_max_body_size' must end with ';'");
+
+    if (i >= tokens.size() || tokens[i] != ";") 
+        throw std::runtime_error("Config Error: 'client_max_body_size' must end with ';'");
 }
 
 void ConfigParser::parse_index(std::vector<std::string>& tokens, size_t& i, ServerConfig& server)
@@ -242,18 +246,22 @@ void ConfigParser::parse_index(std::vector<std::string>& tokens, size_t& i, Serv
     i++;
     if (!server.index.empty())
         throw std::runtime_error("Config Error: Duplicate 'index'");
-    while (i < tokens.size() && tokens[i] != ";") {
+
+    while (i < tokens.size() && tokens[i] != ";") 
+    {
         if (tokens[i] == "{" || tokens[i] == "}")
-            throw std::runtime_error("Config Error: Missing ';' in 'index' directive.");        
-        for (size_t j = 0; j < server.index.size(); j++) {
+            throw std::runtime_error("Config Error: Missing ';' in 'index' directive.");
+
+        for (size_t j = 0; j < server.index.size(); j++) 
+        {
             if (server.index[j] == tokens[i])
                 throw std::runtime_error("Config Error: Duplicate index '" + tokens[i] + "'");
         }
-        
         server.index.push_back(tokens[i]);
         i++;
     }
-    if (i >= tokens.size() || tokens[i] != ";") throw std::runtime_error("Config Error: 'index' must end with ';'");
+    if (i >= tokens.size() || tokens[i] != ";") 
+        throw std::runtime_error("Config Error: 'index' must end with ';'");
 }
 
 

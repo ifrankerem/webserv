@@ -22,7 +22,8 @@ ServerManager::~ServerManager()
         close(it->first);
     }
     _server_fds.clear();
-    if (_epoll_fd != -1) {
+    if (_epoll_fd != -1) 
+    {
         close(_epoll_fd);
         _epoll_fd = -1;
     }
@@ -130,9 +131,7 @@ void ServerManager::setupServers()
             }
 
             _server_fds[socket_fd] = _config.servers[i].listens[j];
-
             opened_listens.push_back(_config.servers[i].listens[j]);
-
             std::cout << ip << ":" << port << std::endl;
         }     
     }
@@ -151,8 +150,10 @@ void ServerManager::run()
                 break;
             continue;
         }
-        for (int i = 0; i < count_fd; i++){
+        for (int i = 0; i < count_fd; i++)
+        {
             int current_fd = _events[i].data.fd;
+            
             if (_server_fds.count(current_fd) > 0 )
                 acceptConnection(current_fd);
             else if (_cgi_to_client.count(current_fd) > 0)
