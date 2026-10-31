@@ -135,12 +135,14 @@ void ConfigParser::parse_listen(std::vector<std::string>& tokens, size_t& i, Ser
     server.listens.push_back(new_listen);
 
     i++;
-    if (i >= tokens.size() || tokens[i] != ";") throw std::runtime_error("Config Error: 'listen' must end with ';'");
+    if (i >= tokens.size() || tokens[i] != ";") 
+        throw std::runtime_error("Config Error: 'listen' must end with ';'");
 }
 
 void ConfigParser::parse_server_name(std::vector<std::string>& tokens, size_t& i, ServerConfig& server)
 {
-    if (!server.server_name.empty()) throw std::runtime_error("Config Error: Duplicate 'server_name'");
+    if (!server.server_name.empty()) 
+        throw std::runtime_error("Config Error: Duplicate 'server_name'");
     
     i++;
     while (i < tokens.size() && tokens[i] != ";") 

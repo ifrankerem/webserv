@@ -2,8 +2,7 @@
 #include "../../includes/http/RequestHandler.hpp"
 #include "../../includes/core/Utils.hpp"
 #include <csignal>
-#include <poll.h>
-#include <cerrno>
+#include <poll.h> //epoll kütüphaneside ekli buna gerek var mı ne değişmesi
 
 ServerManager::ServerManager(const Config& config)
 {
@@ -153,7 +152,7 @@ void ServerManager::run()
         for (int i = 0; i < count_fd; i++)
         {
             int current_fd = _events[i].data.fd;
-            
+
             if (_server_fds.count(current_fd) > 0 )
                 acceptConnection(current_fd);
             else if (_cgi_to_client.count(current_fd) > 0)

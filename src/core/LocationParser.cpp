@@ -199,13 +199,18 @@ void ConfigParser::parse_location_client_max_body_size(std::vector<std::string>&
     size_t multiplier = 1;
     char last_char = val[val.length() - 1];
 
-    if (last_char == 'M' || last_char == 'm') {
+    if (last_char == 'M' || last_char == 'm') 
+    {
         multiplier = 1024 * 1024;
         val = val.substr(0, val.length() - 1);
-    } else if (last_char == 'K' || last_char == 'k') {
+    } 
+    else if (last_char == 'K' || last_char == 'k') 
+    {
         multiplier = 1024;
         val = val.substr(0, val.length() - 1);
-    } else if (last_char == 'G' || last_char == 'g') {
+    } 
+    else if (last_char == 'G' || last_char == 'g') 
+    {
         multiplier = 1024 * 1024 * 1024;
         val = val.substr(0, val.length() - 1);
     }

@@ -1,14 +1,12 @@
 #ifndef SERVERMANAGER_HPP
 #define SERVERMANAGER_HPP
 
-#include <map>
-#include <sys/epoll.h>
-#include <iostream>
-#include <fcntl.h>
-#include <netinet/in.h>
-#include <cstring>
 #include "../core/ConfigParser.hpp"
 #include "Client.hpp"
+#include <iostream>
+#include <sys/epoll.h>
+#include <fcntl.h>
+#include <cstring>
 
 #define MAX_EVENTS 1024
 

@@ -1,7 +1,6 @@
 #include "../../includes/http/HttpParser.hpp"
 #include "../../includes/core/Utils.hpp"
-#include <cstdlib>
-#include <iostream>
+#include <cstdlib> //atoi silinicekse sil
 
 HttpParser::HttpParser() : _state(PARSE_READING), _total_body_read(0), _s_index(0)
 {
@@ -79,7 +78,7 @@ void HttpParser::parse()
         }
 
         if (_request.headers.find("content-length") != _request.headers.end()) {
-            size_t content_length = std::atoi(_request.headers["content-length"].c_str());
+            size_t content_length = std::atoi(_request.headers["content-length"].c_str()); //bizim atoi kullanılabilir mi bul?
 
             if (_raw_data.length() >= content_length) {
                 if (_raw_data.length() == content_length) {

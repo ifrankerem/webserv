@@ -1,7 +1,6 @@
 #ifndef CLIENT_HPP
 #define CLIENT_HPP
 
-#include <sys/socket.h>
 #include <netinet/in.h>
 #include <ctime>
 #include "../http/HttpParser.hpp"
