@@ -277,6 +277,11 @@ std::vector<std::string> ConfigParser::tokenize(std::ifstream& file)
     while (file.get(c)) {
 
         if (c == '#') {
+            if (!current_token.empty()) 
+            {
+                tokens.push_back(current_token);
+                current_token.clear();
+            }
             while (c != '\n' && file.get(c)) {
             }
             continue;
