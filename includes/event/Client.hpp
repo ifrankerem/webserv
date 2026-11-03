@@ -1,21 +1,22 @@
-    #ifndef CLIENT_HPP
-    #define CLIENT_HPP
+#ifndef CLIENT_HPP
+#define CLIENT_HPP
 
-    #include <sys/socket.h>
-    #include <netinet/in.h>
-    #include <ctime>
-    #include "../http/HttpParser.hpp"
+#include <netinet/in.h>
+#include <ctime>
+#include "../http/HttpParser.hpp"
 
-    class RequestHandler;
+class RequestHandler;
 
-    enum ClientState {
-        READING,
-        PROCESSING,
-        WRITING,
-        CLOSING
-    };
+enum ClientState 
+{
+    READING,
+    PROCESSING,
+    WRITING,
+    CLOSING
+};
 
-    class Client {
+class Client 
+{
     private:
         int                 _fd;
         struct sockaddr_in  _address;
@@ -28,8 +29,6 @@
         int                 _serverPort;
         std::string         _serverIp;
         RequestHandler*     _handler;
-        // Son recv/send ya da CGI olayinin zamani (saniye).
-        // ServerManager::checkTimeouts() simdiki zamanla farkina bakar.
         time_t              _lastActivity;
 
     public:
@@ -61,8 +60,8 @@
         void            setHandler(RequestHandler* handler);
         void            clearHandler();
 
-        void            touch();                 // "su an aktif" diye isaretle
+        void            touch();
         time_t          getLastActivity() const;
-    };
+};
 
-    #endif
+#endif

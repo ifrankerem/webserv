@@ -3,34 +3,33 @@
 
 #include "HttpRequest.hpp"
 
-enum ParseState {
-    PARSE_READING,      // Veri hala parça parça geliyor
-    PARSE_HEADERS_DONE, // Başlıklar bitti, gövde okunuyor
-    PARSE_CHUNKED,      // Transfer-Encoding: chunked, chunk'lar okunuyor
-    PARSE_DONE,         // Her şey kusursuz bitti
-    PARSE_ERROR         // Syntax hatası var
+enum ParseState 
+{
+    PARSE_READING,
+    PARSE_HEADERS_DONE,
+    PARSE_CHUNKED,
+    PARSE_DONE,
+    PARSE_ERROR
 };
 
-class HttpParser {
+class HttpParser 
+{
     private:
-        std::string _raw_data; // recv'den gelen verilerin biriktiği havuz
-        HttpRequest _request;  // Dolduracağımız struct kutusu              
-        ParseState  _state;    // Parser'ın anlık durumu
+        std::string _raw_data;
+        HttpRequest _request;             
+        ParseState  _state;
         size_t      _total_body_read;
-        size_t          _s_index;//yeni eklendi
-
+        size_t      _s_index;
     public:
         HttpParser();
-        ~HttpParser();
 
-        void feed(const char* chunk, int size);
-        void parse();
-        const HttpRequest& getParsedRequest() const;
-        ParseState getState() const;
-        HttpRequest& getParsedRequest();
-        void reset(); // Yeni istek gelirse motoru temizlemek 
-        size_t getTotalBodyRead() const;
-        void printDebug() const;//bunu sil
+        void                feed(const char* chunk, int size);
+        void                parse();
+        const HttpRequest&  getParsedRequest() const;
+        ParseState          getState() const;
+        HttpRequest&        getParsedRequest();
+        void                reset(); 
+        size_t              getTotalBodyRead() const;
 };
 
 #endif

@@ -2,14 +2,15 @@
 #include "../../includes/http/RequestHandler.hpp"
 #include "../../includes/core/Utils.hpp"
 #include <csignal>
-#include <poll.h>
-#include <cerrno>
+#include <poll.h> //epoll kütüphaneside ekli buna gerek var mı ne değişmesi
 
-ServerManager::ServerManager(const Config& config){
+ServerManager::ServerManager(const Config& config)
+{
     _config = config;
 }
     
-ServerManager::~ServerManager(){
+ServerManager::~ServerManager()
+{
     std::map<int, Client>::iterator it = _clients.begin();
     while (it != _clients.end()) {
         int fd = it->first;
@@ -20,7 +21,8 @@ ServerManager::~ServerManager(){
         close(it->first);
     }
     _server_fds.clear();
-    if (_epoll_fd != -1) {
+    if (_epoll_fd != -1) 
+    {
         close(_epoll_fd);
         _epoll_fd = -1;
     }
@@ -34,7 +36,8 @@ void ServerManager::signal_handler(int sig)
     g_running = 0;
 }
 
-const ServerConfig* findServerConfig(const Config& config, const std::string& ip, int port, const std::string& host_header) {
+const ServerConfig* findServerConfig(const Config& config, const std::string& ip, int port, const std::string& host_header) 
+{
     const ServerConfig* default_server = NULL;
     for (size_t i = 0; i < config.servers.size(); i++) {
         for (size_t j = 0; j < config.servers[i].listens.size(); j++) {
@@ -69,7 +72,6 @@ bool listen_check(const std::vector<Listen> &listens, const std::string &ip, int
 
 void ServerManager::setupServers()
 {
-    // CGI borusu koptugunda write() SIGPIPE ile sunucuyu öldürmesin
     signal(SIGPIPE, SIG_IGN);
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
@@ -128,9 +130,7 @@ void ServerManager::setupServers()
             }
 
             _server_fds[socket_fd] = _config.servers[i].listens[j];
-
             opened_listens.push_back(_config.servers[i].listens[j]);
-
             std::cout << ip << ":" << port << std::endl;
         }     
     }
@@ -149,32 +149,22 @@ void ServerManager::run()
                 break;
             continue;
         }
-        for (int i = 0; i < count_fd; i++){
+        for (int i = 0; i < count_fd; i++)
+        {
             int current_fd = _events[i].data.fd;
+
             if (_server_fds.count(current_fd) > 0 )
-            {
                 acceptConnection(current_fd);
-            }
             else if (_cgi_to_client.count(current_fd) > 0)
-            {
                 handleCgiEvent(current_fd, _events[i].events);
-            }
             else if (_clients.count(current_fd) == 0)
-            {
                 continue;
-            }
             else if (_events[i].events & (EPOLLERR | EPOLLHUP | EPOLLRDHUP))
-            {
                 closeConnection(current_fd);
-            }
             else if ((_events[i].events & EPOLLIN) && _clients[current_fd].getState() == READING)
-            {
                 handleClientRead(current_fd);
-            }
             else if ((_events[i].events & EPOLLOUT) && _clients[current_fd].getState() == WRITING)
-            {
                 handleClientWrite(current_fd);
-            }
         }
         checkTimeouts();
     }
@@ -241,15 +231,9 @@ void ServerManager::handleClientRead(int client_fd)
         }
     }
     else if (byte == -1)
-    {
-        // if (errno == EAGAIN || errno == EWOULDBLOCK)
-        //     return;
         closeConnection(client_fd);
-    }
     else
-    {
         closeConnection(client_fd);
-    }
 }
 
 void ServerManager::handleClientWrite(int client_fd)
@@ -331,7 +315,6 @@ void ServerManager::handleClientWrite(int client_fd)
         client.advanceSent(bytes_sent);
         if (!client.hasPendingData())
         {
-            // Tüm veri gönderildi
             bool keep_alive = true;
             HttpRequest &req = client.getParserObj().getParsedRequest();
             if (req.headers.count("connection") && utils::toLower(req.headers["connection"]) == "close")
@@ -350,15 +333,9 @@ void ServerManager::handleClientWrite(int client_fd)
         }
     }
     else if (bytes_sent == -1)
-    {
-        // if (errno == EAGAIN || errno == EWOULDBLOCK)
-        //     return; 
         closeConnection(client_fd);
-    }
     else
-    {
         closeConnection(client_fd);
-    }
 }
 
 void ServerManager::closeConnection(int client_fd)
@@ -385,7 +362,7 @@ void ServerManager::closeConnection(int client_fd)
 void ServerManager::handleCgiEvent(int cgi_fd, uint32_t events)
 {
     std::map<int, int>::iterator mapped = _cgi_to_client.find(cgi_fd);
-    if (mapped == _cgi_to_client.end()) // bayat olay: bu fd artik bizim degil
+    if (mapped == _cgi_to_client.end())
         return;
 
     int client_fd = mapped->second;
@@ -458,7 +435,7 @@ void ServerManager::checkTimeouts()
 
                 Client& client_ref = _clients[client_fd];
                 client_ref.prepareResponse(utils::defaultErrorPage(504).serialize());
-                client_ref.clearHandler(); // ~RequestHandler() calisir: kill(pid, SIGKILL) ve waitpid yapar!
+                client_ref.clearHandler();
                 client_ref.setState(WRITING);
                 client_ref.touch();
 

@@ -1,14 +1,10 @@
-#include <iostream>
 #include "includes/core/ConfigParser.hpp"
 #include "includes/event/ServerManager.hpp"
-#include <dirent.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <dirent.h>
 
-int main(int argc, char** argv) {
-    try {
+int main(int argc, char** argv) 
+{
+    try 
+    {
         if (argc > 2)
         {
             std::cerr << "Usage: ./webserv [file.conf]\n";
@@ -26,7 +22,8 @@ int main(int argc, char** argv) {
         manage.setupServers();
         manage.run();        
     } 
-    catch (const std::exception& e) {
-        std::cerr << "\n[!] KARDESIM PARSER PATLADI: " << e.what() << "\n\n";
+    catch (const std::exception& e) 
+    {
+        std::cerr  << e.what() << "\n";
     }
 }
