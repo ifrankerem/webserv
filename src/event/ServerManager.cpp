@@ -41,10 +41,12 @@ const ServerConfig* findServerConfig(const Config& config, const std::string& ip
     const ServerConfig* default_server = NULL;
     for (size_t i = 0; i < config.servers.size(); i++) {
         for (size_t j = 0; j < config.servers[i].listens.size(); j++) {
-            if (config.servers[i].listens[j].port == port &&
-                (config.servers[i].listens[j].ip == ip || config.servers[i].listens[j].ip == "0.0.0.0" || ip == "0.0.0.0")) {
-                if (default_server == NULL) default_server = &config.servers[i];
-                if (!config.servers[i].server_name.empty()) {
+            if (config.servers[i].listens[j].port == port && (config.servers[i].listens[j].ip == ip || config.servers[i].listens[j].ip == "0.0.0.0" || ip == "0.0.0.0")) 
+            {
+                if (default_server == NULL) 
+                    default_server = &config.servers[i];
+                if (!config.servers[i].server_name.empty()) 
+                {
                     bool match = false;
                     for (size_t k = 0; k < config.servers[i].server_name.size(); k++) {
                         if (host_header.find(config.servers[i].server_name[k]) != std::string::npos) {
@@ -52,7 +54,8 @@ const ServerConfig* findServerConfig(const Config& config, const std::string& ip
                             break;
                         }
                     }
-                    if (match) return &config.servers[i];
+                    if (match) 
+                        return &config.servers[i];
                 }
             }
         }
@@ -105,14 +108,14 @@ void ServerManager::setupServers()
                     
             if(bind(socket_fd, (struct sockaddr*)&address, sizeof(address)) == -1)
             {
-                std::cerr << "Hata: Bind core failed)" << std::endl;
+                std::cerr << "Error: Bind core failed)" << std::endl;
                 close(socket_fd);
                 continue;
             }
 
             if (listen(socket_fd,SOMAXCONN) == -1)
             {
-                std::cerr << "Hata: Listen failed!" << std::endl;
+                std::cerr << "Error: Listen failed!" << std::endl;
                 close(socket_fd);
                 continue;
             }
@@ -124,7 +127,7 @@ void ServerManager::setupServers()
             
             if (epoll_ctl(_epoll_fd, EPOLL_CTL_ADD, socket_fd, &event) == -1) 
             {
-                std::cerr << "Hata: epoll_ctl failed!" << std::endl;
+                std::cerr << "Error: epoll_ctl failed!" << std::endl;
                 close(socket_fd);
                 continue;
             }
