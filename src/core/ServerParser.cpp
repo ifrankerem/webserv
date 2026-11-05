@@ -128,10 +128,11 @@ void ConfigParser::parse_listen(std::vector<std::string>& tokens, size_t& i, Ser
             throw std::runtime_error("Config Error: 'parse_listen' 3");
         new_listen.port = port;
     }
-    for (size_t j = 0; j < server.listens.size(); j++) {
-        if (server.listens[j].ip == new_listen.ip && server.listens[j].port == new_listen.port)
-            throw std::runtime_error("Config Error: Duplicate listen " + value);
-    }
+    // BUrayı açalım mı?
+    // for (size_t j = 0; j < server.listens.size(); j++) {
+    //     if (server.listens[j].ip == new_listen.ip && server.listens[j].port == new_listen.port)
+    //         throw std::runtime_error("Config Error: Duplicate listen " + value);
+    // }
     server.listens.push_back(new_listen);
 
     i++;
