@@ -2,6 +2,7 @@
 #include "../../includes/http/RequestHandler.hpp"
 #include "../../includes/core/Utils.hpp"
 #include <csignal>
+#include <new>
 #include <poll.h> //epoll kütüphaneside ekli buna gerek var mı ne değişmesi
 
 ServerManager::ServerManager(const Config& config)
@@ -153,18 +154,28 @@ void ServerManager::run()
         {
             int current_fd = _events[i].data.fd;
 
-            if (_server_fds.count(current_fd) > 0 )
-                acceptConnection(current_fd);
-            else if (_cgi_to_client.count(current_fd) > 0)
-                handleCgiEvent(current_fd, _events[i].events);
-            else if (_clients.count(current_fd) == 0)
-                continue;
-            else if (_events[i].events & (EPOLLERR | EPOLLHUP | EPOLLRDHUP))
-                closeConnection(current_fd);
-            else if ((_events[i].events & EPOLLIN) && _clients[current_fd].getState() == READING)
-                handleClientRead(current_fd);
-            else if ((_events[i].events & EPOLLOUT) && _clients[current_fd].getState() == WRITING)
-                handleClientWrite(current_fd);
+            try
+            {
+                if (_server_fds.count(current_fd) > 0 )
+                    acceptConnection(current_fd);
+                else if (_cgi_to_client.count(current_fd) > 0)
+                    handleCgiEvent(current_fd, _events[i].events);
+                else if (_clients.count(current_fd) == 0)
+                    continue;
+                else if (_events[i].events & (EPOLLERR | EPOLLHUP | EPOLLRDHUP))
+                    closeConnection(current_fd);
+                else if ((_events[i].events & EPOLLIN) && _clients[current_fd].getState() == READING)
+                    handleClientRead(current_fd);
+                else if ((_events[i].events & EPOLLOUT) && _clients[current_fd].getState() == WRITING)
+                    handleClientWrite(current_fd);
+            }
+            catch (const std::bad_alloc&)
+            {
+                if (_cgi_to_client.count(current_fd) > 0)
+                    closeConnection(_cgi_to_client[current_fd]);
+                else if (_clients.count(current_fd) > 0)
+                    closeConnection(current_fd);
+            }
         }
         checkTimeouts();
     }
