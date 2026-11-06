@@ -13,12 +13,12 @@
 class ServerManager 
 {
     private:
-        Config                          _config;
-        int                             _epoll_fd;
-        struct epoll_event              _events[MAX_EVENTS];
-        std::map<int, Listen>           _server_fds; 
-        std::map<int, Client>           _clients;
-        std::map<int, int>              _cgi_to_client;
+        Config                _config;
+        int                   _epoll_fd;
+        struct epoll_event    _events[MAX_EVENTS];
+        std::map<int, Listen> _server_fds; 
+        std::map<int, Client> _clients;
+        std::map<int, int>    _cgi_to_client;
 
         void            acceptConnection(int server_fd); 
         void            handleClientRead(int client_fd);

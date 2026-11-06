@@ -3,13 +3,13 @@
 
 ConfigParser::ConfigParser()
 {
-    command_map["listen"]               = &ConfigParser::parse_listen;
-    command_map["server_name"]          = &ConfigParser::parse_server_name;
-    command_map["root"]                 = &ConfigParser::parse_root;
-    command_map["error_page"]           = &ConfigParser::parse_error_page;
-    command_map["client_max_body_size"] = &ConfigParser::parse_client_max_body_size;
-    command_map["index"]                = &ConfigParser::parse_index;
-    command_map["location"]             = &ConfigParser::parse_location;
+    command_map["listen"]                 = &ConfigParser::parse_listen;
+    command_map["server_name"]            = &ConfigParser::parse_server_name;
+    command_map["root"]                   = &ConfigParser::parse_root;
+    command_map["error_page"]             = &ConfigParser::parse_error_page;
+    command_map["client_max_body_size"]   = &ConfigParser::parse_client_max_body_size;
+    command_map["index"]                  = &ConfigParser::parse_index;
+    command_map["location"]               = &ConfigParser::parse_location;
 
     location_command_map["root"]          = &ConfigParser::parse_location_root;
     location_command_map["alias"]         = &ConfigParser::parse_location_alias;

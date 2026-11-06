@@ -21,9 +21,7 @@ class Client
         int                 _fd; // bu nerde kullanılıyor
         struct sockaddr_in  _address; // bu nerde kullanılıyo
         ClientState         _state;
-
         HttpParser          _parser;
-
         std::string         _writeBuffer;
         size_t              _bytesSent;
         int                 _serverPort;

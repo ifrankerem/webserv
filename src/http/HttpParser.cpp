@@ -157,10 +157,8 @@ ParseState HttpParser::getState() const
 
 void HttpParser::reset() 
 {
-    if (_raw_data.capacity() > 64 * 1024) {
+    if (_raw_data.empty() && _raw_data.capacity() > 64 * 1024) {
         std::string().swap(_raw_data);
-    } else {
-        _raw_data.clear();
     }
     _total_body_read = 0;
     _s_index = 0;

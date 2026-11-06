@@ -337,11 +337,38 @@ void ServerManager::handleClientWrite(int client_fd)
 
             if (keep_alive) {
                 client.resetForNextRequest();
-                struct epoll_event event;
-                std::memset(&event, 0, sizeof(event));
-                event.events = EPOLLIN;
-                event.data.fd = client_fd;
-                epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, client_fd, &event);
+                client.parseData();
+
+                if (client.getParseState() == PARSE_DONE)
+                {
+                    client.setState(WRITING);
+                    struct epoll_event event;
+                    std::memset(&event, 0, sizeof(event));
+                    event.events = EPOLLOUT | EPOLLRDHUP;
+                    event.data.fd = client_fd;
+                    epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, client_fd, &event);
+                }
+                else if (client.getParseState() == PARSE_ERROR)
+                {
+                    HttpResponse err = utils::defaultErrorPage(400);
+                    err.headers["Connection"] = "close";
+                    client.prepareResponse(err.serialize());
+                    client.setState(WRITING);
+
+                    struct epoll_event event;
+                    std::memset(&event, 0, sizeof(event));
+                    event.events = EPOLLOUT | EPOLLRDHUP;
+                    event.data.fd = client_fd;
+                    epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, client_fd, &event);
+                }
+                else
+                {
+                    struct epoll_event event;
+                    std::memset(&event, 0, sizeof(event));
+                    event.events = EPOLLIN;
+                    event.data.fd = client_fd;
+                    epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, client_fd, &event);
+                }
             } else {
                 closeConnection(client_fd);
             }
