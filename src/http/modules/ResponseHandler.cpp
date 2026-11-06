@@ -110,9 +110,12 @@ HttpResponse ResponseHandler::handle_get(const std::string& diskPath,const HttpR
 				red_path = req.path + '/';
 			return ResponseHandler::redirect_handler(301, red_path);
 		}
-		for (size_t i = 0; i < loc.index.size(); i++) 
+		std::vector<std::string> index_list = loc.index;
+		if (index_list.empty())
+			index_list = srv.index;
+		for (size_t i = 0; i < index_list.size(); i++)
 		{
-			std::string temp_path = utils::joinPath(diskPath, loc.index[i]);
+			std::string temp_path = utils::joinPath(diskPath, index_list[i]);
 			if (::stat(temp_path.c_str(), &info) == 0)
 				return serveFile(temp_path,srv);
 		}
