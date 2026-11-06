@@ -8,9 +8,7 @@ void ConfigParser::parse_location(std::vector<std::string>& tokens, size_t& i, S
     loc.redirect_code = 0;
     loc.upload_enable = false;
     
-    i++; 
-    if (i >= tokens.size() || tokens[i] == "{" || tokens[i] == "}" || tokens[i] == ";")
-        throw std::runtime_error("Config Error: 'location' requires a path.");
+    i++;//burdaki kontrol servreda yapılıyor bu satıtı sil sonra
     loc.path = tokens[i];
     
     i++;
