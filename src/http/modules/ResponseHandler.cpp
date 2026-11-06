@@ -117,7 +117,7 @@ HttpResponse ResponseHandler::handle_get(const std::string& diskPath,const HttpR
 		{
 			std::string temp_path = utils::joinPath(diskPath, index_list[i]);
 			if (::stat(temp_path.c_str(), &info) == 0)
-				return serveFile(temp_path,srv);
+				return serveFile(temp_path,srv,info);
 		}
 		if(loc.autoindex)
 			return listDirectory(diskPath, loc, srv);
@@ -128,17 +128,13 @@ HttpResponse ResponseHandler::handle_get(const std::string& diskPath,const HttpR
 		if (utils::endsWithSlash(req.path))
 			return RequestHandler::error(404, &srv);
 	}
-	return serveFile(diskPath,srv); //Its normal file on the directory
+	return serveFile(diskPath,srv,info); //Its normal file on the directory
 }
 
 
-HttpResponse ResponseHandler::serveFile(const std::string& diskPath,const ServerConfig& srv)
+HttpResponse ResponseHandler::serveFile(const std::string& diskPath,const ServerConfig& srv,const struct stat &info)
 {
 	HttpResponse x;
-	struct stat info;
-	int stat_info = check_stat(info, diskPath);
-	if(stat_info != 1)
-		return RequestHandler::error(stat_info,&srv);
 	if (!S_ISREG(info.st_mode))
 		return RequestHandler::error(403, &srv);
 	
