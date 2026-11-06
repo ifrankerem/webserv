@@ -79,7 +79,7 @@ std::string toLower(const std::string& s)
     return out;
 }
 
-static int hexValue(char c)
+int hexValue(char c)
 {
     if (c >= '0' && c <= '9')
         return c - '0';
