@@ -299,11 +299,7 @@ HttpResponse ResponseHandler::handle_delete(const std::string& diskPath, const L
 	if (S_ISREG(info.st_mode) == 0)
 		return RequestHandler::error(403, &srv);
 	if (std::remove(diskPath.c_str()) != 0)
-	{
-		if (::access(diskPath.c_str(), F_OK) == -1)
-			return RequestHandler::error(404, &srv);
 		return RequestHandler::error(403, &srv);
-	}
 
 	x.status = 204;
 
