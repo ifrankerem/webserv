@@ -143,16 +143,13 @@ void ServerManager::setupServers()
 
 void ServerManager::run()
 {
-    while (true)
+    while (g_running)
     {
         int count_fd = epoll_wait(_epoll_fd, _events, MAX_EVENTS, 1000);
-        if(count_fd == -1)
-        {
-            if (!g_running)
-                break;
+        if (count_fd <= 0)
             continue;
-        }
-        for (int i = 0; i < count_fd; i++)
+
+        for (int i = 0; i < count_fd && g_running; i++)
         {
             int current_fd = _events[i].data.fd;
 
@@ -175,6 +172,8 @@ void ServerManager::run()
 
 void ServerManager::acceptConnection(int server_fd)
 {
+    if (!g_running)
+        return;
     struct sockaddr_in cl;
     socklen_t cl_len = sizeof(cl);
     int new_client_fd = accept(server_fd, (struct sockaddr *)&cl, &cl_len);
@@ -199,6 +198,8 @@ void ServerManager::acceptConnection(int server_fd)
 
 void ServerManager::handleClientRead(int client_fd)
 {
+    if (!g_running)
+        return;
     char buffer[4096];
     int byte = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
 
@@ -220,7 +221,7 @@ void ServerManager::handleClientRead(int client_fd)
             epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, client_fd, &event);
         }
         else if (_clients[client_fd].getParseState() == PARSE_ERROR)
-        {
+        {//buraya bakılacak
             HttpResponse err = utils::defaultErrorPage(400);
             err.headers["Connection"] = "close";
             _clients[client_fd].prepareResponse(err.serialize());
@@ -241,22 +242,22 @@ void ServerManager::handleClientRead(int client_fd)
 
 void ServerManager::handleClientWrite(int client_fd)
 {
+    if (!g_running)
+        return;
     Client& client = _clients[client_fd];
 
     if (!client.hasPendingData())
     {
         HttpRequest &req = client.getParserObj().getParsedRequest();
-        req.server_port = client.getServerPort();
+        req.server_port = client.getServerPort(); // keremin tarafta kullanılması için var bu neden lazım
 
         if (req.version.compare(0, 5, "HTTP/") == 0 && req.version != "HTTP/1.0" && req.version != "HTTP/1.1")
         {
-            HttpResponse err = utils::defaultErrorPage(505);
+            HttpResponse err = utils::defaultErrorPage(505); //httpResponse html ve istek üretiyor
             err.headers["Connection"] = "close";
             client.prepareResponse(err.serialize());
-        }
-        else if ((req.method == "POST" || req.method == "PUT") &&
-                 req.headers.count("content-length") == 0 &&
-                 req.headers.count("transfer-encoding") == 0)
+        }//put silinicek
+        else if ((req.method == "POST" || req.method == "PUT") && req.headers.count("content-length") == 0 && req.headers.count("transfer-encoding") == 0)
         {
             HttpResponse err = utils::defaultErrorPage(411);
             err.headers["Connection"] = "close";
@@ -269,7 +270,7 @@ void ServerManager::handleClientWrite(int client_fd)
                 host = req.headers["host"];
 
             if (client.getHandler() == NULL) {
-                const ServerConfig* srv = findServerConfig(_config, client.getServerIp(), client.getServerPort(), host);
+                const ServerConfig* srv = findServerConfig(_config, client.getServerIp(), client.getServerPort(), host);//find servera bakılmadı
                 if (srv == NULL) {
                     closeConnection(client_fd);
                     return;
@@ -364,6 +365,8 @@ void ServerManager::closeConnection(int client_fd)
 
 void ServerManager::handleCgiEvent(int cgi_fd, uint32_t events)
 {
+    if (!g_running)
+        return;
     std::map<int, int>::iterator mapped = _cgi_to_client.find(cgi_fd);
     if (mapped == _cgi_to_client.end())
         return;
@@ -424,7 +427,7 @@ void ServerManager::checkTimeouts()
 
         if (now - client.getLastActivity() > 30)
         {
-            if (client.getState() == PROCESSING)
+            if (client.getState() == PROCESSING)//cgi işlemi ise sonsuz kadar çalışabilcek mi
             {
                 std::map<int, int>::iterator cgi_it = _cgi_to_client.begin();
                 while (cgi_it != _cgi_to_client.end()) {
