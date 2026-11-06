@@ -30,8 +30,7 @@ class ConfigParser
         void parse_return(std::vector<std::string>& tokens, size_t& i, LocationConfig& location);
         void parse_upload_enable(std::vector<std::string>& tokens, size_t& i, LocationConfig& location);
         void parse_upload_store(std::vector<std::string>& tokens, size_t& i, LocationConfig& location);
-        void parse_cgi_path(std::vector<std::string>& tokens, size_t& i, LocationConfig& location);
-        void parse_cgi_ext(std::vector<std::string>& tokens, size_t& i, LocationConfig& location);
+        void parse_cgi(std::vector<std::string>& tokens, size_t& i, LocationConfig& location);
 
         std::vector<std::string> tokenize(std::ifstream& file);
     public:

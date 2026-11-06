@@ -4,7 +4,7 @@
 #include "../../includes/http/modules/ResponseHandler.hpp"
 #include "../../includes/core/Utils.hpp"
 #include <csignal>
- #include <algorithm>
+#include <algorithm>
 #include <cstddef>
 #include <cstdlib>
 #include <fcntl.h>
@@ -120,7 +120,7 @@ static std::map<std::string, std::string> buildCgiEnv(const HttpRequest& req, co
 	std::map<std::string, std::string> env;
 	env["REQUEST_METHOD"] = req.method;
 	env["SCRIPT_NAME"] = req.path;
-	env["SCRIPT_FILENAME"] = scriptPath;
+	env["SCRIPT_FILENAME"] = scriptPath.substr(scriptPath.rfind('/') + 1);
 	env["PATH_INFO"] = req.path;
 	env["REQUEST_URI"] = req.path;
 	env["PATH_TRANSLATED"] = "";
@@ -164,10 +164,9 @@ static std::map<std::string, std::string> buildCgiEnv(const HttpRequest& req, co
 	return env;
 }
 
-// raw tuketilir: govde kopyalanmadan response.body'ye swap edilir (100 MB cikti = 0 ek kopya)
 static bool parseCgiOutput(std::string& raw, HttpResponse& response)
 {
-	response.status = 200;
+	response.status = 0; // 0 = script Status yazmadi; asagida 200 ya da 302 olur
 
 	size_t blank = raw.find("\r\n\r\n");
 	size_t headerEndLen = 4;
@@ -198,10 +197,26 @@ static bool parseCgiOutput(std::string& raw, HttpResponse& response)
 			return false;
 		std::string key = line.substr(0, colon);
 		std::string value = utils::trim(line.substr(colon + 1));
-		if (key == "Status")
+		std::string lower = utils::toLower(key); // header adlari buyuk/kucuk harfe duyarsiz: php "Content-type" yazar
+		if (lower == "status")
 			response.status = std::atoi(value.c_str());
+		else if (lower == "content-type")
+			response.headers["Content-Type"] = value;
+		else if (lower == "location")
+			response.headers["Location"] = value;
+		else if(lower == "set-cookie")
+			response.set_cookies.push_back(value);
 		else
 			response.headers[key] = value;
+	}
+
+	// RFC 3875 6.2.3: Status'suz Location bir yonlendirmedir
+	if (response.status == 0)
+	{
+		if (response.headers.count("Location"))
+			response.status = 302;
+		else
+			response.status = 200;
 	}
 
 	if (response.headers.find("Content-Type") == response.headers.end())
@@ -307,7 +322,7 @@ const LocationConfig* RequestHandler::applyLocationRules(HttpRequest &req, const
 	}
 
 	bool allowed = false;
-	if (best->allowed_methods.empty())
+	if (best->allowed_methods.empty()) //all methods are allowed
 		allowed = true;
 	else if(std::find(best->allowed_methods.begin(), best->allowed_methods.end(), req.method) != best->allowed_methods.end())
 		allowed = true;
@@ -329,7 +344,10 @@ const LocationConfig* RequestHandler::applyLocationRules(HttpRequest &req, const
 
 	if(best->redirect_code != 0)
 	{
-		x.response = ResponseHandler::redirect_handler(best->redirect_code,best->redirect_target);
+		if(best->redirect_code / 100 == 3)
+			x.response = ResponseHandler::redirect_handler(best->redirect_code,best->redirect_target);
+		else
+			x.response = error(best->redirect_code,server);
 		return NULL;
 	}
 	return best;
@@ -349,8 +367,6 @@ Step RequestHandler::executeCgi(HttpRequest &req, const std::string &path, const
 	struct Step x = Step();
 	std::string scriptPath = resolveDiskPath(*best, path);
 
-	// resmi tester: POST'ta .bla, dosya diskte olmasa da CGI'ya gider.
-	// GET'te olmayan script 404 kalir (b4 beklentisi).
 	if (req.method != "POST" && access(scriptPath.c_str(), F_OK) != 0)
 	{
 		x.kind = Step::RESPOND;
@@ -408,11 +424,11 @@ Step RequestHandler::executeCgi(HttpRequest &req, const std::string &path, const
 		cgiInOffset = 0;
 		cgiBuffer.clear();
 
-		struct WatchFd y = WatchFd();
-		y.fd = output_pipe[0];
+		struct WatchFd out = WatchFd();
+		out.fd = output_pipe[0];
 		fcntl(output_pipe[0], F_SETFL, O_NONBLOCK);
-		y.events = POLLIN;
-		x.watch.push_back(y);
+		out.events = POLLIN;
+		x.watch.push_back(out);
 
 		// govde olay dongusunde yazilir; ayni anda CGI ciktisi okunabilsin ki
 		// buyuk govdelerde iki boru birbirini kilitlemesin
@@ -438,6 +454,8 @@ Step RequestHandler::executeMethod(HttpRequest &req, const std::string &path, co
 	x.response = ResponseHandler::handle(diskPath, path, req, *best, *server);
 	return x;
 }
+
+//UZERINDEN GEC
 
 
 Step RequestHandler::onReady(int fd, short revents)
@@ -476,9 +494,7 @@ Step RequestHandler::onReady(int fd, short revents)
 		char buf[4096];
 		ssize_t n = read(fd, buf, sizeof(buf));
 		if (n > 0)
-		{
 			cgiBuffer.append(buf, static_cast<size_t>(n));
-		}
 		else if (n == 0)
 		{
 			// Output pipe closed: CGI finished
@@ -488,7 +504,10 @@ Step RequestHandler::onReady(int fd, short revents)
 			cgiPipeFd = -1;
 			if (cgiPid != -1)
 			{
-				waitpid(cgiPid, NULL, 0); // child process now dead, not a zombie
+				pid_t return_pid = waitpid(cgiPid, NULL, WNOHANG); 
+				if(return_pid == 0)
+					kill(cgiPid,SIGKILL); //sdout closed but script not finished so
+				waitpid(cgiPid, NULL, 0);
 				cgiPid = -1;
 			}
 			x.kind = Step::RESPOND;
@@ -520,6 +539,9 @@ Step RequestHandler::onReady(int fd, short revents)
 		cgiPipeFd = -1;
 		if (cgiPid != -1)
 		{
+			pid_t return_pid = waitpid(cgiPid, NULL, WNOHANG); 
+			if(return_pid == 0)
+				kill(cgiPid,SIGKILL); //sdout closed but script not finished so
 			waitpid(cgiPid, NULL, 0);
 			cgiPid = -1;
 		}

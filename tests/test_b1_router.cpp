@@ -183,7 +183,6 @@ static void testUtils()
     CHECK(utils::decodePath("/a%20b") == "/a b");
     CHECK(utils::decodePath("/c+d") == "/c+d");
     CHECK(utils::decodePath("/bad%zz%4") == "/bad%zz%4");
-    CHECK(utils::urlDecode("a+b%21") == "a b!");
     CHECK(utils::endsWithSlash("/x/"));
     CHECK(!utils::endsWithSlash("/x"));
     CHECK(!utils::endsWithSlash(""));

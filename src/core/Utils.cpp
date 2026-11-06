@@ -90,7 +90,9 @@ static int hexValue(char c)
     return -1;
 }
 
-static std::string percentDecode(const std::string& s, bool plusIsSpace)
+
+//TODO
+std::string decodePath(const std::string& s)
 {
     std::string out;
     for (size_t i = 0; i < s.size(); i++)
@@ -101,27 +103,14 @@ static std::string percentDecode(const std::string& s, bool plusIsSpace)
             int low = hexValue(s[i + 2]);
             if (high != -1 && low != -1)
             {
-                out += static_cast<char>(high * 16 + low);
+                out += static_cast<char>(high * 16 + low); //casting 2 hexadecimal valuest to 8 bit char
                 i += 2;
                 continue;
             }
         }
-        if (plusIsSpace && s[i] == '+')
-            out += ' ';
-        else
-            out += s[i];
+        out += s[i];
     }
     return out;
-}
-
-std::string urlDecode(const std::string& s)
-{
-    return percentDecode(s, true);
-}
-
-std::string decodePath(const std::string& s)
-{
-    return percentDecode(s, false);
 }
 
 bool endsWithSlash(const std::string& s)

@@ -21,3 +21,4 @@ html/upload/upload_*
 html/cgi/sink.py
 html/cgi/multi_test.py
 html/cgi/multi_test.php
+__pycache__/

@@ -53,6 +53,7 @@ ResponseHandler::~ResponseHandler()
 
 HttpResponse ResponseHandler::redirect_handler(int status_code,const std::string &target)
 {
+
 	HttpResponse response;
 	response.status = status_code;
 	response.headers["Location"] = target;
@@ -101,7 +102,7 @@ HttpResponse ResponseHandler::handle_get(const std::string& diskPath,const HttpR
 	if(S_ISDIR(info.st_mode) != 0)
 	{
 		if (!utils::endsWithSlash(req.path))
-		{
+		{	//BAKILACAK
 			std::string red_path;
 			if(!req.query.empty())
 				red_path = req.path + '/' + '?' +req.query;
@@ -137,11 +138,8 @@ HttpResponse ResponseHandler::serveFile(const std::string& diskPath,const Server
 		return RequestHandler::error(stat_info,&srv);
 	if (!S_ISREG(info.st_mode))
 		return RequestHandler::error(403, &srv);
-
-	// shortcut: dosya bellege tamamen okunuyor, OOM olmasin diye 10 MB siniri var;
-	// buyuk dosya servis etmek gerekirse parca parca gonderme (streaming) yazilmali.
-	// 413 istemcinin govdesi icindir; burada sorun sunucunun siniri, o yuzden 500.
-	const size_t MAX_FILE_SIZE = 10 * 1024 * 1024;
+	
+	const size_t MAX_FILE_SIZE = 10 * 1024 * 1024; //max file site is 10MB
 	if (static_cast<size_t>(info.st_size) > MAX_FILE_SIZE)
 		return RequestHandler::error(500, &srv);
 
@@ -158,6 +156,8 @@ HttpResponse ResponseHandler::serveFile(const std::string& diskPath,const Server
 	return x;
 }
 
+
+//BAKILACAK
 HttpResponse ResponseHandler::listDirectory(const std::string& diskPath, const LocationConfig& loc, const ServerConfig& srv) //case for autoindex creating an html for indexing
 {
 	DIR* dir = opendir(diskPath.c_str());
@@ -209,31 +209,32 @@ HttpResponse ResponseHandler::listDirectory(const std::string& diskPath, const L
 	return x;
 }
 
-HttpResponse ResponseHandler::handle_post(const std::string& diskPath,const std::string& path,const HttpRequest &req, const LocationConfig& loc,const ServerConfig& srv) // A needs to give me bodylimit free body!!!
+
+//UPLOAD STORE GEREKLI MI
+
+HttpResponse ResponseHandler::handle_post(const std::string& diskPath,const std::string& path,const HttpRequest &req, const LocationConfig& loc,const ServerConfig& srv)
 {
-	HttpResponse x;
 	if(!loc.upload_enable)
 		return RequestHandler::error(403, &srv);
 	if(loc.upload_store.empty())
 		return RequestHandler::error(405, &srv); //ngnix returned 405 so i did it too
-
+	
+	HttpResponse x;
+	
 	std::string type = utils::toLower(utils::getHeader(req.headers, "content-type"));
 	if(type.find("multipart/") != std::string::npos)
 	{
-		// Dosya adi URL'den degil part'in Content-Disposition'indan gelir
 		std::vector<MultipartPart> parts;
-		// boundary case-sensitive: ham header gerekli (type lowercase edilmis olan)
 		if(!parseMultipart(req.body, utils::getHeader(req.headers, "content-type"), parts))
 			return RequestHandler::error(400, &srv);
 
 		bool wrote = false;
 		for(size_t i = 0; i < parts.size(); i++)
 		{
-			std::string filename = utils::urlDecode(parts[i].filename);
+			std::string filename = parts[i].filename;
 			if(filename.empty())
-				continue; // filename'siz: duz metin field, dosya degil
-			// upload_store disina yazma (path traversal) riski
-			if(filename.find('/') != std::string::npos
+				continue;		//skip the empty one its not a file
+			if(filename.find('/') != std::string::npos	//secure for path traversal again!
 				|| filename.find('\\') != std::string::npos
 				|| filename.find("..") != std::string::npos
 				|| filename.find('\0') != std::string::npos)
@@ -256,10 +257,6 @@ HttpResponse ResponseHandler::handle_post(const std::string& diskPath,const std:
 		return x;
 	}
 
-	//diskPath hedef dosya; handle() onu upload_store'dan uretti.
-	//path normalize edilmis, sondaki '/' silinmis olur; '/' kontrolu ham req.path'te.
-	//Dosya adi yoksa (location'in kendisi, '/' ile biten URL ya da hedef dizin)
-	//adi sunucu uretir. Hedef dizin yoksa 404: klasor yerine dosya olusmasin.
 	std::string target = diskPath;
 	std::string url = path;
 	struct stat st;
@@ -268,7 +265,6 @@ HttpResponse ResponseHandler::handle_post(const std::string& diskPath,const std:
 	{
 		if(!isDir)
 			return RequestHandler::error(404, &srv);
-		// sayac yeniden baslatmada sifirlanir; access() dolu adlari atlar
 		static size_t counter = 0;
 		std::string name;
 		do
@@ -312,7 +308,6 @@ HttpResponse ResponseHandler::handle_delete(const std::string& diskPath, const L
 
 	x.status = 204;
 
-
 	return x;
 }
 
@@ -336,8 +331,6 @@ void ResponseHandler::handle_cgi_child(const int output_fd,const int input_fd,st
 		envp.push_back(const_cast<char*>(temp_env[i].c_str()));
 	envp.push_back(NULL);
 
-	// CGI should run in the script's own directory for relative path access.
-	// After chdir, execve argument must be the script basename only.
 	std::string scriptName = scriptPath;
 	std::string scriptDir;
 	size_t slash = scriptPath.rfind('/');
@@ -348,13 +341,10 @@ void ResponseHandler::handle_cgi_child(const int output_fd,const int input_fd,st
 		chdir(scriptDir.c_str());
 	}
 
-	// cgi_path conf'ta goreli olabilir (ör. ./cgi_tester). chdir script dizinine
-	// gittigi icin ayni noktaya donen goreli bir yol kurulur; getcwd izinli degil.
-	// shortcut: script yolu mutlak verilirse goreli yorumlayici cozulemez
 	std::string interp = interpreter;
+	//if there is relative interpreter path
 	if (!interp.empty() && interp[0] != '/' && !scriptDir.empty() && scriptDir[0] != '/')
 	{
-		// scriptDir'in gercek dizin bileseni sayisini say; bas/son bosluklari, ./ ve // gibi durumlari atla
 		size_t components = 0;
 		size_t i = 0;
 		while (i < scriptDir.size())

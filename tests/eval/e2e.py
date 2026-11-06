@@ -6,6 +6,7 @@ Repo kokunden, `make` sonrasi calistir:
     python3 tests/eval/e2e.py --heavy      # R-02 timeout'lar, IO-09, CGI-08, fd/bellek limiti
     python3 tests/eval/e2e.py --siege      # S-01..S-04 (siege gerekli)
     python3 tests/eval/e2e.py --valgrind   # Katman 1 valgrind altinda + S-05 sizinti raporu
+    python3 tests/eval/e2e.py --bonus      # B-01 cookie/session, B-02 ikinci CGI turu (php-cgi gerekli)
 
 Sadece standart kutuphane. Her satir bir kural ID'si tasir; ayrintisi EVAL_RULES.md'de.
 """
@@ -197,6 +198,9 @@ CGI = {
     "syntax.py": 'def (:\n',
     "exit1.py": 'import sys\nsys.exit(1)\n',
     "badheader.py": 'import sys\nsys.stdout.write("bu bir header degil\\n\\ngovde")\n',
+    "earlyclose.py": 'import os,sys,time,signal\nsignal.signal(signal.SIGTERM, signal.SIG_IGN)\n'
+                     'sys.stdout.write("Content-Type: text/plain\\r\\n\\r\\nERKEN"); sys.stdout.flush()\n'
+                     'os.close(1)\ntime.sleep(15)\n',
 }
 FILES = {
     "a/index.html": "<h1>SITE-A</h1>", "a/dosya.txt": "merhaba", "a/hata404.html": "OZEL-404",
@@ -231,7 +235,7 @@ def write_conf(name, body):
 
 def main_conf(off=0):
     d = D
-    cgi = f"cgi_path /usr/bin/python3; cgi_ext .py;"
+    cgi = "cgi .py /usr/bin/python3;"
     return write_conf(f"eval{off}.conf", f"""
 server {{
     listen 127.0.0.1:{P + off};
@@ -484,6 +488,33 @@ def test_cgi():
     report("CGI-07", r.status == 404, f"olmayan script -> {r}")
 
 
+def test_cgi_early_close(srv):
+    # stdout'u kapatip 15 sn daha calisan CGI: EOF'tan sonraki waitpid sunucuyu bekletmemeli
+    res = {}
+
+    def run():
+        t0 = time.time()
+        res["cgi"] = (http("GET", "/cgi/earlyclose.py", timeout=30), time.time() - t0)
+
+    t = threading.Thread(target=run)
+    t.start()
+    time.sleep(0.5 * SLOW)
+    t0 = time.time()
+    g = http("GET", "/", timeout=30)
+    dt = time.time() - t0
+    t.join()
+    r, cgi_dt = res["cgi"]
+    report("CGI-07", r.status == 200 and r.body == b"ERKEN" and cgi_dt < 2 * SLOW,
+           f"stdout'u erken kapatan CGI -> {r}, {cgi_dt:.2f} sn")
+    report("CGI-07", g.status == 200 and dt < SLOW, f"o CGI calisirken GET / {dt:.2f} sn")
+    kids = srv.children()
+    deadline = time.time() + 3 * SLOW
+    while kids and time.time() < deadline:
+        time.sleep(0.2)
+        kids = srv.children()
+    report("CGI-07", not kids, f"stdout'u erken kapatan CGI'dan artik/zombi surec yok: {kids}")
+
+
 def test_nonblocking(srv):
     if WRAP:
         return
@@ -594,7 +625,12 @@ def test_second_instance(srv):
     except subprocess.TimeoutExpired:
         other = http("GET", "/", port=18085)
         p.send_signal(signal.SIGINT)
-        p.communicate()
+        try:
+            p.communicate(timeout=15 * SLOW)
+        except subprocess.TimeoutExpired:  # beklemeye devam etseydik CI is zaman asimina kadar takilirdi
+            p.kill()
+            p.communicate()
+        report("R-01", p.returncode >= 0, f"ortak portlu ikinci surec SIGINT ile cikis kodu {p.returncode}")
         how = f"calismaya devam etti, 18085 -> {other.status}"
         ok = other.status == 200
     report("P-03", ok and srv.alive(), f"ortak portlu ikinci surec {how}; ilk surec ayakta: {srv.alive()}")
@@ -814,6 +850,138 @@ def valgrind_report():
            else "; ".join(sorted(set(bad))[:10]) + note)
 
 
+# ---------------------------------------------------------------- --bonus
+
+PHP_CGI = "/usr/bin/php-cgi"
+P_BONUS = P + 300
+BONUS_CGI = {
+    "hello.py": CGI["hello.py"],
+    "hello.php": '<?php header("Content-Type: text/plain"); echo "PHP-HELLO";\n',
+    "env.php": '<?php header("Content-Type: text/plain");\n'
+               'foreach (["REQUEST_METHOD", "QUERY_STRING", "CONTENT_LENGTH", "CONTENT_TYPE", "SERVER_PORT",\n'
+               '          "GATEWAY_INTERFACE", "HTTP_X_DENEME"] as $k) echo $k . "=" . getenv($k) . "\\n";\n',
+    "body.php": '<?php header("Content-Type: text/plain"); $b = file_get_contents("php://input");\n'
+                'echo "len=" . strlen($b) . " md5=" . md5($b);\n',
+    "stream.php": '<?php header("Content-Type: application/octet-stream");\n'
+                  'for ($i = 0; $i < 80; $i++) { echo str_repeat("x", 65536); flush(); }\n',
+    "cwd.php": '<?php header("Content-Type: text/plain"); echo file_get_contents("data.txt");\n',
+    "data.txt": "GORELI-VERI",
+    "syntax.php": "<?php def (\n",
+    "throw.php": '<?php throw new Exception("hata");\n',
+    "session.py": 'import os,sys\n'
+                  'c = dict(p.strip().split("=", 1) for p in os.environ.get("HTTP_COOKIE", "").split(";") if "=" in p)\n'
+                  'sid = c.get("sid", "")\n'
+                  'if not sid.isalnum(): sid = os.urandom(8).hex()\n'
+                  'os.makedirs("oturum", exist_ok=True)\n'
+                  'f = os.path.join("oturum", sid)\n'
+                  'n = int(open(f).read()) + 1 if os.path.exists(f) else 1\n'
+                  'open(f, "w").write(str(n))\n'
+                  'sys.stdout.write("Content-Type: text/plain\\r\\nSet-Cookie: sid=%s\\r\\n\\r\\nsid=%s count=%d" % (sid, sid, n))\n',
+    "twocookie.py": 'import sys\nsys.stdout.write("Content-Type: text/plain\\r\\nSet-Cookie: a=1\\r\\nSet-Cookie: b=2\\r\\n\\r\\nOK")\n',
+}
+
+
+def bonus_conf():
+    pairs = f"cgi .py /usr/bin/python3; cgi .php {PHP_CGI};"
+    reverse = f"cgi .php {PHP_CGI}; cgi .py /usr/bin/python3;"
+    return write_conf("bonus.conf", f"""
+server {{
+    listen 127.0.0.1:{P_BONUS};
+    location / {{ root {D}/a; allow_methods GET; index index.html; }}
+    location /bcgi {{ root {D}; allow_methods GET POST; {pairs} client_max_body_size 300M; }}
+    location /ters {{ root {D}; allow_methods GET POST; {reverse} }}
+    location /goreli {{ root {os.path.relpath(D, ROOT)}; allow_methods GET POST; {pairs} }}
+}}
+""")
+
+
+def test_bonus():
+    for sub in ("bcgi", "ters", "goreli"):
+        for name, content in BONUS_CGI.items():
+            path = os.path.join(D, sub, name)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w") as f:
+                f.write(content)
+    srv = Server(bonus_conf())
+    if not srv.start((P_BONUS,)):
+        report("B-02", False, f"bonus sunucusu baslamadi; log: {open(srv.log.name).read()[-500:]}")
+        return
+    try:
+        test_bonus_cookie()
+        test_bonus_cgi()
+    finally:
+        srv.stop()
+
+
+def test_bonus_cookie():
+    example = [f for f in glob.glob("**/*", recursive=True)
+               if os.path.isfile(f) and not f.startswith(("tests/", "docs/", ".git/")) and f != "EVAL_RULES.md"
+               and f.endswith((".py", ".php", ".html", ".pl", ".sh"))
+               and re.search(r"set-cookie|setcookie|http_cookie|session_start", open(f, errors="ignore").read(), re.I)]
+    report("B-01", example, f"repoda cookie/session ornegi: {example[:5]}" if example
+           else "repoda cookie/session ornegi yok (S: \"provide simple examples\")")
+
+    r1 = http("GET", "/bcgi/session.py", port=P_BONUS)
+    cookie = r1.headers.get("set-cookie", "")
+    sid = cookie.split(";")[0]
+    report("B-01", r1.status == 200 and sid.startswith("sid=") and r1.body.endswith(b"count=1"),
+           f"ilk istekte Set-Cookie: {cookie!r}, {r1}")
+    r2 = http("GET", "/bcgi/session.py", port=P_BONUS, headers={"Cookie": sid})
+    report("B-01", r2.status == 200 and r2.body == f"{sid} count=2".encode(),
+           f"ayni cookie ile ikinci istek oturumu koruyor: {r2}")
+    r3 = http("GET", "/bcgi/session.py", port=P_BONUS)
+    other = r3.headers.get("set-cookie", "").split(";")[0]
+    report("B-01", r3.body.endswith(b"count=1") and other.startswith("sid=") and other != sid,
+           f"farkli istemci farkli oturum: {sid} / {other}")
+    r = http("GET", "/bcgi/twocookie.py", port=P_BONUS)
+    got = re.findall(rb"(?im)^set-cookie:\s*(\S+)", r.head)
+    report("B-01", got == [b"a=1", b"b=2"], f"CGI'in iki Set-Cookie header'i da istemciye ulasti: {got}")
+
+
+def test_bonus_cgi():
+    if not os.access(PHP_CGI, os.X_OK):
+        report("B-02", False, f"{PHP_CGI} yok, ikinci CGI turu denenemedi")
+        return
+    r = http("GET", "/bcgi/hello.php", port=P_BONUS)
+    p = http("GET", "/bcgi/hello.py", port=P_BONUS)
+    report("B-02", r.status == 200 and r.body == b"PHP-HELLO" and p.body == b"CGI-HELLO",
+           f"ayni location'da .php ve .py: {r} / {p}")
+    r = http("GET", "/bcgi/env.php?a=1&b=2", port=P_BONUS)
+    report("B-02", b"QUERY_STRING=a=1&b=2\n" in r.body, f"CGI-02 php GET query string: {r}")
+    blob = os.urandom(1024 * 1024)
+    want = f"len={len(blob)} md5={hashlib.md5(blob).hexdigest()}".encode()
+    r = http("POST", "/bcgi/body.php", port=P_BONUS, body=blob, headers={"Content-Type": "application/octet-stream"})
+    report("B-02", r.status == 200 and r.body == want, f"CGI-02 php POST 1 MB stdin'e ulasti: {r}")
+    r = http("POST", "/bcgi/body.php", port=P_BONUS, body=blob[:300000], chunked=True)
+    want = f"len=300000 md5={hashlib.md5(blob[:300000]).hexdigest()}".encode()
+    report("B-02", r.status == 200 and r.body == want, f"CGI-04 php chunked POST: {r}")
+    r = http("POST", "/bcgi/env.php?q=1", port=P_BONUS, body=b"abc",
+             headers={"Content-Type": "text/plain", "X-Deneme": "42"})
+    env = dict(l.split("=", 1) for l in r.body.decode(errors="replace").splitlines() if "=" in l)
+    expect = {"REQUEST_METHOD": "POST", "QUERY_STRING": "q=1", "CONTENT_LENGTH": "3", "CONTENT_TYPE": "text/plain",
+              "SERVER_PORT": str(P_BONUS), "GATEWAY_INTERFACE": "CGI/1.1", "HTTP_X_DENEME": "42"}
+    wrong = [f"{k}={env.get(k)!r} (beklenen {v!r})" for k, v in expect.items() if env.get(k) != v]
+    report("B-02", r.status == 200 and not wrong, "CGI-03 php ortam degiskenleri tam" if not wrong else "; ".join(wrong))
+    r = http("GET", "/bcgi/stream.php", port=P_BONUS, timeout=30)
+    report("B-02", r.status == 200 and len(r.body) == 80 * 65536,
+           f"CGI-05 php Content-Length'siz cikti: {len(r.body)} / {80 * 65536} bayt")
+    r = http("GET", "/bcgi/cwd.php", port=P_BONUS)
+    report("B-02", r.status == 200 and r.body == b"GORELI-VERI", f"CGI-06 php goreli yol: {r}")
+    for name in ("syntax.php", "throw.php"):
+        r = http("GET", f"/bcgi/{name}", port=P_BONUS)
+        report("B-02", r.status in (500, 502), f"CGI-07 {name} -> {r}")
+    r = http("GET", "/bcgi/yok.php", port=P_BONUS)
+    report("B-02", r.status == 404, f"CGI-07 olmayan php -> {r}")
+
+    r = http("GET", "/ters/hello.php", port=P_BONUS)
+    p = http("GET", "/ters/hello.py", port=P_BONUS)
+    report("B-02", r.body == b"PHP-HELLO" and p.body == b"CGI-HELLO",
+           f"cgi satirlarinin sirasi ters olunca eslesme dogru: .php {r} / .py {p}")
+    r = http("GET", "/goreli/hello.php", port=P_BONUS)
+    p = http("GET", "/goreli/hello.py", port=P_BONUS)
+    report("B-02", r.body == b"PHP-HELLO" and p.body == b"CGI-HELLO", f"goreli root ile .php {r} / .py {p}")
+
+
 # ---------------------------------------------------------------- main
 
 def main():
@@ -834,6 +1002,7 @@ def main():
             test_default_error_pages()
             test_keepalive()
             test_cgi()
+            test_cgi_early_close(srv)
             test_nonblocking(srv)
             test_second_instance(srv)
             test_abuse(srv)
@@ -844,6 +1013,8 @@ def main():
             test_limits()
         elif MODE == "--siege":
             test_siege(srv)
+        elif MODE == "--bonus":
+            test_bonus()
         code = srv.stop()
         report("R-01", code is not None and code >= 0, f"SIGINT ile cikis kodu {code}")
         if MODE == "--valgrind":

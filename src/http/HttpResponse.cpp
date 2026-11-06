@@ -29,6 +29,15 @@ std::string HttpResponse::serialize(bool headOnly) const
 		out += "\r\n";
 		++it;
 	}
+	std::vector<std::string>::const_iterator cookie_it = set_cookies.begin();
+	while(cookie_it != set_cookies.end())
+	{
+		out += "Set-Cookie";
+		out += ": ";
+		out += *cookie_it;
+		out += "\r\n";
+		++cookie_it;
+	}
 
 	out += "\r\n";
 	if (!headOnly)

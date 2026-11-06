@@ -2,14 +2,11 @@
 #include "../../../includes/core/Utils.hpp"
 #include <cctype>
 
-// header satirindan name="x" / filename="y" parametresinin degerini cikarir.
-// lower: satirin kucuk harfli kopyasi (case-insensitive arama icin)
+
 static std::string getParam(const std::string& line, const std::string& lower,
                             const std::string& param)
 {
     size_t pos = lower.find(param + "=\"");
-    // "filename=\"x\"" icinde "name=\"x\"" de gecbilir; onceki harf
-    // alfanumerikse bu baska bir parametrenin sonu, atla.
     while (pos != std::string::npos && pos > 0 && std::isalnum(lower[pos - 1]))
         pos = lower.find(param + "=\"", pos + 1);
     if (pos == std::string::npos)
@@ -26,13 +23,11 @@ bool parseMultipart(const std::string& body, const std::string& contentType,
                     std::vector<MultipartPart>& out)
 {
     out.clear();
-
-    // Content-Type'tan boundary parametresini al (tirnak icine alinmis olabilir)
+    
     std::string lower_type = utils::toLower(contentType);
-    size_t bpos = lower_type.find("boundary=");
+    size_t bpos = lower_type.find("boundary=");		//trying to find boundory= keyword
     if (bpos == std::string::npos)
         return false;
-
     std::string boundary = contentType.substr(bpos + 9);
     size_t semi = boundary.find(';');
     if (semi != std::string::npos)

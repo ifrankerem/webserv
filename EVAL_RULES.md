@@ -657,7 +657,7 @@ değişiklik istenebilir. Ekip her satırı açıklayabilmeli.
 - **Sırası:** G → F → IO (statik inceleme) → C → H → CGI → R → P → S → D → T → B → K-04 envanteri.
 - **Otomatik testler:** `tests/eval/static_checks.py` (G, F, IO; `--teslim` ile D, T, K-03) ve `tests/eval/e2e.py`
   (varsayılan: C, H, CGI, R-01, IO-07/08, P-03; `--heavy`: R-02, IO-09, CGI-08; `--siege`: S-01..S-04;
-  `--valgrind`: S-05). Her çıktı satırı kural ID'si taşır; GitHub Actions'ta `.github/workflows/ci.yml` ve
+  `--valgrind`: S-05; `--bonus`: B-01, B-02). Her çıktı satırı kural ID'si taşır; GitHub Actions'ta `.github/workflows/ci.yml` ve
   `teslim.yml` bunları koşar. Bu çıktılar kanıt olarak kullanılabilir ama denetimin yerini tutmaz: IO-02/03/04/06,
   H-04 (tarayıcı), K-01/K-04, D-06 ve Q elle incelenir.
 

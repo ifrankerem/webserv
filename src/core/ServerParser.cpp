@@ -20,8 +20,7 @@ ConfigParser::ConfigParser()
     location_command_map["return"]        = &ConfigParser::parse_return;
     location_command_map["upload_enable"] = &ConfigParser::parse_upload_enable;
     location_command_map["upload_store"]  = &ConfigParser::parse_upload_store;
-    location_command_map["cgi_path"]      = &ConfigParser::parse_cgi_path;
-    location_command_map["cgi_ext"]       = &ConfigParser::parse_cgi_ext;
+    location_command_map["cgi"]           = &ConfigParser::parse_cgi;
 }
 
 Config ConfigParser::parse_config_file(const std::string& filename)

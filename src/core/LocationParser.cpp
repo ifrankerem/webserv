@@ -92,37 +92,12 @@ void ConfigParser::parse_upload_store(std::vector<std::string>& tokens, size_t& 
         throw std::runtime_error("Config Error: 'upload_store' must end with ';'");
 }
 
-void ConfigParser::parse_cgi_path(std::vector<std::string>& tokens, size_t& i, LocationConfig& location)
+void ConfigParser::parse_cgi(std::vector<std::string>& tokens, size_t& i, LocationConfig& location)
 {
-    i++;
-    std::string path = tokens[i];
-    std::map<std::string, std::string>::iterator it = location.cgi_pass.begin();
-    while (it != location.cgi_pass.end() && !it->second.empty())
-        ++it;
-    if (it != location.cgi_pass.end())
-        it->second = path;
-    else
-        location.cgi_pass[""] = path;
-
-    i++;
-    if (i >= tokens.size() || tokens[i] != ";") 
-        throw std::runtime_error("Config Error: 'cgi_path' must end with ';'");
-}
-
-void ConfigParser::parse_cgi_ext(std::vector<std::string>& tokens, size_t& i, LocationConfig& location)
-{
-    i++;
-    std::string ext = tokens[i];
-
-    if (location.cgi_pass.count("")) {
-        location.cgi_pass[ext] = location.cgi_pass[""];
-        location.cgi_pass.erase("");
-    } else {
-        location.cgi_pass[ext] = "";
-    }
-    i++;
-    if (i >= tokens.size() || tokens[i] != ";") 
-        throw std::runtime_error("Config Error: 'cgi_ext' must end with ';'");
+    if (i + 3 >= tokens.size() || tokens[i + 3] != ";")
+        throw std::runtime_error("Config Error: 'cgi' must be 'cgi <extension> <interpreter>;'");
+    location.cgi_pass[tokens[i + 1]] = tokens[i + 2];
+    i += 3;
 }
 
 void ConfigParser::parse_location_index(std::vector<std::string>& tokens, size_t& i, LocationConfig& location)

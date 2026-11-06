@@ -259,7 +259,7 @@ def check_clean_configs():
     for conf in sorted(glob.glob("conf/*.conf")):
         text = re.sub(r"#[^\n]*", "", open(conf).read())
         missing = []
-        for key, val in re.findall(r"\b(root|alias|upload_store|cgi_path)\s+([^;\s]+)\s*;", text):
+        for key, val in re.findall(r"\b(root|alias|upload_store|cgi\s+\S+)\s+([^;\s]+)\s*;", text):
             path = val.rstrip("/")
             if os.path.isabs(path):
                 ok = os.path.exists(path)
