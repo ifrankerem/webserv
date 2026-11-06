@@ -146,7 +146,7 @@ void ServerManager::run()
     while (g_running)
     {
         int count_fd = epoll_wait(_epoll_fd, _events, MAX_EVENTS, 1000);
-        if (count_fd <= 0)
+        if (count_fd == -1)
             continue;
 
         for (int i = 0; i < count_fd && g_running; i++)
