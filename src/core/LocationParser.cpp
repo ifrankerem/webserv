@@ -136,7 +136,7 @@ void ConfigParser::parse_allow_methods(std::vector<std::string>& tokens, size_t&
 {
     i++;
     while (i < tokens.size() && tokens[i] != ";") {
-        if (tokens[i] == "GET" || tokens[i] == "POST" || tokens[i] == "DELETE")
+        if (tokens[i] == "GET" || tokens[i] == "POST" || tokens[i] == "DELETE" || tokens[i] == "HEAD")
         {
             for (size_t j = 0; j < location.allowed_methods.size(); j++)
             {

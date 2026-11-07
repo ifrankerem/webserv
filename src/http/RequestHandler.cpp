@@ -6,7 +6,6 @@
 #include <csignal>
 #include <algorithm>
 #include <cstddef>
-#include <cstdlib>
 #include <fcntl.h>
 #include <fstream>
 #include <sstream>
@@ -199,7 +198,11 @@ static bool parseCgiOutput(std::string& raw, HttpResponse& response)
 		std::string value = utils::trim(line.substr(colon + 1));
 		std::string lower = utils::toLower(key); // header adlari buyuk/kucuk harfe duyarsiz: php "Content-type" yazar
 		if (lower == "status")
-			response.status = std::atoi(value.c_str());
+		{
+			response.status = utils::atoi(value.substr(0, value.find(' ')));
+			if (response.status < 100 || response.status > 599)
+				return false;
+		}
 		else if (lower == "content-type")
 			response.headers["Content-Type"] = value;
 		else if (lower == "location")
