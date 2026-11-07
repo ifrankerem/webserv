@@ -449,13 +449,10 @@ def test_keepalive():
                 s.sendall(b"GET /dosya.txt HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
                 r2 = read_response(s)
                 report("H-09", r1.status == 200 and r2.status == 200, f"ayni baglantida 2. istek -> {r2}")
-        with socket.create_connection(("127.0.0.1", P), timeout=5 * SLOW) as s:
-            s.sendall(b"GET /dosya.txt HTTP/1.1\r\nHost: x\r\n\r\n"
-                      b"GET /dosya.txt HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
-            p1 = read_response(s)
-            p2 = read_response(s)
-            report("H-09", p1.status == 200 and p2.status == 200,
-                   f"ayni anda 2 istek tek yazimda (pipelining): {p1.status}, {p2.status}")
+        # read_response ilk cevaptan sonra tampondaki ikinci cevabi atiyor; iki cevap ayni recv'de gelince kayboluyordu
+        statuses, _, _ = nc(b"GET /dosya.txt HTTP/1.1\r\nHost: x\r\n\r\n"
+                            b"GET /dosya.txt HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+        report("H-09", statuses == ["200", "200"], f"ayni anda 2 istek tek yazimda (pipelining): {statuses}")
     except OSError as e:
         report("H-09", False, f"{type(e).__name__}: {e}")
 
