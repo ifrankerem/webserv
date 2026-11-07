@@ -231,7 +231,10 @@ static bool parseCgiOutput(std::string& raw, HttpResponse& response)
 
 size_t RequestHandler::bodyLimit(const HttpRequest &req)
 {
-	const LocationConfig *loc = findLocation(req.path);
+	std::string path;
+	const LocationConfig *loc = NULL;
+	if (normalizePath(utils::decodePath(req.path), path))
+		loc = findLocation(path);
 	// location limit yazmadiysa (0) server limitini miras alir, nginx gibi
 	if(loc == NULL || loc->client_max_body_size == 0)
 		return server->client_max_body_size;

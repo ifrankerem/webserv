@@ -253,9 +253,41 @@ void ServerManager::handleClientRead(int client_fd)
         _clients[client_fd].feedData(buffer, byte);
         _clients[client_fd].parseData();
 
+        ParseState pstate = _clients[client_fd].getParseState();
+        if (pstate != PARSE_READING && pstate != PARSE_ERROR)
+        {
+            HttpRequest &req = _clients[client_fd].getParserObj().getParsedRequest();
+            const ServerConfig* srv = findServerConfig(_config, _clients[client_fd].getServerIp(),
+                                                       _clients[client_fd].getServerPort(),
+                                                       utils::getHeader(req.headers, "host"));
+            if (srv != NULL)
+            {
+                size_t limit = RequestHandler(*srv).bodyLimit(req);
+                size_t cl = 0;
+                bool has_cl = utils::parseSize(utils::getHeader(req.headers, "content-length"), cl);
+                size_t current_size = has_cl ? cl : _clients[client_fd].getParserObj().getTotalBodyRead();
+
+                if (limit != 0 && current_size > limit)
+                {
+                    req.headers["connection"] = "close";
+                    HttpResponse err = errorResponse(_clients[client_fd], 413);
+                    err.headers["Connection"] = "close";
+                    _clients[client_fd].prepareResponse(err.serialize());
+                    _clients[client_fd].setState(WRITING);
+
+                    struct epoll_event event;
+                    std::memset(&event, 0, sizeof(event));
+                    event.events = EPOLLOUT | EPOLLRDHUP;
+                    event.data.fd = client_fd;
+                    epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, client_fd, &event);
+                    return;
+                }
+            }
+        }
+
         if (_clients[client_fd].getParseState() == PARSE_DONE)
         {
-            
+
             _clients[client_fd].setState(WRITING);
 
             struct epoll_event event;
