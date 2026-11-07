@@ -334,6 +334,8 @@ void ServerManager::handleClientWrite(int client_fd)
             HttpRequest &req = client.getParserObj().getParsedRequest();
             if (req.headers.count("connection") && utils::toLower(req.headers["connection"]) == "close")
                 keep_alive = false;
+            if (client.getParseState() == PARSE_ERROR)
+                keep_alive = false;
 
             if (keep_alive) {
                 client.resetForNextRequest();
