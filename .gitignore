@@ -25,4 +25,3 @@ __pycache__/
 
 demo/uploads/*
 !demo/uploads/.keep
-!demo/uploads/ornek.svg

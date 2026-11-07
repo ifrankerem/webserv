@@ -375,9 +375,8 @@
 				document.getElementById('upload-out').textContent = 'Önce bir dosya seç.';
 				return;
 			}
-			const form = new FormData();
-			form.append('file', fileInput.files[0]);
-			doRequest('upload-out', '/upload', { method: 'POST', body: form });
+			const file = fileInput.files[0];
+			doRequest('upload-out', '/upload/' + encodeURIComponent(file.name), { method: 'POST', body: file });
 		});
 
 		document.getElementById('btn-cgi-post').addEventListener('click', () => {

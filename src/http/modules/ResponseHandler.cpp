@@ -5,7 +5,6 @@
 #include "../../../includes/http/RequestHandler.hpp"
 #include "../../../includes/core/Mime.hpp"
 #include "../../../includes/core/Utils.hpp"
-#include "../../../includes/http/modules/MultipartParser.hpp"
 #include <algorithm>
 #include <cstddef>
 #include <string>
@@ -209,42 +208,6 @@ HttpResponse ResponseHandler::handle_post(const std::string& diskPath,const std:
 		return RequestHandler::error(405, &srv); //ngnix returned 405 so i did it too
 	
 	HttpResponse x;
-	
-	std::string type = utils::toLower(utils::getHeader(req.headers, "content-type"));
-	if(type.find("multipart/") != std::string::npos)
-	{
-		std::vector<MultipartPart> parts;
-		if(!parseMultipart(req.body, utils::getHeader(req.headers, "content-type"), parts))
-			return RequestHandler::error(400, &srv);
-
-		bool wrote = false;
-		for(size_t i = 0; i < parts.size(); i++)
-		{
-			std::string filename = parts[i].filename;
-			if(filename.empty())
-				continue;		//skip the empty one its not a file
-			if(filename.find('/') != std::string::npos	//secure for path traversal again!
-				|| filename.find('\\') != std::string::npos
-				|| filename.find("..") != std::string::npos
-				|| filename.find('\0') != std::string::npos)
-				return RequestHandler::error(400, &srv);
-
-			std::ofstream outfile(utils::joinPath(loc.upload_store, filename).c_str(), std::ios::binary);
-			if(!outfile)
-				return RequestHandler::error(500, &srv);
-			outfile.write(parts[i].content.data(), parts[i].content.size());
-			outfile.close();
-			if(!outfile)
-				return RequestHandler::error(500, &srv);
-			wrote = true;
-		}
-		if(!wrote)
-			return RequestHandler::error(400, &srv);
-
-		x.status = 201;
-		x.headers["Location"] = path;
-		return x;
-	}
 
 	std::string target = diskPath;
 	std::string url = path;

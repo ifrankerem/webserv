@@ -146,40 +146,6 @@ int main()
 	std::remove("html/upload/klasor/not.txt");
 	std::remove("html/upload/klasor/ikili.bin");
 
-	// --- POST: multipart/form-data -> 201, ad Content-Disposition'dan ---
-	req.path = "/upload";
-	req.headers["content-type"] = "multipart/form-data; boundary=SINIR";
-	req.body = "--SINIR\r\nContent-Disposition: form-data; name=\"f\"; filename=\"k.txt\"\r\n\r\nveri\r\n--SINIR--\r\n";
-	if (run(srv, req) != 201 || fileContent("html/upload/klasor/k.txt") != "veri")
-		return 1;
-	std::remove("html/upload/klasor/k.txt");
-
-	// --- POST: multipart, filename'siz field atlanir, ikili icerik korunur ---
-	// Null byte'ta kesilirse boyut tutmaz; "name" fonksiyonu filename'a
-	// karismamali (karisirsa part atlanir ve 400 doner).
-	req.body = "--SINIR\r\nContent-Disposition: form-data; name=\"aciklama\"\r\n\r\nduz metin\r\n";
-	req.body += "--SINIR\r\nContent-Disposition: form-data; name=\"f\"; filename=\"ikili.bin\"\r\n\r\n";
-	req.body += std::string("AB\0CD", 5);
-	req.body += "\r\n--SINIR--\r\n";
-	if (run(srv, req) != 201 || fileContent("html/upload/klasor/ikili.bin").size() != 5)
-		return 1;
-	std::remove("html/upload/klasor/ikili.bin");
-
-	// --- POST: boundary'siz/bozuk multipart -> 400 ---
-	req.body = "bu hic boundary icermiyor";
-	if (run(srv, req) != 400)
-		return 1;
-
-	req.headers["content-type"] = "multipart/form-data; boundary=SINIR";
-	req.body = "--SINIR\r\nContent-Disposition: form-data; name=\"f\"; filename=\"yarim.txt\"\r\n\r\nveri";
-	if (run(srv, req) != 400)
-		return 1;
-
-	// --- POST: filename path traversal -> 400, upload_store disina yazmamali ---
-	req.body = "--SINIR\r\nContent-Disposition: form-data; name=\"f\"; filename=\"../evil.txt\"\r\n\r\nEZILDI\r\n--SINIR--\r\n";
-	if (run(srv, req) != 400 || fileExists("html/upload/evil.txt"))
-		return 1;
-
 	// --- POST: URL dosya adi vermiyor -> 201, adi sunucu uretir ---
 	// Location'daki URL'nin gosterdigi dosyada govde olmali; iki POST iki ayri dosya
 	req.path = "/upload";
