@@ -7,6 +7,8 @@ Repo kokunden, `make` sonrasi calistir:
     python3 tests/eval/e2e.py --siege      # S-01..S-04 (siege gerekli)
     python3 tests/eval/e2e.py --valgrind   # Katman 1 valgrind altinda + S-05 sizinti raporu
     python3 tests/eval/e2e.py --bonus      # B-01 cookie/session, B-02 ikinci CGI turu (php-cgi gerekli)
+    python3 tests/eval/e2e.py --nc         # nc ile elle yazilmis gibi ham istekler (H, R, C-03)
+    python3 tests/eval/e2e.py --nc-valgrind  # --nc valgrind altinda + S-05 sizinti raporu
 
 Sadece standart kutuphane. Her satir bir kural ID'si tasir; ayrintisi EVAL_RULES.md'de.
 """
@@ -27,10 +29,10 @@ ROOT = os.getcwd()
 BIN = os.path.join(ROOT, "webserv")
 IDLE = int(os.environ.get("IDLE_TIMEOUT", "30"))  # sunucunun checkTimeouts() suresi (sn)
 MODE = sys.argv[1] if len(sys.argv) > 1 else ""
-SLOW = 10 if MODE == "--valgrind" else 1
+SLOW = 10 if MODE in ("--valgrind", "--nc-valgrind") else 1
 D = tempfile.mkdtemp(prefix="webserv-eval-")
 WRAP = []
-if MODE == "--valgrind":
+if MODE in ("--valgrind", "--nc-valgrind"):
     WRAP = ["valgrind", "--leak-check=full", "--show-leak-kinds=all",
             f"--log-file={D}/vg-%p.log"]
 
@@ -796,6 +798,62 @@ def test_limits():
         srv.stop()
 
 
+def test_slow_clients(srv):
+    res = {}
+
+    def idle_close(key, data):
+        # istek (ya da yarisi) gonderilir, sonra hic bir sey gonderilmez: sunucu IDLE civarinda kapatmali
+        s = socket.create_connection(("127.0.0.1", P), timeout=IDLE + 15)
+        t0 = time.time()
+        s.sendall(data)
+        try:
+            while s.recv(65536):
+                pass
+            res[key] = time.time() - t0
+        except socket.timeout:
+            res[key] = None
+        s.close()
+
+    jobs = [
+        threading.Thread(target=idle_close, args=("keepalive", b"GET / HTTP/1.1\r\nHost: x\r\n\r\n")),
+        threading.Thread(target=idle_close, args=("chunk", b"POST /yukle/yavas HTTP/1.1\r\nHost: x\r\n"
+                                                            b"Transfer-Encoding: chunked\r\n\r\n5\r\nab")),
+    ]
+    for j in jobs:
+        j.start()
+
+    held = []  # yarim header ile asili duran 100 baglanti varken normal istek hizli olmali
+    for _ in range(100):
+        try:
+            c = socket.create_connection(("127.0.0.1", P), timeout=5)
+            c.sendall(b"GET / HTTP/1.1\r\nHo")
+            held.append(c)
+        except OSError:
+            break
+    t0 = time.time()
+    r = http("GET", "/dosya.txt")
+    dt = time.time() - t0
+    report("R-02", r.status == 200 and dt < 1, f"{len(held)} yarim baglanti asiliyken GET {r.status}, {dt:.2f} sn")
+
+    s = socket.create_connection(("127.0.0.1", P), timeout=30)  # header'lari 2 sn arayla parca parca
+    t0 = time.time()
+    for part in (b"GET /dosya.txt HTTP/1.1\r\n", b"Host: x\r\n", b"Connection: close\r\n", b"\r\n"):
+        s.sendall(part)
+        time.sleep(2)
+    got = read_response(s)
+    s.close()
+    report("R-02", got.status == 200, f"header'lari 8 sn'de parca parca gelen istek -> {got.status} ({time.time() - t0:.0f} sn)")
+
+    for c in held:
+        c.close()
+    for j in jobs:
+        j.join()
+    for key, label in (("keepalive", "cevaptan sonra bosta kalan keep-alive"), ("chunk", "chunk ortasinda duran istek")):
+        dt = res.get(key)
+        report("R-02", dt is not None and dt <= IDLE + 5,
+               f"{label}: {'kapanmadi' if dt is None else f'{dt:.0f} sn sonra kapandi'} (sinir {IDLE}+5 sn)")
+
+
 # ---------------------------------------------------------------- --siege
 
 def test_siege(srv):
@@ -982,6 +1040,136 @@ def test_bonus_cgi():
     report("B-02", r.body == b"PHP-HELLO" and p.body == b"CGI-HELLO", f"goreli root ile .php {r} / .py {p}")
 
 
+# ---------------------------------------------------------------- --nc
+
+def nc(data, wait=1.5, half_close=False, slow=False, ip="127.0.0.1", port=P, cap=300000):
+    """nc ile elle yazilmis gibi ham istek: gelen butun cevaplarin status kodlarini ve baglantinin kapanip kapanmadigini dondurur."""
+    s = socket.create_connection((ip, port), timeout=wait * SLOW)
+    if slow:
+        for i in range(len(data)):
+            s.sendall(data[i:i + 1])
+            time.sleep(0.01)
+    else:
+        s.sendall(data)
+    if half_close:
+        s.shutdown(socket.SHUT_WR)  # echo ... | nc: stdin bitince yazma yonu kapanir
+    out, closed = b"", False
+    try:
+        while len(out) < cap:
+            chunk_data = s.recv(65536)
+            if not chunk_data:
+                closed = True
+                break
+            out += chunk_data
+    except socket.timeout:
+        pass
+    s.close()
+    statuses, rest = [], out
+    while True:  # cevaplari Content-Length'e gore tek tek ayir: govde \n ile bitmeyebilir
+        m = re.match(rb"HTTP/1\.[01] (\d{3})", rest)
+        head, sep, after = rest.partition(b"\r\n\r\n")
+        if not m or not sep:
+            break
+        statuses.append(m.group(1).decode())
+        length = re.search(rb"(?i)\r\ncontent-length:\s*(\d+)", head)
+        rest = after[int(length.group(1)) if length else 0:]
+    return statuses, closed, out
+
+
+def nc_desc(statuses, closed):
+    shown = ", ".join(statuses) if len(statuses) <= 5 else f"{len(statuses)} cevap ({statuses[0]}...)"
+    return f"{shown or 'cevap yok'}, baglanti {'kapandi' if closed else 'acik'}"
+
+
+def test_nc(srv):
+    host, close = b"Host: localhost\r\n", b"Connection: close\r\n"
+    get = b"GET / HTTP/1.1\r\n" + host + close + b"\r\n"
+    keep = b"GET / HTTP/1.1\r\n" + host + b"\r\n"
+    one_400 = lambda s, c, b: s == ["400"] and c  # tek 400 ve baglanti kapanir: 400 sonsuz donguye girmemeli (#117)
+    cases = [
+        # (kural, aciklama, istek, nc() secenekleri, gecme kosulu(statuses, closed, body))
+        # --- normal akis: bunlar bugun de geciyor
+        ("H-09", "GET / Connection: close", get, {}, lambda s, c, b: s == ["200"] and c),
+        ("H-09", "GET / keep-alive", keep, {}, lambda s, c, b: s == ["200"] and not c),
+        ("H-09", "iki istek tek yazimda (pipelining)", keep + b"GET /dosya.txt HTTP/1.1\r\n" + host + close + b"\r\n",
+         {}, lambda s, c, b: s == ["200", "200"]),
+        ("H-09", "istek bayt bayt yavas", get, {"slow": True}, lambda s, c, b: s == ["200"]),
+        ("H-07", "chunk extension '5;x=1'", b"POST /yukle/nc_c1.txt HTTP/1.1\r\n" + host
+         + b"Transfer-Encoding: chunked\r\n" + close + b"\r\n5;x=1\r\nmerha\r\n0\r\n\r\n", {},
+         lambda s, c, b: s == ["201"]),
+        ("H-03", "HTTP/1.1, Host yok -> 400", b"GET / HTTP/1.1\r\n" + close + b"\r\n", {}, lambda s, c, b: s == ["400"]),
+        ("H-03", "HTTP/1.2 -> 505", b"GET / HTTP/1.2\r\n" + host + close + b"\r\n", {}, lambda s, c, b: s == ["505"]),
+        ("H-03", "fazla bosluk 'GET  /  HTTP/1.1' -> 400", b"GET  /  HTTP/1.1\r\n" + host + close + b"\r\n", {},
+         lambda s, c, b: s == ["400"]),
+        ("H-02", "kucuk harf metot 'get'", b"get / HTTP/1.1\r\n" + host + close + b"\r\n", {},
+         lambda s, c, b: s and s[0] in ("400", "405", "501")),
+        ("H-03", "/../../etc/passwd", b"GET /../../etc/passwd HTTP/1.1\r\n" + host + close + b"\r\n", {},
+         lambda s, c, b: s and s[0] in ("400", "403", "404") and b"root:" not in b),
+        ("H-03", "/%2e%2e/%2e%2e/etc/passwd", b"GET /%2e%2e/%2e%2e/etc/passwd HTTP/1.1\r\n" + host + close + b"\r\n",
+         {}, lambda s, c, b: s and s[0] in ("400", "403", "404") and b"root:" not in b),
+        ("H-03", "/a%00b (NUL)", b"GET /a%00b HTTP/1.1\r\n" + host + close + b"\r\n", {},
+         lambda s, c, b: s and s[0] in ("400", "404")),
+        ("H-03", "DELETE izinsiz route -> 405", b"DELETE /index.html HTTP/1.1\r\n" + host + close + b"\r\n", {},
+         lambda s, c, b: s == ["405"]),
+        ("H-01", "POST /yukle/nc.txt -> 201", b"POST /yukle/nc.txt HTTP/1.1\r\n" + host + b"Content-Length: 5\r\n"
+         + close + b"\r\nmerha", {}, lambda s, c, b: s == ["201"]),
+        ("H-01", "GET /yukle/nc.txt -> 200 + govde", b"GET /yukle/nc.txt HTTP/1.1\r\n" + host + close + b"\r\n", {},
+         lambda s, c, b: s == ["200"] and b.endswith(b"merha")),
+        ("H-01", "DELETE /yukle/nc.txt -> 204", b"DELETE /yukle/nc.txt HTTP/1.1\r\n" + host + close + b"\r\n", {},
+         lambda s, c, b: s == ["204"]),
+        ("H-03", "return 301", b"GET /eski HTTP/1.1\r\n" + host + close + b"\r\n", {}, lambda s, c, b: s == ["301"]),
+        ("H-03", "olmayan sayfa -> ozel 404", b"GET /yok.html HTTP/1.1\r\n" + host + close + b"\r\n", {},
+         lambda s, c, b: s == ["404"] and b"OZEL-404" in b),
+        ("H-01", "CGI GET", b"GET /cgi/hello.py HTTP/1.1\r\n" + host + close + b"\r\n", {},
+         lambda s, c, b: s == ["200"] and b.endswith(b"CGI-HELLO")),
+        ("C-03", "127.0.0.2 ayni port, farkli site", get, {"ip": "127.0.0.2"},
+         lambda s, c, b: s == ["200"] and b"SITE-B" in b),
+        ("R-01", "100 KB tek header", b"GET / HTTP/1.1\r\n" + host + b"X-Buyuk: " + b"a" * 100000 + b"\r\n" + close
+         + b"\r\n", {}, lambda s, c, b: len(s) == 1),
+        # --- #117: parse hatasindan sonra tek 400 gelmeli ve baglanti kapanmali (bugun sonsuz 400 basiyor)
+        ("H-09", "telnet'te yanlis satir 'BOZUK'", b"BOZUK\r\n\r\n", {}, one_400),
+        ("H-09", "'BOZUK' + Connection: close", b"BOZUK\r\n" + close + b"\r\n", {}, one_400),
+        ("H-09", "surumsuz 'GET /'", b"GET /\r\n\r\n", {}, one_400),
+        ("H-09", "bosluksuz tek kelime 'merhaba'", b"merhaba\r\n", {}, one_400),
+        ("H-09", "baglanir baglanmaz Enter (bos satirlar)", b"\r\n\r\n", {},
+         lambda s, c, b: len(s) <= 1 and (c or not s)),
+        ("H-09", "istekten once bos satir: 200 ya da tek 400", b"\r\n" + get, {},
+         lambda s, c, b: s == ["200"] or (s == ["400"] and c)),
+        ("H-09", "gecerli istek, ayni baglantida bozuk satir: 200 sonra tek 400", keep + b"BOZUK\r\n\r\n", {},
+         lambda s, c, b: s == ["200", "400"] and c),
+        ("H-09", "bozuk satir, ardindan gecerli istek: tek 400 ve kapanis", b"BOZUK\r\n\r\n" + keep, {}, one_400),
+        ("H-09", "chunk boyutu 'zz'", b"POST /yukle/nc_z HTTP/1.1\r\n" + host + b"Transfer-Encoding: chunked\r\n\r\n"
+         b"zz\r\nab\r\n0\r\n\r\n", {}, one_400),
+        ("H-09", "chunk boyutu '-5'", b"POST /yukle/nc_z HTTP/1.1\r\n" + host + b"Transfer-Encoding: chunked\r\n\r\n"
+         b"-5\r\nab\r\n0\r\n\r\n", {}, one_400),
+        ("H-09", "Content-Length + Transfer-Encoding birlikte", b"POST /yukle/nc_z HTTP/1.1\r\n" + host
+         + b"Content-Length: 3\r\nTransfer-Encoding: chunked\r\n\r\nabc", {}, one_400),
+    ]
+    for rid, name, data, opts, ok in cases:
+        try:
+            statuses, closed, out = nc(data, **opts)
+            body = out.partition(b"\r\n\r\n")[2]
+            report(rid, ok(statuses, closed, body), f"nc: {name}: {nc_desc(statuses, closed)}")
+        except OSError as e:
+            report(rid, False, f"nc: {name}: {type(e).__name__}: {e}")
+    t0 = time.time()
+    r = http("GET", "/")
+    report("R-01", srv.proc.poll() is None and r.status == 200 and time.time() - t0 < SLOW,
+           f"nc testlerinden sonra sunucu ayakta, GET / {r.status} ({time.time() - t0:.2f} sn)")
+
+
+def test_nc_abuse(srv):
+    # R-01'deki kotu istekler: sunucu ayakta kalsa bile ayni istege birden fazla cevap (sel) vermemeli
+    for name, make in ABUSE:
+        try:
+            statuses, closed, _ = nc(make())
+            report("R-01", len(statuses) <= 1 and srv.proc.poll() is None,
+                   f"nc: '{name}' en fazla bir cevap: {nc_desc(statuses, closed)}")
+        except OSError as e:
+            report("R-01", False, f"nc: '{name}': {type(e).__name__}: {e}")
+    report("R-01", srv.alive(), "kotu isteklerden sonra sunucu ayakta ve GET / 200")
+
+
 # ---------------------------------------------------------------- main
 
 def main():
@@ -1011,13 +1199,17 @@ def main():
             test_disk_stall()
             test_cgi_big()
             test_limits()
+            test_slow_clients(srv)
         elif MODE == "--siege":
             test_siege(srv)
         elif MODE == "--bonus":
             test_bonus()
+        elif MODE in ("--nc", "--nc-valgrind"):
+            test_nc(srv)
+            test_nc_abuse(srv)
         code = srv.stop()
         report("R-01", code is not None and code >= 0, f"SIGINT ile cikis kodu {code}")
-        if MODE == "--valgrind":
+        if MODE in ("--valgrind", "--nc-valgrind"):
             valgrind_report()
     finally:
         if srv.proc and srv.proc.poll() is None:
