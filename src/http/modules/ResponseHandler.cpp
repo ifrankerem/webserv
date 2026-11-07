@@ -120,7 +120,7 @@ HttpResponse ResponseHandler::handle_get(const std::string& diskPath,const HttpR
 				return serveFile(temp_path,srv,info);
 		}
 		if(loc.autoindex)
-			return listDirectory(diskPath, loc, srv);
+			return listDirectory(diskPath,srv,req.path);
 		else
 			return RequestHandler::error(404,&srv);
 	}
@@ -157,7 +157,7 @@ HttpResponse ResponseHandler::serveFile(const std::string& diskPath,const Server
 
 
 //BAKILACAK
-HttpResponse ResponseHandler::listDirectory(const std::string& diskPath, const LocationConfig& loc, const ServerConfig& srv) //case for autoindex creating an html for indexing
+HttpResponse ResponseHandler::listDirectory(const std::string& diskPath, const ServerConfig& srv,const std::string &url) //case for autoindex creating an html for indexing
 {
 	DIR* dir = opendir(diskPath.c_str());
 	if (dir == NULL)
@@ -181,19 +181,9 @@ HttpResponse ResponseHandler::listDirectory(const std::string& diskPath, const L
 	closedir(dir);
 
 	std::sort(names.begin(), names.end());
-
-	std::string base;
-	if (!loc.alias.empty())
-		base = loc.alias;
-	else if (!loc.root.empty())
-		base = loc.root;
-	else
-		base = srv.root;
-
-	std::string f_path = diskPath.substr(base.size(), diskPath.size()) + '/';
-
-	std::string body = "<html>\n<head><title>Index of " + f_path +
-		"</title></head>\n<body>\n<h1>Index of " + f_path + "</h1>\n<hr>\n<pre>\n";
+	std::string clean_url = htmlEscape(url);
+	std::string body = "<html>\n<head><title>Index of " + clean_url +
+		"</title></head>\n<body>\n<h1>Index of " + clean_url + "</h1>\n<hr>\n<pre>\n";
 	for (size_t i = 0; i < names.size(); i++)
 	{
 		std::string safe = htmlEscape(names[i]);

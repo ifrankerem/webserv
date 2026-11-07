@@ -24,7 +24,7 @@ public:
     static HttpResponse handle_post(const std::string& diskPath,const std::string& path,const HttpRequest &req, const LocationConfig& loc,const ServerConfig& srv);
     static HttpResponse handle_delete(const std::string& diskPath,const LocationConfig& loc,const ServerConfig& srv);
     static HttpResponse serveFile(const std::string& diskPath,const ServerConfig& srv,const struct stat &info);
-    static HttpResponse listDirectory(const std::string& diskPath, const LocationConfig& loc, const ServerConfig& srv);
+    static HttpResponse listDirectory(const std::string& diskPath, const ServerConfig& srv,const std::string &url);
     static void handle_cgi_child(const int output_fd,const int input_fd,std::map<std::string, std::string>& env_variables,const std::string& scriptPath,const std::string& interpreter);
 
 
