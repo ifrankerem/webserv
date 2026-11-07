@@ -28,7 +28,8 @@ void HttpParser::parse()
             size_t first_space = line.find(' ');
             size_t last_space = line.rfind(' ');
 
-            if (first_space == std::string::npos || first_space == last_space) {
+            if (first_space == std::string::npos || first_space == last_space ||
+                first_space == 0 || last_space == line.length() - 1) {
                 _state = PARSE_ERROR; 
                 return;
             }
@@ -51,11 +52,25 @@ void HttpParser::parse()
         } 
         else {
             size_t colon_pos = line.find(':');
-            if (colon_pos != std::string::npos) {
-                std::string key = utils::toLower(line.substr(0, colon_pos));
-                std::string value = utils::trim(line.substr(colon_pos + 1));
-                _request.headers[key] = value;
+            if (colon_pos == std::string::npos || colon_pos == 0) {
+                _state = PARSE_ERROR;
+                return;
             }
+
+            std::string raw_key = line.substr(0, colon_pos);
+            if (raw_key.find_first_of(" \t") != std::string::npos) {
+                _state = PARSE_ERROR;
+                return;
+            }
+
+            std::string key = utils::toLower(raw_key);
+            if (key == "host" && _request.headers.find("host") != _request.headers.end()) {
+                _state = PARSE_ERROR;
+                return;
+            }
+
+            std::string value = utils::trim(line.substr(colon_pos + 1));
+            _request.headers[key] = value;
         }
     }
 

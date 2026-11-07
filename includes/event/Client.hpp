@@ -1,7 +1,6 @@
 #ifndef CLIENT_HPP
 #define CLIENT_HPP
 
-#include <netinet/in.h>
 #include <ctime>
 #include "../http/HttpParser.hpp"
 
@@ -11,15 +10,12 @@ enum ClientState
 {
     READING,
     PROCESSING,
-    WRITING,
-    CLOSING
+    WRITING
 };
 
 class Client 
 {
     private:
-        int                 _fd; // bu nerde kullanılıyor
-        struct sockaddr_in  _address; // bu nerde kullanılıyo
         ClientState         _state;
         HttpParser          _parser;
         std::string         _writeBuffer;
@@ -31,10 +27,8 @@ class Client
 
     public:
         Client();
-        Client(int fd, struct sockaddr_in &address);
         ~Client();
 
-        struct sockaddr_in  getAdress();//silinebilir
         const std::string&  getServerIp() const;
         RequestHandler*     getHandler() const;
         ClientState         getState() const;
@@ -42,7 +36,6 @@ class Client
         ParseState          getParseState() const;
         time_t              getLastActivity() const;
         int                 getServerPort() const;
-        int                 getFd() const; //silinebilir
         void                setState(ClientState state);
         void                setServerPort(int port);
         void                setServerIp(const std::string& ip);
