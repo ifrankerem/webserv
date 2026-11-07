@@ -64,6 +64,16 @@ const ServerConfig* findServerConfig(const Config& config, const std::string& ip
     return default_server;
 }
 
+HttpResponse ServerManager::errorResponse(Client& client, int status)
+{
+    HttpRequest& req = client.getParserObj().getParsedRequest();
+    const ServerConfig* srv = findServerConfig(_config, client.getServerIp(), client.getServerPort(),
+                                               utils::getHeader(req.headers, "host"));
+    if (srv == NULL)
+        return utils::defaultErrorPage(status);
+    return RequestHandler::error(status, srv);
+}
+
 bool listen_check(const std::vector<Listen> &listens, const std::string &ip, int port)
 {
     for (size_t i = 0; i < listens.size(); i++)
@@ -233,7 +243,7 @@ void ServerManager::handleClientRead(int client_fd)
         }
         else if (_clients[client_fd].getParseState() == PARSE_ERROR)
         {//buraya bakılacak
-            HttpResponse err = utils::defaultErrorPage(400);
+            HttpResponse err = errorResponse(_clients[client_fd], 400);
             err.headers["Connection"] = "close";
             _clients[client_fd].prepareResponse(err.serialize());
             _clients[client_fd].setState(WRITING);
@@ -264,13 +274,13 @@ void ServerManager::handleClientWrite(int client_fd)
 
         if (req.version.compare(0, 5, "HTTP/") == 0 && req.version != "HTTP/1.0" && req.version != "HTTP/1.1")
         {
-            HttpResponse err = utils::defaultErrorPage(505); //httpResponse html ve istek üretiyor
+            HttpResponse err = errorResponse(client, 505); //httpResponse html ve istek üretiyor
             err.headers["Connection"] = "close";
             client.prepareResponse(err.serialize());
         }//put silinicek
         else if ((req.method == "POST" || req.method == "PUT") && req.headers.count("content-length") == 0 && req.headers.count("transfer-encoding") == 0)
         {
-            HttpResponse err = utils::defaultErrorPage(411);
+            HttpResponse err = errorResponse(client, 411);
             err.headers["Connection"] = "close";
             client.prepareResponse(err.serialize());
         }
@@ -352,7 +362,7 @@ void ServerManager::handleClientWrite(int client_fd)
                 }
                 else if (client.getParseState() == PARSE_ERROR)
                 {
-                    HttpResponse err = utils::defaultErrorPage(400);
+                    HttpResponse err = errorResponse(client, 400);
                     err.headers["Connection"] = "close";
                     client.prepareResponse(err.serialize());
                     client.setState(WRITING);
@@ -480,7 +490,7 @@ void ServerManager::checkTimeouts()
                 }
 
                 Client& client_ref = _clients[client_fd];
-                client_ref.prepareResponse(utils::defaultErrorPage(504).serialize());
+                client_ref.prepareResponse(errorResponse(client_ref, 504).serialize());
                 client_ref.clearHandler();
                 client_ref.setState(WRITING);
                 client_ref.touch();
