@@ -26,6 +26,10 @@ jobs:
     - name: C-01..C-13, H-01..H-09, CGI-01..CGI-07, R-01, IO-07/08, P-03
       timeout-minutes: 10
       run: python3 tests/eval/e2e.py
+    - name: nc ham istekler (H-09 bozuk istek, R-01)
+      if: success() || failure()
+      timeout-minutes: 10
+      run: python3 tests/eval/e2e.py --nc
 
   eval-heavy:
     name: "EVAL heavy (R-02, IO-09, CGI-08, siege, valgrind)"

@@ -3,6 +3,7 @@
 
 #include "../core/ConfigParser.hpp"
 #include "Client.hpp"
+#include "../http/HttpResponse.hpp"
 #include <iostream>
 #include <sys/epoll.h>
 #include <fcntl.h>
@@ -26,6 +27,7 @@ class ServerManager
         void            closeConnection(int client_fd);
         void            handleCgiEvent(int cgi_fd, uint32_t events);
         void            checkTimeouts();
+        HttpResponse    errorResponse(Client& client, int status);
         static void     signal_handler(int signal);
 
     public:

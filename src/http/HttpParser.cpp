@@ -111,12 +111,9 @@ void HttpParser::parse()
 
         size_t chunk_size = 0;
         for (size_t k = 0; k < size_str.size(); k++) {
-            char c = size_str[k];
-            chunk_size *= 16;
-            if (c >= '0' && c <= '9')      chunk_size += c - '0';
-            else if (c >= 'a' && c <= 'f') chunk_size += c - 'a' + 10;
-            else if (c >= 'A' && c <= 'F') chunk_size += c - 'A' + 10;
-            else { _state = PARSE_ERROR; return; }
+            int digit = utils::hexValue(size_str[k]);
+            if (digit == -1) { _state = PARSE_ERROR; return; }
+            chunk_size = chunk_size * 16 + digit;
         }
 
         if (chunk_size == 0) {

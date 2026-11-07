@@ -13,6 +13,7 @@ namespace utils
     std::string httpReason(int status);
     std::string getExtension(const std::string& path);
     std::string toLower(const std::string& s);
+    int hexValue(char c);
     std::string decodePath(const std::string& s);
     bool endsWithSlash(const std::string& s);
     std::string joinPath(std::string base, const std::string& rest);

@@ -447,7 +447,7 @@ Step RequestHandler::executeMethod(HttpRequest &req, const std::string &path, co
 	x.kind = Step::RESPOND;
 	std::string diskPath;
 	//POST ve DELETE ayni klasorle calisir: hedefi tek yerde hesapla
-	if ((req.method == "DELETE" || req.method == "POST") && !best->upload_store.empty())
+	if ((req.method == "DELETE" || req.method == "POST"))
 		diskPath = resolveUploadPath(*best, path);
 	else
 		diskPath = resolveDiskPath(*best, path); // its final version of path root + req
