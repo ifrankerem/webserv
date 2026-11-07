@@ -1,0 +1,131 @@
+#include "../../includes/event/Client.hpp"
+#include "../../includes/http/RequestHandler.hpp"
+
+Client::Client(): _state(READING), _bytesSent(0), _serverPort(0), _handler(NULL), _lastActivity(std::time(NULL))
+{
+}
+
+void Client::touch() 
+{
+    _lastActivity = std::time(NULL);
+}
+
+time_t Client::getLastActivity() const 
+{
+    return _lastActivity;
+}
+
+
+ClientState Client::getState() const
+{
+    return _state;
+}
+
+void Client::setState(ClientState state)
+{ 
+    _state = state;
+}
+
+void Client::feedData(const char* chunk, int size)
+{
+    _parser.feed(chunk, size); 
+}
+
+void Client::parseData() 
+{
+    _parser.parse();
+}
+
+ParseState Client::getParseState() const 
+{
+    return _parser.getState();
+}
+
+HttpParser& Client::getParserObj() 
+{
+    return _parser;
+}
+
+void Client::resetForNextRequest() 
+{
+    _parser.reset();
+    if (_writeBuffer.capacity() > 64 * 1024)
+        std::string().swap(_writeBuffer);
+    else
+        _writeBuffer.clear();
+    _bytesSent = 0;
+    _state = READING;
+    clearHandler();
+}
+
+Client::~Client()
+{
+    clearHandler();
+}
+
+void Client::setServerPort(int port) 
+{ 
+    _serverPort = port; 
+}
+
+int Client::getServerPort() const 
+{ 
+    return _serverPort; 
+}
+
+void Client::setServerIp(const std::string& ip) 
+{ 
+    _serverIp = ip; 
+}
+
+const std::string& Client::getServerIp() const 
+{ 
+    return _serverIp; 
+}
+
+void Client::prepareResponse(const std::string& serialized) 
+{
+    _writeBuffer = serialized;
+    _bytesSent = 0;
+}
+
+
+bool Client::hasPendingData() const 
+{ 
+    return !_writeBuffer.empty() && _bytesSent < _writeBuffer.length(); 
+}
+
+const char* Client::sendPtr() const 
+{ 
+    return _writeBuffer.c_str() + _bytesSent; 
+}
+
+size_t Client::sendSize() const 
+{ 
+    return _writeBuffer.length() - _bytesSent; 
+}
+
+void Client::advanceSent(size_t n) 
+{ 
+    _bytesSent += n; 
+}
+
+RequestHandler* Client::getHandler() const 
+{
+    return _handler;
+}
+
+void Client::setHandler(RequestHandler* handler) 
+{
+    clearHandler();
+    _handler = handler;
+}
+
+void Client::clearHandler() 
+{
+    if (_handler != NULL) 
+    {
+        delete _handler;
+        _handler = NULL;
+    }
+}

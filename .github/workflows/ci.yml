@@ -5,8 +5,53 @@ on:
     branches: [ "main", "master", "develop" ]
   pull_request:
     branches: [ "main", "master", "develop" ]
+  workflow_dispatch:
 
 jobs:
+  # EVAL_RULES.md kurallari. Her satir bir kural ID'si basar (G-02, H-03...).
+  eval-static:
+    name: "EVAL static (G, F, IO)"
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: G-01..G-05, F-01..F-04, IO-01/05/08
+      run: python3 tests/eval/static_checks.py
+
+  eval-e2e:
+    name: "EVAL e2e (C, H, CGI, R, P)"
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - run: make
+    - name: C-01..C-13, H-01..H-09, CGI-01..CGI-07, R-01, IO-07/08, P-03
+      timeout-minutes: 10
+      run: python3 tests/eval/e2e.py
+    - name: nc ham istekler (H-09 bozuk istek, R-01)
+      if: success() || failure()
+      timeout-minutes: 10
+      run: python3 tests/eval/e2e.py --nc
+
+  eval-heavy:
+    name: "EVAL heavy (R-02, IO-09, CGI-08, siege, valgrind)"
+    # uzun surer: sadece PR'da ve elle tetiklenince
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - run: sudo apt-get update && sudo apt-get install -y siege valgrind
+    - run: make
+    - name: R-02 timeout'lar, IO-09, CGI-08, R-01 fd/bellek siniri
+      timeout-minutes: 10
+      run: python3 tests/eval/e2e.py --heavy
+    - name: S-01..S-04 siege
+      if: success() || failure()
+      timeout-minutes: 15
+      run: python3 tests/eval/e2e.py --siege
+    - name: S-05 valgrind
+      if: success() || failure()
+      timeout-minutes: 30
+      run: python3 tests/eval/e2e.py --valgrind
+
   build_and_test:
     runs-on: ubuntu-latest
     steps:
@@ -51,6 +96,29 @@ jobs:
       if: success() || failure()
       run: ./webserv_multi_cgi
 
+    - name: Timeout Tests
+      if: success() || failure()
+      # IDLE_TIMEOUT 30 s; iki senaryo ayni anda kosar, adim ~31 s surer
+      timeout-minutes: 3
+      run: |
+        ./webserv conf/default.conf > /dev/null 2>&1 &
+        WS=$!
+        sleep 1
+        # 1) Hic veri gondermeyen baglanti: sunucu kapatinca cat EOF gorur ve 0 ile biter.
+        #    Sunucu kapatmazsa timeout 40 sn sonra 124 ile keser.
+        ( exec 3<>/dev/tcp/127.0.0.1/8081; timeout 40 cat <&3 > /dev/null ) &
+        IDLE=$!
+        # 2) SIGTERM'i yok sayan sonsuz CGI (html/cgi/hang.py): 504 donmeli
+        CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 40 http://127.0.0.1:8081/cgi/hang.py || true)
+        IDLE_RC=0; wait $IDLE || IDLE_RC=$?
+        # 3) Timeout'tan sonra sunucu hala cevap vermeli (waitpid'de donmus olmamali)
+        AFTER=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1:8081/ || true)
+        # 4) CGI sureci gercekten olmus olmali
+        LEFT=$(pgrep -fc 'python3 hang.py' || true)
+        kill $WS 2>/dev/null || true
+        echo "idle_rc=$IDLE_RC (0 bekleniyor)  cgi=$CODE (504)  after=$AFTER (200)  hang.py=$LEFT (0)"
+        [ "$IDLE_RC" = 0 ] && [ "$CODE" = 504 ] && [ "$AFTER" = 200 ] && [ "$LEFT" = 0 ]
+
     - name: Setup 42 tester environment
       if: success() || failure()
       run: |
@@ -75,12 +143,38 @@ jobs:
             echo "[mon] $(free -m | awk '/Mem/{print "used="$3"MB avail="$7"MB"}') webserv_rss=$(ps -o rss= -p $WS 2>/dev/null)KB cgi=$(pgrep -c cgi_tester || true)"
           done ) &
         MON=$!
+        # every 0.5 s: time, webserv RSS kB, sum of CGI children RSS kB, current test kind
+        echo plain > test_kind
+        ( while kill -0 $WS 2>/dev/null; do
+            echo "$(date +%s.%N) $(awk '/^VmRSS/{print $2}' /proc/$WS/status) $(ps --ppid $WS -o rss= | awk '{s+=$1} END{print s+0}') $(cat test_kind)"
+            sleep 0.5
+          done > mem.log 2>/dev/null ) &
+        SAMPLER=$!
         set +e
-        echo '' | ./tester_42 http://127.0.0.1:9000
-        RC=$?
-        kill $MON
+        START=$(date +%s)
+        # tester prints "Test ..." before each test; .bla in that line means the test goes through CGI
+        echo '' | ./tester_42 http://127.0.0.1:9000 | while IFS= read -r line || [ -n "$line" ]; do
+          printf '%s\n' "$line"
+          case $line in
+            *Test*.bla*) echo cgi > test_kind ;;
+            *Test*) echo plain > test_kind ;;
+          esac
+        done
+        RC=${PIPESTATUS[1]}
+        DUR=$(( $(date +%s) - START ))
+        kill $MON $SAMPLER; wait $SAMPLER 2>/dev/null
         echo "tester exit code: $RC"
         if ! kill -0 $WS 2>/dev/null; then echo "webserv died during the test"; RC=1; fi
+        # kernel-kept peak RSS; must be read before webserv is killed
+        HWM=$(awk '/^VmHWM/{print $2}' /proc/$WS/status 2>/dev/null)
         sudo dmesg 2>/dev/null | grep -iE "out of memory|killed process" | tail -5
         kill $WS 2>/dev/null
+        awk -v dur=$DUR -v hwm=${HWM:-0} -v rc=$RC -f .github/mem_report.awk mem.log | tee -a "$GITHUB_STEP_SUMMARY"
         exit $RC
+
+    - name: Upload memory log
+      if: success() || failure()
+      uses: actions/upload-artifact@v7
+      with:
+        name: mem-log
+        path: mem.log

@@ -9,7 +9,7 @@
 #include <string>
 #include <sys/stat.h>
 #include <cstdio>
-#include "../includes/RequestHandler.hpp"
+#include "../includes/http/RequestHandler.hpp"
 
 // Kok dizin "html". Location'lar: "/" (GET POST, autoindex acik), "/gizli"
 static ServerConfig makeServer()
@@ -185,7 +185,7 @@ int main()
 	if (res.status != 404)
 		return 1;
 
-	// --- dizin, index yok, autoindex kapali -> 404 + config'deki hata sayfasi ---
+	// --- dizin, index yok, autoindex kapali -> 404 (42 tester /directory/Yeah bunu bekliyor) + config'deki hata sayfasi ---
 	res = run(srv, "GET", "/gizli/");
 	if (res.status != 404 || !contains(res.body, "error_page 404"))
 		return 1;

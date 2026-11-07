@@ -11,7 +11,7 @@
 #include <cstdio>
 #include <unistd.h>
 #include <poll.h>
-#include "../includes/RequestHandler.hpp"
+#include "../includes/http/RequestHandler.hpp"
 
 static ServerConfig makeServer()
 {
@@ -243,7 +243,7 @@ int main()
 
 	HttpRequest req;
 	req.version = "HTTP/1.1";
-	req.headers["Host"] = "localhost";
+	req.headers["host"] = "localhost";
 	req.remote_addr = "127.0.0.1";
 	req.server_port = 8080;
 
@@ -273,14 +273,14 @@ int main()
 	req.method = "POST";
 	req.path = "/cgi/post.py";
 	req.query = "";
-	req.headers["Content-Type"] = "text/plain";
+	req.headers["content-type"] = "text/plain";
 	req.body = "merhaba cgi";
 	{
 		HttpResponse res = runCgi(srv, req);
 		if (res.status != 200 || !contains(res.body, "received:merhaba cgi"))
 			return 1;
 	}
-	req.headers.erase("Content-Type");
+	req.headers.erase("content-type");
 	req.body = "";
 
 	// --- Status header'i ile 404 donen CGI ---
@@ -326,14 +326,14 @@ int main()
 	req.method = "POST";
 	req.path = "/cgi/sink.py";
 	req.query = "";
-	req.headers["Content-Type"] = "text/plain";
+	req.headers["content-type"] = "text/plain";
 	req.body = std::string(200000, 'a');
 	{
 		HttpResponse res = runCgi(srv, req);
 		if (res.status != 200 || !contains(res.body, "len=200000"))
 			return 1;
 	}
-	req.headers.erase("Content-Type");
+	req.headers.erase("content-type");
 	req.body.clear();
 
 	// --- Hic cikti uretmeyen script -> 502 ---

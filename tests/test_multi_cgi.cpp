@@ -1,7 +1,7 @@
 // Multi-CGI parser testi
 //   make multi_cgi
 //
-// Ayni location'da birden fazla cgi_ext/cgi_path cifti parse edilip
+// Ayni location'da birden fazla cgi satiri parse edilip
 // dogru interpreter ile eslestiriliyor mu kontrol eder.
 
 #include <iostream>
@@ -11,8 +11,8 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <poll.h>
-#include "../includes/ConfigParser.hpp"
-#include "../includes/RequestHandler.hpp"
+#include "../includes/core/ConfigParser.hpp"
+#include "../includes/http/RequestHandler.hpp"
 
 static void writeFile(const std::string& path, const std::string& content)
 {
@@ -59,7 +59,7 @@ static HttpResponse runCgi(const ServerConfig& srv, HttpRequest& req)
 		ready = handler.onReady(fd, POLLIN);
 		if (ready.kind == Step::WAIT)
 			usleep(10000);
-	} while (ready.kind == Step::WAIT && ++tries < 100);
+	} while (ready.kind == Step::WAIT && ++tries < 500); // 5 sn: CI'da php-cgi'in ilk acilisi 1 sn'yi asabiliyor
 
 	if (ready.kind != Step::RESPOND)
 	{
@@ -84,21 +84,17 @@ static std::string makeConf(const std::string& order)
 	std::string root = std::string(cwd) + "/html";
 
 	std::string pairs;
-	if (order == "ext_first")
+	if (order == "php_first")
 	{
 		pairs =
-			"        cgi_ext .py;\n"
-			"        cgi_path /usr/bin/python3;\n"
-			"        cgi_ext .php;\n"
-			"        cgi_path /usr/bin/php-cgi;\n";
+			"        cgi .php /usr/bin/php-cgi;\n"
+			"        cgi .py /usr/bin/python3;\n";
 	}
 	else
 	{
 		pairs =
-			"        cgi_path /usr/bin/python3;\n"
-			"        cgi_ext .py;\n"
-			"        cgi_path /usr/bin/php-cgi;\n"
-			"        cgi_ext .php;\n";
+			"        cgi .py /usr/bin/python3;\n"
+			"        cgi .php /usr/bin/php-cgi;\n";
 	}
 
 	std::ostringstream oss;
@@ -139,7 +135,7 @@ static bool testOrder(const std::string& order)
 
 	HttpRequest req;
 	req.version = "HTTP/1.1";
-	req.headers["Host"] = "localhost";
+	req.headers["host"] = "localhost";
 	req.remote_addr = "127.0.0.1";
 	req.server_port = 8080;
 	req.method = "GET";
@@ -178,9 +174,9 @@ int main()
 		return 1;
 	resetFixtures();
 
-	if (!testOrder("ext_first"))
+	if (!testOrder("php_first"))
 		return 1;
-	if (!testOrder("path_first"))
+	if (!testOrder("py_first"))
 		return 1;
 
 	std::cout << "\nMulti-CGI parser tests passed\n";
