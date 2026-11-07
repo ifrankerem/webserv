@@ -449,6 +449,13 @@ def test_keepalive():
                 s.sendall(b"GET /dosya.txt HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
                 r2 = read_response(s)
                 report("H-09", r1.status == 200 and r2.status == 200, f"ayni baglantida 2. istek -> {r2}")
+        with socket.create_connection(("127.0.0.1", P), timeout=5 * SLOW) as s:
+            s.sendall(b"GET /dosya.txt HTTP/1.1\r\nHost: x\r\n\r\n"
+                      b"GET /dosya.txt HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+            p1 = read_response(s)
+            p2 = read_response(s)
+            report("H-09", p1.status == 200 and p2.status == 200,
+                   f"ayni anda 2 istek tek yazimda (pipelining): {p1.status}, {p2.status}")
     except OSError as e:
         report("H-09", False, f"{type(e).__name__}: {e}")
 
@@ -1093,6 +1100,14 @@ def test_nc(srv):
         ("H-09", "GET / keep-alive", keep, {}, lambda s, c, b: s == ["200"] and not c),
         ("H-09", "iki istek tek yazimda (pipelining)", keep + b"GET /dosya.txt HTTP/1.1\r\n" + host + close + b"\r\n",
          {}, lambda s, c, b: s == ["200", "200"]),
+        ("H-09", "uc istek tek yazimda (pipelining)", keep + keep + b"GET /dosya.txt HTTP/1.1\r\n" + host + close + b"\r\n",
+         {}, lambda s, c, b: s == ["200", "200", "200"]),
+        ("H-09", "ilk istekte Connection: close varken 2. istek islenmez", get + keep,
+         {}, lambda s, c, b: s == ["200"] and c),
+        ("H-09", "POST + GET tek yazimda (pipelining with body)",
+         b"POST /yukle/nc_pipe.txt HTTP/1.1\r\n" + host + b"Content-Length: 5\r\n\r\nmerha"
+         b"GET /yukle/nc_pipe.txt HTTP/1.1\r\n" + host + close + b"\r\n",
+         {}, lambda s, c, b: s == ["201", "200"] and b"merha" in b),
         ("H-09", "istek bayt bayt yavas", get, {"slow": True}, lambda s, c, b: s == ["200"]),
         ("H-07", "chunk extension '5;x=1'", b"POST /yukle/nc_c1.txt HTTP/1.1\r\n" + host
          + b"Transfer-Encoding: chunked\r\n" + close + b"\r\n5;x=1\r\nmerha\r\n0\r\n\r\n", {},
@@ -1144,6 +1159,20 @@ def test_nc(srv):
          b"-5\r\nab\r\n0\r\n\r\n", {}, one_400),
         ("H-09", "Content-Length + Transfer-Encoding birlikte", b"POST /yukle/nc_z HTTP/1.1\r\n" + host
          + b"Content-Length: 3\r\nTransfer-Encoding: chunked\r\n\r\nabc", {}, one_400),
+        ("H-09", "iki noktasiz header (connEctİon = clo se)",
+         b"GET / HTTP/1.1\r\n" + host + b"connEct\xc4\xb0on = clo se\r\n\r\n", {}, one_400),
+        ("H-09", "iki noktadan once bosluk (Connection : close)",
+         b"GET / HTTP/1.1\r\n" + host + b"Connection : close\r\n\r\n", {}, one_400),
+        ("H-09", "baslik adinda bosluk (Content Length: 10)",
+         b"GET / HTTP/1.1\r\n" + host + b"Content Length: 10\r\n\r\n", {}, one_400),
+        ("H-09", "cift Host basligi",
+         b"GET / HTTP/1.1\r\nHost: a.com\r\nHost: b.com\r\n\r\n", {}, one_400),
+        ("H-09", "virgullu Connection: keep-alive, close",
+         b"GET / HTTP/1.1\r\n" + host + b"Connection: keep-alive, close\r\n\r\n", {},
+         lambda s, c, b: s == ["200"] and c),
+        ("H-09", "header trim bol bosluk ve tab",
+         b"GET / HTTP/1.1\r\nHost:   \tlocalhost\t  \r\nConnection:   close  \r\n\r\n", {},
+         lambda s, c, b: s == ["200"] and c),
     ]
     for rid, name, data, opts, ok in cases:
         try:

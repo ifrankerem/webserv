@@ -1,6 +1,5 @@
 #include "../../includes/http/HttpParser.hpp"
 #include "../../includes/core/Utils.hpp"
-#include <cstdlib> //atoi silinicekse sil
 
 HttpParser::HttpParser() : _state(PARSE_READING), _total_body_read(0), _s_index(0)
 {
@@ -29,7 +28,8 @@ void HttpParser::parse()
             size_t first_space = line.find(' ');
             size_t last_space = line.rfind(' ');
 
-            if (first_space == std::string::npos || first_space == last_space) {
+            if (first_space == std::string::npos || first_space == last_space ||
+                first_space == 0 || last_space == line.length() - 1) {
                 _state = PARSE_ERROR; 
                 return;
             }
@@ -52,16 +52,25 @@ void HttpParser::parse()
         } 
         else {
             size_t colon_pos = line.find(':');
-            if (colon_pos != std::string::npos) {
-                std::string key = utils::toLower(line.substr(0, colon_pos));
-                std::string value = line.substr(colon_pos + 1);
-                
-                size_t first_non_space = value.find_first_not_of(" ");
-                if (first_non_space != std::string::npos) {
-                    value = value.substr(first_non_space);
-                }
-                _request.headers[key] = value;
+            if (colon_pos == std::string::npos || colon_pos == 0) {
+                _state = PARSE_ERROR;
+                return;
             }
+
+            std::string raw_key = line.substr(0, colon_pos);
+            if (raw_key.find_first_of(" \t") != std::string::npos) {
+                _state = PARSE_ERROR;
+                return;
+            }
+
+            std::string key = utils::toLower(raw_key);
+            if (key == "host" && _request.headers.find("host") != _request.headers.end()) {
+                _state = PARSE_ERROR;
+                return;
+            }
+
+            std::string value = utils::trim(line.substr(colon_pos + 1));
+            _request.headers[key] = value;
         }
     }
 
@@ -78,7 +87,11 @@ void HttpParser::parse()
         }
 
         if (_request.headers.find("content-length") != _request.headers.end()) {
-            size_t content_length = std::atoi(_request.headers["content-length"].c_str()); //bizim atoi kullanılabilir mi bul?
+            size_t content_length = 0;
+            if (!utils::parseSize(_request.headers["content-length"], content_length)) {
+                _state = PARSE_ERROR;
+                return;
+            }
 
             if (_raw_data.length() >= content_length) {
                 if (_raw_data.length() == content_length) {

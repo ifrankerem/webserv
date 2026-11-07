@@ -8,7 +8,7 @@ void ConfigParser::parse_location(std::vector<std::string>& tokens, size_t& i, S
     loc.redirect_code = 0;
     loc.upload_enable = false;
     
-    i++;//burdaki kontrol servreda yapılıyor bu satıtı sil sonra
+    i++;
     loc.path = tokens[i];
     
     i++;
@@ -94,9 +94,17 @@ void ConfigParser::parse_upload_store(std::vector<std::string>& tokens, size_t& 
 
 void ConfigParser::parse_cgi(std::vector<std::string>& tokens, size_t& i, LocationConfig& location)
 {
+    if (tokens[i + 1][0] != '.' || tokens[i + 1].length() < 2)
+        throw std::runtime_error("Config Error: CGI extension must start with '.' (e.g. '.py')");
+    if (i + 2 >= tokens.size() || tokens[i + 2] == ";" || tokens[i + 2] == "{" || tokens[i + 2] == "}")
+        throw std::runtime_error("Config Error: 'cgi' directive requires an interpreter path.");
     if (i + 3 >= tokens.size() || tokens[i + 3] != ";")
         throw std::runtime_error("Config Error: 'cgi' must be 'cgi <extension> <interpreter>;'");
     location.cgi_pass[tokens[i + 1]] = tokens[i + 2];
+
+    //bu kontrolu yapalım mı?
+    // if (location.cgi_pass.find(tokens[i + 1]) != location.cgi_pass.end())    
+        // throw std::runtime_error("Config Error: Duplicate CGI extension '" + tokens[i + 1] + "' in location");
     i += 3;
 }
 
@@ -188,10 +196,14 @@ void ConfigParser::parse_location_client_max_body_size(std::vector<std::string>&
         val = val.substr(0, val.length() - 1);
     }
 
-    int size = utils::atoi(val);
-    if (size < 0)
+    size_t size = 0;
+    if (!utils::parseSize(val, size))
         throw std::runtime_error("Config Error: 'client_max_body_size' must be positive or 0");
-    
+
+    const size_t max_val = static_cast<size_t>(-1);
+    if (multiplier > 0 && size > max_val / multiplier)
+        throw std::runtime_error("Config Error: 'client_max_body_size' exceeds maximum allowed size");
+
     location.client_max_body_size = size * multiplier;
     i++;
     if (i >= tokens.size() || tokens[i] != ";") 

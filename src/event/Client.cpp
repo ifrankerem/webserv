@@ -1,11 +1,7 @@
 #include "../../includes/event/Client.hpp"
 #include "../../includes/http/RequestHandler.hpp"
 
-Client::Client(): _fd(-1), _state(READING), _bytesSent(0), _serverPort(0), _handler(NULL), _lastActivity(std::time(NULL))
-{
-}
-
-Client::Client(int fd, sockaddr_in &address): _fd(fd), _address(address), _state(READING), _bytesSent(0), _serverPort(0), _handler(NULL), _lastActivity(std::time(NULL))
+Client::Client(): _state(READING), _bytesSent(0), _serverPort(0), _handler(NULL), _lastActivity(std::time(NULL))
 {
 }
 
@@ -19,10 +15,6 @@ time_t Client::getLastActivity() const
     return _lastActivity;
 }
 
-int Client::getFd() const
-{
-    return _fd;
-}
 
 ClientState Client::getState() const
 {
@@ -97,10 +89,6 @@ void Client::prepareResponse(const std::string& serialized)
     _bytesSent = 0;
 }
 
-struct sockaddr_in Client::getAdress()
-{
-    return _address;
-};
 
 bool Client::hasPendingData() const 
 { 

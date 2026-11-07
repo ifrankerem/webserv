@@ -104,11 +104,26 @@ void ServerManager::setupServers()
                 continue;      
             
             int socket_fd = socket(AF_INET,SOCK_STREAM,0);
-        
-            int opt = 1;
-            setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+            if (socket_fd == -1)
+            {
+                std::cerr << "Error: Socket creation failed!" << std::endl;
+                continue;
+            }
 
-            fcntl(socket_fd, F_SETFL, O_NONBLOCK);
+            int opt = 1;
+            if (setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == -1)
+            {
+                std::cerr << "Error: setsockopt failed!" << std::endl;
+                close(socket_fd);
+                continue;
+            }
+
+            if (fcntl(socket_fd, F_SETFL, O_NONBLOCK) == -1)
+            {
+                std::cerr << "Error: fcntl failed!" << std::endl;
+                close(socket_fd);
+                continue;
+            }
 
             struct sockaddr_in address;
 
@@ -202,15 +217,23 @@ void ServerManager::acceptConnection(int server_fd)
     {
         return;
     }
-    fcntl(new_client_fd, F_SETFL, O_NONBLOCK);          
+    if (fcntl(new_client_fd, F_SETFL, O_NONBLOCK) == -1)
+    {
+        close(new_client_fd);
+        return;
+    }
     
     struct epoll_event event;
     std::memset(&event, 0, sizeof(event));
     event.events = EPOLLIN; 
     event.data.fd = new_client_fd;
-    epoll_ctl(_epoll_fd, EPOLL_CTL_ADD, new_client_fd, &event); 
+    if (epoll_ctl(_epoll_fd, EPOLL_CTL_ADD, new_client_fd, &event) == -1)
+    {
+        close(new_client_fd);
+        return;
+    } 
     
-    Client new_client(new_client_fd,cl);
+    Client new_client;
     new_client.setServerPort(_server_fds[server_fd].port);
     new_client.setServerIp(_server_fds[server_fd].ip);
     _clients[new_client_fd] = new_client;
@@ -255,8 +278,6 @@ void ServerManager::handleClientRead(int client_fd)
             epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, client_fd, &event);
         }
     }
-    else if (byte == -1)
-        closeConnection(client_fd);
     else
         closeConnection(client_fd);
 }
@@ -277,8 +298,8 @@ void ServerManager::handleClientWrite(int client_fd)
             HttpResponse err = errorResponse(client, 505); //httpResponse html ve istek üretiyor
             err.headers["Connection"] = "close";
             client.prepareResponse(err.serialize());
-        }//put silinicek
-        else if ((req.method == "POST" || req.method == "PUT") && req.headers.count("content-length") == 0 && req.headers.count("transfer-encoding") == 0)
+        }
+        else if (req.method == "POST" && req.headers.count("content-length") == 0 && req.headers.count("transfer-encoding") == 0)
         {
             HttpResponse err = errorResponse(client, 411);
             err.headers["Connection"] = "close";
@@ -342,8 +363,12 @@ void ServerManager::handleClientWrite(int client_fd)
         {
             bool keep_alive = true;
             HttpRequest &req = client.getParserObj().getParsedRequest();
-            if (req.headers.count("connection") && utils::toLower(req.headers["connection"]) == "close")
-                keep_alive = false;
+            if (req.headers.count("connection"))
+            {
+                std::string conn = utils::toLower(req.headers["connection"]);
+                if (conn == "close" || conn.find("close") != std::string::npos)
+                    keep_alive = false;
+            }
             if (client.getParseState() == PARSE_ERROR)
                 keep_alive = false;
 
@@ -386,8 +411,6 @@ void ServerManager::handleClientWrite(int client_fd)
             }
         }
     }
-    else if (bytes_sent == -1)
-        closeConnection(client_fd);
     else
         closeConnection(client_fd);
 }
