@@ -53,12 +53,7 @@ void HttpParser::parse()
             size_t colon_pos = line.find(':');
             if (colon_pos != std::string::npos) {
                 std::string key = utils::toLower(line.substr(0, colon_pos));
-                std::string value = line.substr(colon_pos + 1);
-                
-                size_t first_non_space = value.find_first_not_of(" ");
-                if (first_non_space != std::string::npos) {
-                    value = value.substr(first_non_space);
-                }
+                std::string value = utils::trim(line.substr(colon_pos + 1));
                 _request.headers[key] = value;
             }
         }
@@ -78,7 +73,7 @@ void HttpParser::parse()
 
         if (_request.headers.find("content-length") != _request.headers.end()) {
             size_t content_length = 0;
-            if (!utils::parseSize(utils::trim(_request.headers["content-length"]), content_length)) {
+            if (!utils::parseSize(_request.headers["content-length"], content_length)) {
                 _state = PARSE_ERROR;
                 return;
             }
