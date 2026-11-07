@@ -185,6 +185,27 @@ int atoi(const std::string &str)
     return static_cast<int>(value);
 }
 
+bool parseSize(const std::string &str, size_t &out)
+{
+    if (str.empty())
+        return false;
+
+    const size_t max_val = static_cast<size_t>(-1);
+    size_t value = 0;
+    for (size_t i = 0; i < str.size(); i++)
+    {
+        if (str[i] < '0' || str[i] > '9')
+            return false;
+
+        size_t digit = static_cast<size_t>(str[i] - '0');
+        if (value > max_val / 10 || (value == max_val / 10 && digit > max_val % 10))//burada ne oluyo bak
+            return false;
+        value = value * 10 + digit;
+    }
+    out = value;
+    return true;
+}
+
 in_addr_t inet_addr(const std::string& ip)
 {
     struct addrinfo hints, *res = NULL;

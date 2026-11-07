@@ -98,21 +98,21 @@ void ConfigParser::parse_listen(std::vector<std::string>& tokens, size_t& i, Ser
             if (ip[j] == '.' || ip[j] == ':')
             {
                 if ((j - last) > 3)
-                    throw std::runtime_error("Config Error: 'parse_listen' 0");  
+                    throw std::runtime_error("Config Error: Invalid IP octet length in 'listen' (too many digits)");  
                 int ip_octet = utils::atoi(value.substr(last, j - last));
                 if (ip_octet == -1 || ip_octet > 255 || ip_octet < 0)
-                    throw std::runtime_error("Config Error: 'parse_listen' 1");                 
+                    throw std::runtime_error("Config Error: Invalid IP octet value in 'listen' (must be 0-255)");                 
                 last = j + 1;
                 if(ip[j] == '.')
                   dot++;
             }
         }
         if(dot != 3)
-          throw std::runtime_error("Config Error: 'parse_listen' invalid ip format");
+          throw std::runtime_error("Config Error: Invalid IP format in 'listen' (expected 4 octets)");
         int port = utils::atoi(value.substr(colon + 1));
         if (port == -1 || (port > 65535 || port <= 0))
         {
-            throw std::runtime_error("Config Error: 'parse_listen' 2 ");
+            throw std::runtime_error("Config Error: Invalid port in 'listen' (must be 1-65535)");
         }
         
         new_listen.ip = ip.substr(0,ip.size()-1);
@@ -124,7 +124,7 @@ void ConfigParser::parse_listen(std::vector<std::string>& tokens, size_t& i, Ser
 
         int port = utils::atoi(value);
         if (port == -1 || (port > 65535 || port <= 0))
-            throw std::runtime_error("Config Error: 'parse_listen' 3");
+            throw std::runtime_error("Config Error: Invalid port in 'listen' (must be 1-65535)");
         new_listen.port = port;
     }
     // BUrayı açalım mı?
@@ -214,6 +214,8 @@ void ConfigParser::parse_client_max_body_size(std::vector<std::string>& tokens, 
 {
     i++;
     std::string val = tokens[i];
+    if (val.empty())
+        throw std::runtime_error("Config Error: 'client_max_body_size' cannot be empty");
     size_t multiplier = 1;
     char last_char = val[val.length() - 1];
 
@@ -233,9 +235,13 @@ void ConfigParser::parse_client_max_body_size(std::vector<std::string>& tokens, 
         val = val.substr(0, val.length() - 1);
     }
 
-    int size = utils::atoi(val);
-    if (size <= 0)
+    size_t size = 0;
+    if (!utils::parseSize(val, size) || size == 0)
         throw std::runtime_error("Config Error: 'client_max_body_size' must be positive");
+
+    const size_t max_val = static_cast<size_t>(-1);
+    if (multiplier > 0 && size > max_val / multiplier)
+        throw std::runtime_error("Config Error: 'client_max_body_size' exceeds maximum allowed size");
 
     server.client_max_body_size = size * multiplier;
     i++;

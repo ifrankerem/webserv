@@ -196,10 +196,14 @@ void ConfigParser::parse_location_client_max_body_size(std::vector<std::string>&
         val = val.substr(0, val.length() - 1);
     }
 
-    int size = utils::atoi(val);
-    if (size < 0)
+    size_t size = 0;
+    if (!utils::parseSize(val, size))
         throw std::runtime_error("Config Error: 'client_max_body_size' must be positive or 0");
-    
+
+    const size_t max_val = static_cast<size_t>(-1);
+    if (multiplier > 0 && size > max_val / multiplier)
+        throw std::runtime_error("Config Error: 'client_max_body_size' exceeds maximum allowed size");
+
     location.client_max_body_size = size * multiplier;
     i++;
     if (i >= tokens.size() || tokens[i] != ";") 

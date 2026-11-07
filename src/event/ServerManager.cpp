@@ -104,11 +104,26 @@ void ServerManager::setupServers()
                 continue;      
             
             int socket_fd = socket(AF_INET,SOCK_STREAM,0);
-        
-            int opt = 1;
-            setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+            if (socket_fd == -1)
+            {
+                std::cerr << "Error: Socket creation failed!" << std::endl;
+                continue;
+            }
 
-            fcntl(socket_fd, F_SETFL, O_NONBLOCK);
+            int opt = 1;
+            if (setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == -1)
+            {
+                std::cerr << "Error: setsockopt failed!" << std::endl;
+                close(socket_fd);
+                continue;
+            }
+
+            if (fcntl(socket_fd, F_SETFL, O_NONBLOCK) == -1)
+            {
+                std::cerr << "Error: fcntl failed!" << std::endl;
+                close(socket_fd);
+                continue;
+            }
 
             struct sockaddr_in address;
 
@@ -202,13 +217,21 @@ void ServerManager::acceptConnection(int server_fd)
     {
         return;
     }
-    fcntl(new_client_fd, F_SETFL, O_NONBLOCK);          
+    if (fcntl(new_client_fd, F_SETFL, O_NONBLOCK) == -1)
+    {
+        close(new_client_fd);
+        return;
+    }
     
     struct epoll_event event;
     std::memset(&event, 0, sizeof(event));
     event.events = EPOLLIN; 
     event.data.fd = new_client_fd;
-    epoll_ctl(_epoll_fd, EPOLL_CTL_ADD, new_client_fd, &event); 
+    if (epoll_ctl(_epoll_fd, EPOLL_CTL_ADD, new_client_fd, &event) == -1)
+    {
+        close(new_client_fd);
+        return;
+    } 
     
     Client new_client(new_client_fd,cl);
     new_client.setServerPort(_server_fds[server_fd].port);

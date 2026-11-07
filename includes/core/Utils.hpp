@@ -22,6 +22,7 @@ namespace utils
     HttpResponse defaultErrorPage(int status);
     std::vector<std::string> mapToEnv(const std::map<std::string, std::string>& env);
     int atoi(const std::string &str);
+    bool parseSize(const std::string &str, size_t &out);
     in_addr_t inet_addr(const std::string& ip);
 }
 
