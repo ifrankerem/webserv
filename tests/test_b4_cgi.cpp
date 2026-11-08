@@ -10,7 +10,7 @@
 #include <sys/stat.h>
 #include <cstdio>
 #include <unistd.h>
-#include <poll.h>
+#include <sys/epoll.h>
 #include "../includes/http/RequestHandler.hpp"
 
 static ServerConfig makeServer()
@@ -178,9 +178,9 @@ static HttpResponse runCgi(const ServerConfig& srv, HttpRequest& req)
 	int inFd = -1;
 	for (size_t i = 0; i < step.watch.size(); i++)
 	{
-		if (step.watch[i].events & POLLIN)
+		if (step.watch[i].events & EPOLLIN)
 			outFd = step.watch[i].fd;
-		if (step.watch[i].events & POLLOUT)
+		if (step.watch[i].events & EPOLLOUT)
 			inFd = step.watch[i].fd;
 	}
 
@@ -191,7 +191,7 @@ static HttpResponse runCgi(const ServerConfig& srv, HttpRequest& req)
 	{
 		if (writing)
 		{
-			ready = handler.onReady(inFd, POLLOUT);
+			ready = handler.onReady(inFd, EPOLLOUT);
 			if (stdinClosed(ready, inFd))
 				writing = false;
 			else if (ready.kind == Step::WAIT)
@@ -199,7 +199,7 @@ static HttpResponse runCgi(const ServerConfig& srv, HttpRequest& req)
 		}
 		else
 		{
-			ready = handler.onReady(outFd, POLLIN);
+			ready = handler.onReady(outFd, EPOLLIN);
 			if (ready.kind == Step::WAIT)
 				usleep(10000);
 		}

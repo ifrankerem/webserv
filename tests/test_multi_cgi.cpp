@@ -10,7 +10,7 @@
 #include <cstdlib>
 #include <unistd.h>
 #include <sys/stat.h>
-#include <poll.h>
+#include <sys/epoll.h>
 #include "../includes/core/ConfigParser.hpp"
 #include "../includes/http/RequestHandler.hpp"
 
@@ -56,7 +56,7 @@ static HttpResponse runCgi(const ServerConfig& srv, HttpRequest& req)
 	int tries = 0;
 	do
 	{
-		ready = handler.onReady(fd, POLLIN);
+		ready = handler.onReady(fd, EPOLLIN);
 		if (ready.kind == Step::WAIT)
 			usleep(10000);
 	} while (ready.kind == Step::WAIT && ++tries < 500); // 5 sn: CI'da php-cgi'in ilk acilisi 1 sn'yi asabiliyor
