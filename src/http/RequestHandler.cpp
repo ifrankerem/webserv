@@ -104,9 +104,11 @@ std::string RequestHandler::resolveDiskPath(const LocationConfig& loc, const std
 {
 	if (!loc.alias.empty())
 		return utils::joinPath(loc.alias, path.substr(loc.path.size()));
-	if (loc.root.empty())
-		return utils::joinPath(server->root, path);
-	return utils::joinPath(loc.root, path);
+	if (!loc.root.empty())
+		return utils::joinPath(loc.root, path);
+	if (server->root.empty())
+		return "";
+	return utils::joinPath(server->root, path);
 }
 
 std::string RequestHandler::resolveUploadPath(const LocationConfig& loc, const std::string& path)
@@ -252,9 +254,9 @@ HttpResponse RequestHandler::error(int status, const ServerConfig *server)
 	// sayfa URI'si normal istek gibi cozulur: eslesen location'in root/alias'i
 	RequestHandler tmp(*server);
 	const LocationConfig* loc = tmp.findLocation(it->second);
-	std::string path = server->root + it->second;
-	if (loc != NULL)
-		path = tmp.resolveDiskPath(*loc, it->second);
+	if (loc == NULL)
+		return utils::defaultErrorPage(status);
+	std::string path = tmp.resolveDiskPath(*loc, it->second);
 	std::ifstream file(path.c_str());
 
 	if (!file.is_open())

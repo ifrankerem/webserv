@@ -84,8 +84,6 @@ static int check_stat(struct stat &info, const std::string& diskPath)
 		// errno kullanmak yasak; access() ile varlik/yetki ayirt et
 		if (::access(diskPath.c_str(), F_OK) == -1)
 			return 404;
-		if (::access(diskPath.c_str(), R_OK) == -1)
-			return 403;
 		return 500;
 	}
 	return 1;
