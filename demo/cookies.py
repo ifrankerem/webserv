@@ -13,7 +13,7 @@ YEAR = 365 * 24 * 3600
 
 env = os.environ
 query = parse_qs(env.get("QUERY_STRING", ""))
-action = query.get("islem", [""])[0]
+action = query.get("action", [""])[0]
 form = parse_qs(sys.stdin.buffer.read().decode("utf-8", "replace")) if env.get("REQUEST_METHOD") == "POST" else {}
 
 raw_cookie = env.get("HTTP_COOKIE", "")
@@ -50,50 +50,50 @@ if sid:
     with open(session_file(sid)) as f:
         session = json.load(f)
 
-if action == "sil":
+if action == "delete":
     for name in list(cookies):
         delete_cookie(name)
     if sid:
         os.remove(session_file(sid))
     sid, session = "", {}
-    message = "Bütün cookie'ler silindi ve sunucudaki oturum kaldırıldı. Sayfayı yenileyince yeni bir oturum açılır."
+    message = "All cookies were deleted and the session on the server was removed. Refresh the page to start a new session."
 else:
     if not sid:
         sid = secrets.token_hex(16)
-        session = {"olusturuldu": time.strftime("%H:%M:%S"), "istek_sayisi": 0}
+        session = {"created": time.strftime("%H:%M:%S"), "requests": 0}
         set_cookie("sid", sid, "; HttpOnly")
-    session["istek_sayisi"] = session.get("istek_sayisi", 0) + 1
+    session["requests"] = session.get("requests", 0) + 1
 
-    if action == "kabul":
-        set_cookie("consent", "hepsi", "; Max-Age=%d" % YEAR)
-        set_cookie("tema", cookies.get("tema", "acik"), "; Max-Age=%d" % YEAR)
-        message = "Bütün cookie'ler kabul edildi. Bu tek cevapta birden fazla Set-Cookie satırı gönderildi."
-    elif action == "zorunlu":
-        set_cookie("consent", "zorunlu", "; Max-Age=%d" % YEAR)
-        message = "Sadece zorunlu cookie'ler kullanılacak."
-    elif action == "geri":
-        set_cookie("consent", "zorunlu", "; Max-Age=%d" % YEAR)
-        for name in ("tema", "ziyaret"):
+    if action == "accept":
+        set_cookie("consent", "all", "; Max-Age=%d" % YEAR)
+        set_cookie("theme", cookies.get("theme", "light"), "; Max-Age=%d" % YEAR)
+        message = "All cookies were accepted. This single response sent more than one Set-Cookie line."
+    elif action == "required":
+        set_cookie("consent", "required", "; Max-Age=%d" % YEAR)
+        message = "Only required cookies will be used."
+    elif action == "withdraw":
+        set_cookie("consent", "required", "; Max-Age=%d" % YEAR)
+        for name in ("theme", "visits"):
             if name in cookies:
                 delete_cookie(name)
-        message = "İzin geri çekildi: isteğe bağlı cookie'ler silindi, oturum cookie'si duruyor."
-    elif action == "tema":
-        if cookies.get("consent") == "hepsi":
-            set_cookie("tema", "koyu" if cookies.get("tema") == "acik" else "acik", "; Max-Age=%d" % YEAR)
+        message = "Consent withdrawn: optional cookies were deleted, the session cookie stays."
+    elif action == "theme":
+        if cookies.get("consent") == "all":
+            set_cookie("theme", "dark" if cookies.get("theme") == "light" else "light", "; Max-Age=%d" % YEAR)
         else:
-            message = "Tema tercihi isteğe bağlı bir cookie; önce izin vermelisin."
-    elif action == "giris":
-        name = form.get("isim", [""])[0].strip()[:40]
+            message = "The theme preference is an optional cookie; you must give consent first."
+    elif action == "login":
+        name = form.get("name", [""])[0].strip()[:40]
         if name:
-            session["isim"] = name
-            message = "Giriş yapıldı. İsim cookie'de değil, sunucudaki oturumda saklanıyor."
-    elif action == "cikis":
-        session.pop("isim", None)
-        message = "Çıkış yapıldı."
+            session["name"] = name
+            message = "Logged in. The name is stored in the session on the server, not in a cookie."
+    elif action == "logout":
+        session.pop("name", None)
+        message = "Logged out."
 
-    if cookies.get("consent") == "hepsi":
-        visits = cookies.get("ziyaret", "0")
-        set_cookie("ziyaret", str(int(visits) + 1 if visits.isdigit() else 1), "; Max-Age=%d" % YEAR)
+    if cookies.get("consent") == "all":
+        visits = cookies.get("visits", "0")
+        set_cookie("visits", str(int(visits) + 1 if visits.isdigit() else 1), "; Max-Age=%d" % YEAR)
 
     with open(session_file(sid), "w") as f:
         json.dump(session, f)
@@ -101,86 +101,86 @@ else:
 
 def rows(pairs):
     if not pairs:
-        return '<p class="muted">(yok)</p>'
+        return '<p class="muted">(none)</p>'
     return "<table>" + "".join("<tr><th>%s</th><td>%s</td></tr>" % (html.escape(k), html.escape(v))
                                for k, v in pairs) + "</table>"
 
 
 consent = cookies.get("consent", "")
-dark = consent == "hepsi" and cookies.get("tema") == "koyu"
-name = session.get("isim", "")
+dark = consent == "all" and cookies.get("theme") == "dark"
+name = session.get("name", "")
 
 if name:
-    login = '<p>Hoş geldin, <b>%s</b>! <a href="/cookies.py?islem=cikis">Çıkış yap</a></p>' % html.escape(name)
-elif action != "sil":
-    login = """<form method="POST" action="/cookies.py?islem=giris">
-                <input name="isim" placeholder="İsmin" required><button>Giriş yap</button>
+    login = '<p>Welcome, <b>%s</b>! <a href="/cookies.py?action=logout">Log out</a></p>' % html.escape(name)
+elif action != "delete":
+    login = """<form method="POST" action="/cookies.py?action=login">
+                <input name="name" placeholder="Your name" required><button>Log in</button>
             </form>"""
 else:
     login = ""
 
 banner = ""
-if not consent and action != "sil":
+if not consent and action != "delete":
     banner = """<div class="banner">
-        <p><b>Bu site cookie kullanıyor.</b> Oturumun için <b>zorunlu</b> bir cookie (<code>sid</code>) zaten konuldu;
-        site onsuz çalışmadığı için bunun için izin istemiyoruz. Tema tercihi ve ziyaret sayacı için
-        <b>isteğe bağlı</b> cookie'ler kullanmak istiyoruz.</p>
-        <a class="button" href="/cookies.py?islem=zorunlu">Sadece zorunlu</a>
-        <a class="button" href="/cookies.py?islem=kabul">Hepsini kabul et</a>
+        <p><b>This site uses cookies.</b> A <b>required</b> cookie (<code>sid</code>) was already set for your session;
+        we don't ask consent for it because the site does not work without it. We would like to use
+        <b>optional</b> cookies for the theme preference and the visit counter.</p>
+        <a class="button" href="/cookies.py?action=required">Required only</a>
+        <a class="button" href="/cookies.py?action=accept">Accept all</a>
     </div>"""
 
 headers = ["Content-Type: text/html; charset=UTF-8"] + ["Set-Cookie: " + c for c in set_cookies]
 print("\r\n".join(headers) + "\r\n\r\n", end="")
 print("""<!DOCTYPE html>
-<html lang="tr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Cookie ve oturum</title>
+    <title>Cookies and sessions</title>
     <link rel="stylesheet" href="/style.css">
 </head>
 <body class="%s">
-    <header><a href="/">webserv demo</a> / Cookie ve oturum</header>
+    <header><a href="/">webserv demo</a> / Cookies and sessions</header>
     <main>
         %s
         <section>
-            <h2>Oturum</h2>
+            <h2>Session</h2>
             %s
-            <p class="muted">Bu oturumdaki istek sayısı: %d · İzin durumu: <b>%s</b> · Tema: <b>%s</b> · Ziyaret sayacı (cookie): <b>%s</b></p>
+            <p class="muted">Requests in this session: %d · Consent: <b>%s</b> · Theme: <b>%s</b> · Visit counter (cookie): <b>%s</b></p>
             <p>
-                <a class="button" href="/cookies.py">Yenile</a>
-                <a class="button" href="/cookies.py?islem=tema">Temayı değiştir</a>
-                <a class="button" href="/cookies.py?islem=geri">İzni geri çek</a>
-                <a class="button danger" href="/cookies.py?islem=sil">Bütün cookie'leri sil</a>
+                <a class="button" href="/cookies.py">Refresh</a>
+                <a class="button" href="/cookies.py?action=theme">Change theme</a>
+                <a class="button" href="/cookies.py?action=withdraw">Withdraw consent</a>
+                <a class="button danger" href="/cookies.py?action=delete">Delete all cookies</a>
             </p>
         </section>
         <section>
-            <h2>Cookie paneli</h2>
-            <h3>1. Tarayıcının bu istekte gönderdiği <code>Cookie</code> header'ı</h3>
+            <h2>Cookie panel</h2>
+            <h3>1. The <code>Cookie</code> header the browser sent with this request</h3>
             <pre>%s</pre>
-            <h3>2. Sunucunun bu cevapta gönderdiği <code>Set-Cookie</code> satırları</h3>
+            <h3>2. The <code>Set-Cookie</code> lines the server sent in this response</h3>
             <pre>%s</pre>
-            <h3>3. Sunucuda saklanan oturum (session)</h3>
+            <h3>3. The session stored on the server</h3>
             <pre>%s</pre>
-            <h3>4. JavaScript'in görebildiği cookie'ler (<code>document.cookie</code>)</h3>
+            <h3>4. Cookies JavaScript can see (<code>document.cookie</code>)</h3>
             <pre id="jscookies"></pre>
-            <p class="muted"><code>sid</code> burada görünmüyor çünkü <code>HttpOnly</code>: JavaScript okuyamıyor,
-            bu yüzden bir XSS saldırısıyla çalınamıyor.</p>
+            <p class="muted"><code>sid</code> is not shown here because it is <code>HttpOnly</code>: JavaScript cannot read it,
+            so an XSS attack cannot steal it.</p>
         </section>
     </main>
     <script>
-        document.getElementById("jscookies").textContent = document.cookie || "(boş)";
+        document.getElementById("jscookies").textContent = document.cookie || "(empty)";
     </script>
 </body>
 </html>""" % (
-    "koyu" if dark else "",
+    "dark" if dark else "",
     banner + ('<section class="note">%s</section>' % html.escape(message) if message else ""),
     login,
-    session.get("istek_sayisi", 0),
-    html.escape(consent or "henüz seçilmedi"),
-    html.escape(cookies.get("tema", "-") if consent == "hepsi" else "-"),
-    html.escape(cookies.get("ziyaret", "-")),
-    html.escape("Cookie: " + raw_cookie if raw_cookie else "(Cookie header'ı yok: tarayıcının bu siteye ait cookie'si yok)"),
-    html.escape("\n".join("Set-Cookie: " + c for c in set_cookies) or "(bu cevapta Set-Cookie yok)"),
-    html.escape(json.dumps(session, ensure_ascii=False, indent=2) if session else "(oturum yok)"),
+    session.get("requests", 0),
+    html.escape(consent or "not chosen yet"),
+    html.escape(cookies.get("theme", "-") if consent == "all" else "-"),
+    html.escape(cookies.get("visits", "-")),
+    html.escape("Cookie: " + raw_cookie if raw_cookie else "(no Cookie header: the browser has no cookies for this site)"),
+    html.escape("\n".join("Set-Cookie: " + c for c in set_cookies) or "(no Set-Cookie in this response)"),
+    html.escape(json.dumps(session, ensure_ascii=False, indent=2) if session else "(no session)"),
 ))

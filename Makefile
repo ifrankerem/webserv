@@ -6,7 +6,7 @@ CXXFLAGS = -std=c++98 -Wall -Wextra -Werror -g
 CORE_SRC = src/core/LocationParser.cpp src/core/ServerParser.cpp src/core/Mime.cpp src/core/Utils.cpp
 EVENT_SRC = src/event/ServerManager.cpp src/event/Client.cpp
 HTTP_SRC = src/http/HttpParser.cpp src/http/HttpResponse.cpp src/http/RequestHandler.cpp
-MODULES_SRC = src/http/modules/ResponseHandler.cpp src/http/modules/MultipartParser.cpp
+MODULES_SRC = src/http/modules/ResponseHandler.cpp
 
 B_SRC = src/http/RequestHandler.cpp $(MODULES_SRC) src/core/Mime.cpp src/http/HttpResponse.cpp src/core/Utils.cpp
 A_SRC = src/core/LocationParser.cpp src/core/ServerParser.cpp $(EVENT_SRC) src/http/HttpParser.cpp

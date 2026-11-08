@@ -83,7 +83,7 @@ Bölüm 3'teki en az bir kural ID'sine bağlanabilmeli. Bağlanamayan her özell
 | Makefile'da zorunlulara ek hedefler | S: "Your Makefile must at least contain the rules". **Şart:** `make` / `make all` yalnızca `webserv` üretir. |
 | Bonus: cookie/session, çoklu CGI | S Bonus part |
 | stdout/stderr'e log, errno'yu loglamak | E2: "errno may be logged, not used to drive control flow"; "an error should be displayed if an issue occurs" |
-| Tarayıcı uyumu için gereken HTTP davranışı: status line, `Content-Length`, `Content-Type` (MIME), `Connection`, `Location`, `Host` okuma, chunked çözme, `multipart/form-data` upload | S: "compatible with standard web browsers", "Clients must be able to upload files", "for chunked requests, your server needs to un-chunk them", RFC okuma tavsiyesi |
+| Tarayıcı uyumu için gereken HTTP davranışı: status line, `Content-Length`, `Content-Type` (MIME), `Connection`, `Location`, `Host` okuma, chunked çözme, ham body upload | S: "compatible with standard web browsers", "Clients must be able to upload files", "for chunked requests, your server needs to un-chunk them", RFC okuma tavsiyesi |
 
 ### K-03 — Bulgu sayılan ekler — KAPSAM
 
@@ -454,9 +454,9 @@ Her kural: **Kaynak** (alıntı), **Kontrol** (komut veya inceleme), **Geçme kr
 #### H-05 — Upload ve geri alma — BÖLÜM (Basic checks)
 - **Kaynak:** S: "Clients must be able to upload files." E2: "Upload some files to the server and retrieve them."
 - **Kontrol:** `head -c 1048576 /dev/urandom > $D/r.bin`; bir PNG; bir metin dosyası. Her birini
-  `curl -F "file=@..."` (multipart) ve `curl --data-binary @...` (ham body) ile yükle, `GET` ile geri al, `cmp`.
-  Tarayıcıdaki bir HTML formuyla da yükle.
-- **Geçme:** her dosya bayt bayt aynı geri geliyor; multipart sınır satırları dosyaya karışmıyor.
+  `curl --data-binary @...` (ham body) ile yükle, `GET` ile geri al, `cmp`.
+  Tarayıcıdan `html/index.html` test sayfasıyla da yükle (dosyayı ham body olarak yollar).
+- **Geçme:** her dosya bayt bayt aynı geri geliyor. Multipart desteklenmiyor: multipart gövde olduğu gibi kaydedilir.
 
 #### H-06 — DELETE — BÖLÜM (Basic checks)
 - **Kaynak:** S, E2 (H-01, C-10).

@@ -3,7 +3,6 @@
 #include "../../includes/core/Utils.hpp"
 #include <csignal>
 #include <new>
-#include <poll.h> //epoll kütüphaneside ekli buna gerek var mı ne değişmesi
 
 ServerManager::ServerManager(const Config& config)
 {
@@ -361,10 +360,7 @@ void ServerManager::handleClientWrite(int client_fd)
                 for (size_t i = 0; i < result.watch.size(); i++) {
                     struct epoll_event event;
                     std::memset(&event, 0, sizeof(event));
-                    if (result.watch[i].events & POLLIN)
-                        event.events |= EPOLLIN;
-                    if (result.watch[i].events & POLLOUT)
-                        event.events |= EPOLLOUT;
+                    event.events = result.watch[i].events;
                     
                     event.data.fd = result.watch[i].fd;
                     epoll_ctl(_epoll_fd, EPOLL_CTL_ADD, result.watch[i].fd, &event);
@@ -488,13 +484,7 @@ void ServerManager::handleCgiEvent(int cgi_fd, uint32_t events)
     if (client.getHandler() == NULL) return;
     client.touch();
 
-    short poll_events = 0;
-    if (events & EPOLLIN) poll_events |= POLLIN;
-    if (events & EPOLLOUT) poll_events |= POLLOUT;
-    if (events & EPOLLERR) poll_events |= POLLERR;
-    if (events & EPOLLHUP) poll_events |= POLLHUP;
-
-    Step result = client.getHandler()->onReady(cgi_fd, poll_events);
+    Step result = client.getHandler()->onReady(cgi_fd, events);
 
     for (size_t i = 0; i < result.unwatch.size(); i++) {
         epoll_ctl(_epoll_fd, EPOLL_CTL_DEL, result.unwatch[i], NULL);

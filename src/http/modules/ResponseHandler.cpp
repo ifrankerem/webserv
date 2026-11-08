@@ -3,9 +3,7 @@
 #include "../../../includes/http/HttpRequest.hpp"
 #include "../../../includes/http/HttpResponse.hpp"
 #include "../../../includes/http/RequestHandler.hpp"
-#include "../../../includes/core/Mime.hpp"
 #include "../../../includes/core/Utils.hpp"
-#include "../../../includes/http/modules/MultipartParser.hpp"
 #include <algorithm>
 #include <cstddef>
 #include <string>
@@ -85,8 +83,6 @@ static int check_stat(struct stat &info, const std::string& diskPath)
 		// errno kullanmak yasak; access() ile varlik/yetki ayirt et
 		if (::access(diskPath.c_str(), F_OK) == -1)
 			return 404;
-		if (::access(diskPath.c_str(), R_OK) == -1)
-			return 403;
 		return 500;
 	}
 	return 1;
@@ -151,7 +147,7 @@ HttpResponse ResponseHandler::serveFile(const std::string& diskPath,const Server
 	x.body.assign(first, last);
 
 	x.status = 200;
-	x.headers["Content-Type"] = mimeType(diskPath);
+	x.headers["Content-Type"] = utils::mimeType(diskPath);
 	return x;
 }
 
@@ -209,42 +205,6 @@ HttpResponse ResponseHandler::handle_post(const std::string& diskPath,const std:
 		return RequestHandler::error(405, &srv); //ngnix returned 405 so i did it too
 	
 	HttpResponse x;
-	
-	std::string type = utils::toLower(utils::getHeader(req.headers, "content-type"));
-	if(type.find("multipart/") != std::string::npos)
-	{
-		std::vector<MultipartPart> parts;
-		if(!parseMultipart(req.body, utils::getHeader(req.headers, "content-type"), parts))
-			return RequestHandler::error(400, &srv);
-
-		bool wrote = false;
-		for(size_t i = 0; i < parts.size(); i++)
-		{
-			std::string filename = parts[i].filename;
-			if(filename.empty())
-				continue;		//skip the empty one its not a file
-			if(filename.find('/') != std::string::npos	//secure for path traversal again!
-				|| filename.find('\\') != std::string::npos
-				|| filename.find("..") != std::string::npos
-				|| filename.find('\0') != std::string::npos)
-				return RequestHandler::error(400, &srv);
-
-			std::ofstream outfile(utils::joinPath(loc.upload_store, filename).c_str(), std::ios::binary);
-			if(!outfile)
-				return RequestHandler::error(500, &srv);
-			outfile.write(parts[i].content.data(), parts[i].content.size());
-			outfile.close();
-			if(!outfile)
-				return RequestHandler::error(500, &srv);
-			wrote = true;
-		}
-		if(!wrote)
-			return RequestHandler::error(400, &srv);
-
-		x.status = 201;
-		x.headers["Location"] = path;
-		return x;
-	}
 
 	std::string target = diskPath;
 	std::string url = path;

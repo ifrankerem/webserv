@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-# CI timeout testi icin (.github/workflows/ci.yml, "Timeout Tests").
-# SIGTERM'i yok sayar ve hic cikti uretmeden sonsuza kadar bekler.
-# Sunucu IDLE_TIMEOUT sonra bu sureci SIGKILL ile oldurup client'a 504 donmeli.
+# For the CI timeout test (.github/workflows/ci.yml, "Timeout Tests").
+# Ignores SIGTERM and waits forever without printing anything.
+# After IDLE_TIMEOUT the server must SIGKILL this process and send 504 to the client.
 import signal
 import time
 

@@ -1,4 +1,3 @@
-#include "../../includes/core/Mime.hpp"
 #include "../../includes/core/Utils.hpp"
 #include <cstddef>
 
@@ -23,7 +22,7 @@ static const MimeEntry mimeTable[] = {
 	{ ".pdf",  "application/pdf" }
 };
 
-std::string mimeType(const std::string& path)
+std::string utils::mimeType(const std::string& path)
 {
 	std::string ext = utils::toLower(utils::getExtension(path));
 

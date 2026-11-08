@@ -12,7 +12,7 @@
 #include <iostream>
 #include <map>
 #include <ostream>
-#include <poll.h>
+#include <sys/epoll.h>
 #include <string>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -104,9 +104,11 @@ std::string RequestHandler::resolveDiskPath(const LocationConfig& loc, const std
 {
 	if (!loc.alias.empty())
 		return utils::joinPath(loc.alias, path.substr(loc.path.size()));
-	if (loc.root.empty())
-		return utils::joinPath(server->root, path);
-	return utils::joinPath(loc.root, path);
+	if (!loc.root.empty())
+		return utils::joinPath(loc.root, path);
+	if (server->root.empty())
+		return "";
+	return utils::joinPath(server->root, path);
 }
 
 std::string RequestHandler::resolveUploadPath(const LocationConfig& loc, const std::string& path)
@@ -252,9 +254,9 @@ HttpResponse RequestHandler::error(int status, const ServerConfig *server)
 	// sayfa URI'si normal istek gibi cozulur: eslesen location'in root/alias'i
 	RequestHandler tmp(*server);
 	const LocationConfig* loc = tmp.findLocation(it->second);
-	std::string path = server->root + it->second;
-	if (loc != NULL)
-		path = tmp.resolveDiskPath(*loc, it->second);
+	if (loc == NULL)
+		return utils::defaultErrorPage(status);
+	std::string path = tmp.resolveDiskPath(*loc, it->second);
 	std::ifstream file(path.c_str());
 
 	if (!file.is_open())
@@ -433,14 +435,14 @@ Step RequestHandler::executeCgi(HttpRequest &req, const std::string &path, const
 		struct WatchFd out = WatchFd();
 		out.fd = output_pipe[0];
 		fcntl(output_pipe[0], F_SETFL, O_NONBLOCK);
-		out.events = POLLIN;
+		out.events = EPOLLIN;
 		x.watch.push_back(out);
 
 		// govde olay dongusunde yazilir; ayni anda CGI ciktisi okunabilsin ki
 		// buyuk govdelerde iki boru birbirini kilitlemesin
 		struct WatchFd in = WatchFd();
 		in.fd = input_pipe[1];
-		in.events = POLLOUT;
+		in.events = EPOLLOUT;
 		x.watch.push_back(in);
 		x.kind = Step::WAIT;
 	}
@@ -464,19 +466,19 @@ Step RequestHandler::executeMethod(HttpRequest &req, const std::string &path, co
 //UZERINDEN GEC
 
 
-Step RequestHandler::onReady(int fd, short revents)
+Step RequestHandler::onReady(int fd, uint32_t revents)
 {
 	struct Step x;
 	x.kind = Step::WAIT;
 
 	if (fd == cgiStdinFd)
 	{
-		if (revents & (POLLERR | POLLHUP)) // CGI artik okumuyor (öldü/çikti)
+		if (revents & (EPOLLERR | EPOLLHUP)) // CGI artik okumuyor (öldü/çikti)
 		{
 			closeCgiStdin(x);
 			return x;
 		}
-		if (revents & POLLOUT)
+		if (revents & EPOLLOUT)
 		{
 			size_t remaining = cgiBody.size() - cgiInOffset;
 			if (remaining > 0)
@@ -495,7 +497,7 @@ Step RequestHandler::onReady(int fd, short revents)
 	if (!cgiActive || fd != cgiPipeFd)
 		return x;
 
-	if (revents & POLLIN)
+	if (revents & EPOLLIN)
 	{
 		char buf[4096];
 		ssize_t n = read(fd, buf, sizeof(buf));
@@ -530,7 +532,7 @@ Step RequestHandler::onReady(int fd, short revents)
 			return x;
 		}
 	}
-	else if (revents & (POLLERR | POLLHUP)) // fd error or pipe hang up (closed)
+	else if (revents & (EPOLLERR | EPOLLHUP)) // fd error or pipe hang up (closed)
 	{
 		if(!(cgiBuffer.empty())) //there is a tricky situation in this case POLLHUP means pipe closed but there will remain cgi buffer. But kernel sends POLLHUP instaead of PULLIN so there is valid data in there but we just did the error in this if. So i fixed it
 		{

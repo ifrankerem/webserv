@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <string>
+#include <sys/epoll.h>
 #include <sys/types.h>
 #include <vector>
 #include "../core/Config.hpp"
@@ -11,7 +12,7 @@
 
 struct WatchFd { //CGI
     int   fd;
-    short events;
+    uint32_t events;
 };
 
 struct Step {
@@ -63,7 +64,7 @@ public:
     size_t       bodyLimit(const HttpRequest& req);
     Step         handle(HttpRequest& req);
     void         closeCgiStdin(Step& x);
-    Step         onReady(int fd, short revents);
+    Step         onReady(int fd, uint32_t revents);
     static HttpResponse error(int status,const ServerConfig *server);
 
 };

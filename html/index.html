@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="en">
 <head>
 	<meta charset="UTF-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-	<title>42 Webserv — Manuel Test Paneli</title>
+	<title>42 Webserv — Manual Test Panel</title>
 	<style>
 		:root {
 			color-scheme: dark;
@@ -153,7 +153,7 @@
 		}
 
 		pre:empty::before {
-			content: 'Henüz cevap yok.';
+			content: 'No response yet.';
 			color: var(--muted);
 		}
 
@@ -178,34 +178,34 @@
 </head>
 <body>
 	<header>
-		<h1>42 Webserv — Manuel Test Paneli</h1>
-		<p>Tarayıcıdan testleri çalıştır, cevapları aşağıda gör.</p>
+		<h1>42 Webserv — Manual Test Panel</h1>
+		<p>Run the tests from the browser and see the responses below.</p>
 	</header>
 
 	<main>
 		<section class="card">
-			<h2>🚀 Sunucu Durumu</h2>
+			<h2>🚀 Server Status</h2>
 			<div class="row">
-				<button id="btn-ping" class="primary">Ping at</button>
-				<span id="ping-status" class="status info">Bekleniyor</span>
+				<button id="btn-ping" class="primary">Send ping</button>
+				<span id="ping-status" class="status info">Waiting</span>
 			</div>
-			<div class="output-label">Cevap:</div>
+			<div class="output-label">Response:</div>
 			<pre id="ping-out"></pre>
 		</section>
 
 		<section class="card">
-			<h2>📄 Static Dosya</h2>
+			<h2>📄 Static File</h2>
 			<div class="row">
 				<button data-get="/test_static.txt">GET /test_static.txt</button>
-				<button data-get="/gizli/dosya.html">GET /gizli/dosya.html</button>
-				<button data-get="/altklasor/">GET /altklasor/</button>
+				<button data-get="/hidden/file.html">GET /hidden/file.html</button>
+				<button data-get="/subdir/">GET /subdir/</button>
 			</div>
-			<div class="output-label">Cevap:</div>
+			<div class="output-label">Response:</div>
 			<pre id="static-out"></pre>
 		</section>
 
 		<section class="card">
-			<h2>📝 Method Testleri</h2>
+			<h2>📝 Method Tests</h2>
 
 			<h3 class="muted">GET</h3>
 			<div class="row">
@@ -214,28 +214,28 @@
 
 			<h3 class="muted">POST (application/x-www-form-urlencoded)</h3>
 			<div class="row">
-				<input type="text" id="post-input" placeholder="Bir şeyler yaz..." value="selam" />
+				<input type="text" id="post-input" placeholder="Type something..." value="hello" />
 				<button id="btn-post" class="primary">POST /methodtest/</button>
 			</div>
 
 			<h3 class="muted">DELETE</h3>
 			<div class="row">
-				<input type="text" id="delete-target" value="/upload/ornek.txt" />
-				<button id="btn-delete" class="danger">DELETE gönder</button>
+				<input type="text" id="delete-target" value="/upload/example.txt" />
+				<button id="btn-delete" class="danger">Send DELETE</button>
 			</div>
 
-			<div class="output-label">Cevap:</div>
+			<div class="output-label">Response:</div>
 			<pre id="method-out"></pre>
 		</section>
 
 		<section class="card">
-			<h2>📤 Dosya Yükleme</h2>
+			<h2>📤 File Upload</h2>
 			<div class="row">
 				<input type="file" id="upload-file" />
 				<button id="btn-upload" class="primary">POST /upload</button>
 			</div>
-			<p class="hint">Yüklenen dosyalar <code>html/upload/</code> altına kaydedilir.</p>
-			<div class="output-label">Cevap:</div>
+			<p class="hint">Uploaded files are saved under <code>html/upload/</code>.</p>
+			<div class="output-label">Response:</div>
 			<pre id="upload-out"></pre>
 		</section>
 
@@ -245,50 +245,50 @@
 			<h3 class="muted">GET /cgi/flush.py</h3>
 			<div class="row">
 				<button data-get="/cgi/flush.py">flush.py</button>
-				<button data-get="/cgi/flush.py?isim=webserv">?isim=webserv</button>
+				<button data-get="/cgi/flush.py?name=webserv">?name=webserv</button>
 				<button data-get="/cgi/env.py">env.py</button>
-				<button data-get="/cgi/echo.py?msg=selam">echo.py</button>
+				<button data-get="/cgi/echo.py?msg=hello">echo.py</button>
 			</div>
 
 			<h3 class="muted">POST /cgi/flush.py</h3>
 			<div class="row">
-				<input type="text" id="cgi-isim" placeholder="isim" value="webserv" />
-				<input type="text" id="cgi-mesaj" placeholder="mesaj" value="merhaba" />
+				<input type="text" id="cgi-name" placeholder="name" value="webserv" />
+				<input type="text" id="cgi-message" placeholder="message" value="hello" />
 				<button id="btn-cgi-post" class="primary">CGI POST</button>
 			</div>
 
-			<div class="output-label">Cevap:</div>
+			<div class="output-label">Response:</div>
 			<pre id="cgi-out"></pre>
 		</section>
 
 		<section class="card">
 			<h2>📂 Autoindex</h2>
 			<div class="row">
-				<button data-get="/listelenecek/">GET /listelenecek/</button>
-				<button data-get="/depo/">GET /depo/</button>
+				<button data-get="/listing/">GET /listing/</button>
+				<button data-get="/storage/">GET /storage/</button>
 			</div>
-			<div class="output-label">Cevap:</div>
+			<div class="output-label">Response:</div>
 			<pre id="autoindex-out"></pre>
 		</section>
 
 		<section class="card">
 			<h2>↩️ Redirect</h2>
 			<div class="row">
-				<button id="btn-redirect">GET /eski</button>
+				<button id="btn-redirect">GET /old</button>
 			</div>
-			<p class="hint">Fetch redirect'i otomatik takip eder; 301 + Location başlığı görmek için manuel yakalanır.</p>
-			<div class="output-label">Cevap:</div>
+			<p class="hint">Fetch follows redirects automatically; it is caught manually to show the 301 and the Location header.</p>
+			<div class="output-label">Response:</div>
 			<pre id="redirect-out"></pre>
 		</section>
 
 		<section class="card">
-			<h2>⚠️ Error Sayfaları</h2>
+			<h2>⚠️ Error Pages</h2>
 			<div class="row">
-				<button data-get="/bulunmayan-sayfa-12345">GET 404</button>
+				<button data-get="/missing-page-12345">GET 404</button>
 				<button id="btn-405">POST 405</button>
 				<button id="btn-413">POST 413</button>
 			</div>
-			<div class="output-label">Cevap:</div>
+			<div class="output-label">Response:</div>
 			<pre id="error-out"></pre>
 		</section>
 	</main>
@@ -306,7 +306,7 @@
 			}
 			out += '\n';
 			out += body.slice(0, MAX_PREVIEW);
-			if (body.length > MAX_PREVIEW) out += '\n\n... (kısaltıldı)';
+			if (body.length > MAX_PREVIEW) out += '\n\n... (truncated)';
 			return out;
 		}
 
@@ -319,7 +319,7 @@
 		async function doRequest(targetId, url, options = {}) {
 			const el = document.getElementById(targetId);
 			const method = options.method || 'GET';
-			el.textContent = 'İstek gönderiliyor...';
+			el.textContent = 'Sending request...';
 			try {
 				const res = await fetch(url, options);
 				const text = await res.text();
@@ -343,14 +343,14 @@
 		document.getElementById('btn-ping').addEventListener('click', async () => {
 			const status = document.getElementById('ping-status');
 			status.className = 'status info';
-			status.textContent = 'İstek gönderiliyor...';
+			status.textContent = 'Sending request...';
 			try {
 				const res = await fetch('/');
 				const text = await res.text();
 				setStatus('ping-status', res.ok, `${res.status} ${res.statusText}`);
 				document.getElementById('ping-out').textContent = formatResponse(res.status, res.statusText, res.headers, text, '/', 'GET');
 			} catch (e) {
-				setStatus('ping-status', false, 'Bağlantı hatası');
+				setStatus('ping-status', false, 'Connection error');
 				document.getElementById('ping-out').textContent = e.message;
 			}
 		});
@@ -360,7 +360,7 @@
 			doRequest('method-out', '/methodtest/', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-				body: new URLSearchParams({ mesaj: val })
+				body: new URLSearchParams({ message: val })
 			});
 		});
 
@@ -372,33 +372,32 @@
 		document.getElementById('btn-upload').addEventListener('click', () => {
 			const fileInput = document.getElementById('upload-file');
 			if (!fileInput.files.length) {
-				document.getElementById('upload-out').textContent = 'Önce bir dosya seç.';
+				document.getElementById('upload-out').textContent = 'Choose a file first.';
 				return;
 			}
-			const form = new FormData();
-			form.append('file', fileInput.files[0]);
-			doRequest('upload-out', '/upload', { method: 'POST', body: form });
+			const file = fileInput.files[0];
+			doRequest('upload-out', '/upload/' + encodeURIComponent(file.name), { method: 'POST', body: file });
 		});
 
 		document.getElementById('btn-cgi-post').addEventListener('click', () => {
-			const isim = document.getElementById('cgi-isim').value;
-			const mesaj = document.getElementById('cgi-mesaj').value;
+			const name = document.getElementById('cgi-name').value;
+			const message = document.getElementById('cgi-message').value;
 			doRequest('cgi-out', '/cgi/flush.py', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-				body: new URLSearchParams({ isim, mesaj })
+				body: new URLSearchParams({ name, message })
 			});
 		});
 
 		document.getElementById('btn-redirect').addEventListener('click', async () => {
 			const out = document.getElementById('redirect-out');
-			out.textContent = 'İstek gönderiliyor...';
+			out.textContent = 'Sending request...';
 			try {
-				const res = await fetch('/eski', { redirect: 'manual' });
+				const res = await fetch('/old', { redirect: 'manual' });
 				const text = await res.text();
-				out.textContent = formatResponse(res.status, res.statusText, res.headers, text, '/eski', 'GET');
+				out.textContent = formatResponse(res.status, res.statusText, res.headers, text, '/old', 'GET');
 			} catch (e) {
-				out.textContent = 'Hata: ' + e.message;
+				out.textContent = 'Error: ' + e.message;
 			}
 		});
 

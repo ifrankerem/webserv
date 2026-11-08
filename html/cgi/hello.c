@@ -8,7 +8,7 @@ int main(void)
 
     printf("Content-Type: text/html\r\n\r\n");
     printf("<html><body>\n");
-    printf("<h1>Merhaba, C CGI!</h1>\n");
+    printf("<h1>Hello, C CGI!</h1>\n");
     printf("<p>Method: %s</p>\n", method ? method : "-");
     printf("<p>Query: %s</p>\n", query ? query : "-");
     printf("</body></html>\n");

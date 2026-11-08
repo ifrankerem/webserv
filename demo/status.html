@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Status codes</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <header><a href="/">webserv demo</a> / Status codes</header>
+    <main>
+        <section>
+            <h2>Status codes</h2>
+            <p class="muted">Each button sends a real request to the server and shows the status code it gets back.
+            The links open the same request in the browser.</p>
+            <table id="tests"></table>
+        </section>
+    </main>
+    <script>
+        const tests = [
+            ["200", "GET /index.html", "/index.html", {}],
+            ["201", "POST /uploads/status-test.txt (raw body)", "/uploads/status-test.txt", { method: "POST", body: "uploaded from the status page\n" }],
+            ["301", "GET /old (return 301 /)", "/old", { redirect: "manual" }],
+            ["403", "DELETE /forbidden/file (no upload_store)", "/forbidden/file", { method: "DELETE" }],
+            ["404", "GET /missing.html (custom 404 page)", "/missing.html", {}],
+            ["405", "DELETE /index.html (only GET and POST allowed)", "/index.html", { method: "DELETE" }],
+            ["413", "POST /limit, 1000 bytes (limit 100)", "/limit", { method: "POST", body: "x".repeat(1000) }],
+            ["405", "FOO / (unknown method)", "/", { method: "FOO" }],
+            ["502", "GET /broken.py (CGI with a syntax error)", "/broken.py", {}],
+            ["504", "GET /infinite.py (CGI that never ends, takes ~30 s)", "/infinite.py", {}],
+        ];
+
+        const table = document.getElementById("tests");
+        tests.forEach(([expected, label, url, options], i) => {
+            const row = table.insertRow();
+            const link = !options.method || options.method === "GET"
+                ? '<a href="' + url + '">' + label + '</a>' : label;
+            row.innerHTML = "<th>expected " + expected + "</th><td>" + link + "</td>"
+                + '<td><button type="button">Send</button> <span id="r' + i + '"></span></td>';
+            row.querySelector("button").addEventListener("click", async () => {
+                const out = document.getElementById("r" + i);
+                out.textContent = "waiting...";
+                try {
+                    const res = await fetch(url, options);
+                    const code = res.type === "opaqueredirect" ? "301 (redirect)" : res.status + " " + res.statusText;
+                    out.textContent = "-> " + code;
+                } catch (err) {
+                    out.textContent = "-> error: " + err;
+                }
+            });
+        });
+    </script>
+</body>
+</html>

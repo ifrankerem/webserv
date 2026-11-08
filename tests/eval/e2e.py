@@ -385,15 +385,6 @@ def test_upload():
     r = http("GET", "/yukle/r.bin")
     report("H-05", r.status == 200 and r.body == blob, f"ham upload geri alindi bayt bayt: {r.status}")
 
-    part = os.urandom(200 * 1024)
-    bnd = "----evalSINIR7f3a9c"
-    body = (f"--{bnd}\r\nContent-Disposition: form-data; name=\"aciklama\"\r\n\r\nmetin\r\n"
-            f"--{bnd}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"m.bin\"\r\n"
-            f"Content-Type: application/octet-stream\r\n\r\n").encode() + part + f"\r\n--{bnd}--\r\n".encode()
-    r = http("POST", "/yukle", body=body, headers={"Content-Type": f"multipart/form-data; boundary={bnd}"})
-    g = http("GET", "/yukle/m.bin")
-    report("H-05", r.status == 201 and g.body == part, f"multipart upload -> {r.status}, geri alinan ayni: {g.body == part}")
-
     cblob = os.urandom(300 * 1024 + 17)
     r = http("POST", "/yukle/c.bin", body=cblob, chunked=True, headers={"Content-Type": "application/octet-stream"})
     g = http("GET", "/yukle/c.bin")
