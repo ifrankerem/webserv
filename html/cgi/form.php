@@ -10,12 +10,12 @@ $body = file_get_contents('php://input');
 <h1>PHP CGI</h1>
 <p>Method: <?= $method ?></p>
 <p>Query: <?= htmlspecialchars($_SERVER['QUERY_STRING']) ?></p>
-<p>Name: <?= $name !== '' ? $name : '(yok)' ?></p>
-<p>Body (<?= strlen($body) ?> bayt): <?= htmlspecialchars($body) ?></p>
+<p>Name: <?= $name !== '' ? $name : '(none)' ?></p>
+<p>Body (<?= strlen($body) ?> bytes): <?= htmlspecialchars($body) ?></p>
 
 <form method="POST" action="form.php">
-    <input name="name" placeholder="isim">
-    <button>Gonder</button>
+    <input name="name" placeholder="name">
+    <button>Send</button>
 </form>
 </body>
 </html>

@@ -16,7 +16,7 @@ def esc(value):
 
 def table(rows):
     if not rows:
-        return '<p class="muted">(boş)</p>'
+        return '<p class="muted">(empty)</p>'
     out = "<table>"
     for name, value in rows:
         out += "<tr><th>" + esc(name) + "</th><td>" + esc(value) + "</td></tr>"
@@ -41,37 +41,37 @@ if content_type.startswith("application/x-www-form-urlencoded"):
 
 preview = body[:4000].decode("utf-8", "replace")
 if len(body) > 4000:
-    preview += "\n... (" + str(len(body) - 4000) + " bayt daha)"
+    preview += "\n... (" + str(len(body) - 4000) + " more bytes)"
 
 print("Content-Type: text/html; charset=UTF-8\r\n\r\n", end="")
 print("""<!DOCTYPE html>
-<html lang="tr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>İstek dedektifi</title>
+    <title>Request inspector</title>
     <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-    <header><a href="/">webserv demo</a> / İstek dedektifi</header>
+    <header><a href="/">webserv demo</a> / Request inspector</header>
     <main>""")
 
 print("""        <section>
-            <h2>Dene</h2>
+            <h2>Try it</h2>
             <form method="GET" action="/inspector.py">
-                <input name="isim" placeholder="isim"><input name="mesaj" placeholder="mesaj">
-                <button>GET gönder</button>
+                <input name="name" placeholder="name"><input name="message" placeholder="message">
+                <button>Send GET</button>
             </form>
-            <form method="POST" action="/inspector.py?kaynak=form">
-                <input name="isim" placeholder="isim"><input name="mesaj" placeholder="mesaj">
-                <button>POST gönder</button>
+            <form method="POST" action="/inspector.py?source=form">
+                <input name="name" placeholder="name"><input name="message" placeholder="message">
+                <button>Send POST</button>
             </form>
         </section>""")
 
-print("<section><h2>İstek satırı</h2><pre>" + esc(request_line) + "</pre></section>")
-print("<section><h2>Header'lar</h2>" + table(headers) + "</section>")
-print("<section><h2>Query string parametreleri</h2>" + table(params) + "</section>")
-print("<section><h2>Form alanları (POST body)</h2>" + table(form) + "</section>")
-print("<section><h2>Body (" + str(len(body)) + " bayt)</h2><pre>" + esc(preview) + "</pre></section>")
-print("<section><h2>CGI ortam değişkenleri</h2>" + table(sorted(env.items())) + "</section>")
+print("<section><h2>Request line</h2><pre>" + esc(request_line) + "</pre></section>")
+print("<section><h2>Headers</h2>" + table(headers) + "</section>")
+print("<section><h2>Query string parameters</h2>" + table(params) + "</section>")
+print("<section><h2>Form fields (POST body)</h2>" + table(form) + "</section>")
+print("<section><h2>Body (" + str(len(body)) + " bytes)</h2><pre>" + esc(preview) + "</pre></section>")
+print("<section><h2>CGI environment variables</h2>" + table(sorted(env.items())) + "</section>")
 print("    </main>\n</body>\n</html>")

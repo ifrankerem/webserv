@@ -86,11 +86,11 @@ a.button.danger { background: #dc2626; }
 }
 .note { background: #ecfdf5; color: #065f46; }
 
-body.koyu { background: #111827; color: #e5e7eb; }
-body.koyu section { background: #1f2937; box-shadow: none; }
-body.koyu th { color: #9ca3af; }
-body.koyu th, body.koyu td { border-color: #374151; }
-body.koyu .note { background: #064e3b; color: #d1fae5; }
+body.dark { background: #111827; color: #e5e7eb; }
+body.dark section { background: #1f2937; box-shadow: none; }
+body.dark th { color: #9ca3af; }
+body.dark th, body.dark td { border-color: #374151; }
+body.dark .note { background: #064e3b; color: #d1fae5; }
 
 ul.pages { list-style: none; padding: 0; }
 ul.pages li { margin: 8px 0; }

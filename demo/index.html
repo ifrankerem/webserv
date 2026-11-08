@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -11,19 +11,19 @@
     <main>
         <section>
             <h2>webserv</h2>
-            <p>C++98 ile yazılmış, epoll tabanlı, non-blocking bir HTTP/1.1 sunucusu. Bu site sunucunun
-            özelliklerini tarayıcıdan tek tek denemek için hazırlandı.</p>
-            <img src="/logo.svg" alt="webserv logosu" width="96" height="96">
+            <p>A non-blocking, epoll-based HTTP/1.1 server written in C++98. This site lets you try the
+            server's features one by one from the browser.</p>
+            <img src="/logo.svg" alt="webserv logo" width="96" height="96">
         </section>
         <section>
-            <h2>Sayfalar</h2>
+            <h2>Pages</h2>
             <ul class="pages">
-                <li><a href="/inspector.py">İstek dedektifi</a> <span class="muted">— gelen istek ve CGI'a giden ortam değişkenleri</span></li>
-                <li><a href="/hesap.py">Hesap makinesi</a> <span class="muted">— GET query string, aynı hesap Python ve PHP ile (çoklu CGI)</span></li>
-                <li><a href="/derleyici.py">Online C/C++ derleyici</a> <span class="muted">— POST body CGI'a, gcc/g++ ile derle ve çalıştır</span></li>
-                <li><a href="/cookies.py">Cookie ve oturum</a> <span class="muted">— zorunlu/isteğe bağlı cookie, Set-Cookie, session</span></li>
-                <li><a href="/durum.html">Durum kodları</a> <span class="muted">— 201, 301, 403, 404, 405, 413, 502, 504...</span></li>
-                <li><a href="http://127.0.0.1:4243/">İkinci site (port 4243)</a> <span class="muted">— farklı port, farklı içerik</span></li>
+                <li><a href="/inspector.py">Request inspector</a> <span class="muted">— the incoming request and the environment variables passed to CGI</span></li>
+                <li><a href="/calc.py">Calculator</a> <span class="muted">— GET query string, the same calculation in Python and PHP (multiple CGI)</span></li>
+                <li><a href="/compiler.py">Online C/C++ compiler</a> <span class="muted">— POST body to CGI, compile and run with gcc/g++</span></li>
+                <li><a href="/cookies.py">Cookies and sessions</a> <span class="muted">— required/optional cookies, Set-Cookie, session</span></li>
+                <li><a href="/status.html">Status codes</a> <span class="muted">— 201, 301, 403, 404, 405, 413, 502, 504...</span></li>
+                <li><a href="http://127.0.0.1:4243/">Second site (port 4243)</a> <span class="muted">— different port, different content</span></li>
             </ul>
         </section>
     </main>
