@@ -3,7 +3,6 @@
 #include "../../../includes/http/HttpRequest.hpp"
 #include "../../../includes/http/HttpResponse.hpp"
 #include "../../../includes/http/RequestHandler.hpp"
-#include "../../../includes/core/Mime.hpp"
 #include "../../../includes/core/Utils.hpp"
 #include <algorithm>
 #include <cstddef>
@@ -148,7 +147,7 @@ HttpResponse ResponseHandler::serveFile(const std::string& diskPath,const Server
 	x.body.assign(first, last);
 
 	x.status = 200;
-	x.headers["Content-Type"] = mimeType(diskPath);
+	x.headers["Content-Type"] = utils::mimeType(diskPath);
 	return x;
 }
 

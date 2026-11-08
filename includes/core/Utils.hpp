@@ -12,6 +12,7 @@ namespace utils
     std::string toString(size_t n);
     std::string httpReason(int status);
     std::string getExtension(const std::string& path);
+    std::string mimeType(const std::string& path);
     std::string toLower(const std::string& s);
     int hexValue(char c);
     std::string decodePath(const std::string& s);
